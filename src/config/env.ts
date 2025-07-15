@@ -9,7 +9,9 @@ export const ConfigSchema = z.object({
     .default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_POOL_SIZE: z.coerce.number().int().positive().default(10),
-  LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
+  LOG_LEVEL: z
+    .enum(['error', 'warn', 'info', 'debug', 'verbose'])
+    .default('info'),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

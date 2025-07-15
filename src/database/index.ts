@@ -25,7 +25,7 @@ const createDatabase = (): Kysely<Database> => {
       pool: createPool(),
     }),
     log(event) {
-      if (config.LOG_LEVEL === 'debug') {
+      if (config.LOG_LEVEL === 'verbose') {
         if (event.level === 'query') {
           console.log('Query:', event.query.sql);
           console.log('Parameters:', event.query.parameters);

@@ -56,18 +56,3 @@ export interface Database {
 export type Tenant = Selectable<TenantsTable>;
 export type NewTenant = Insertable<TenantsTable>;
 export type TenantUpdate = Updateable<TenantsTable>;
-
-/**
- * Pagination types
- */
-export interface PaginationOptions {
-  limit: number;
-  offset: number;
-}
-
-export interface PaginatedResult<T> {
-  data: T[];
-  total: number;
-  limit: number;
-  offset: number;
-}

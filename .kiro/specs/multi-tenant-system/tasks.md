@@ -18,7 +18,7 @@
   - Implement tenant table migration with proper indexes
   - _Requirements: 9.1, 9.3_
 
-- [ ] 4. Implement base CRUD repository pattern
+- [x] 4. Implement base CRUD repository pattern
   - Create BaseCrudRepository interface and abstract implementation
   - Implement generic CRUD operations with Kysely
   - Add pagination support to base repository
