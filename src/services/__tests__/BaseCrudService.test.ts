@@ -4,7 +4,10 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BaseCrudServiceImpl } from '../BaseCrudService.js';
-import type { BaseCrudRepository, PaginatedResult } from '../../repositories/types.js';
+import type {
+  BaseCrudRepository,
+  PaginatedResult,
+} from '../../repositories/types.js';
 
 // Test entity type
 interface TestEntity {
@@ -25,10 +28,18 @@ interface UpdateTestData {
 }
 
 // Test service implementation
-class TestService extends BaseCrudServiceImpl<TestEntity, CreateTestData, UpdateTestData> {}
+class TestService extends BaseCrudServiceImpl<
+  TestEntity,
+  CreateTestData,
+  UpdateTestData
+> {}
 
 describe('BaseCrudService', () => {
-  let mockRepository: BaseCrudRepository<TestEntity, CreateTestData, UpdateTestData>;
+  let mockRepository: BaseCrudRepository<
+    TestEntity,
+    CreateTestData,
+    UpdateTestData
+  >;
   let service: TestService;
 
   const testEntity: TestEntity = {
@@ -70,11 +81,16 @@ describe('BaseCrudService', () => {
       if (result.success) {
         expect(result.data).toEqual(paginatedResult);
       }
-      expect(mockRepository.findAll).toHaveBeenCalledWith({ page: 1, limit: 10 });
+      expect(mockRepository.findAll).toHaveBeenCalledWith({
+        page: 1,
+        limit: 10,
+      });
     });
 
     it('should handle repository errors', async () => {
-      vi.mocked(mockRepository.findAll).mockRejectedValue(new Error('Database error'));
+      vi.mocked(mockRepository.findAll).mockRejectedValue(
+        new Error('Database error')
+      );
 
       const result = await service.findAll();
 
@@ -112,7 +128,9 @@ describe('BaseCrudService', () => {
     });
 
     it('should handle repository errors', async () => {
-      vi.mocked(mockRepository.findById).mockRejectedValue(new Error('Connection error'));
+      vi.mocked(mockRepository.findById).mockRejectedValue(
+        new Error('Connection error')
+      );
 
       const result = await service.findById('123');
 
@@ -138,7 +156,6 @@ describe('BaseCrudService', () => {
       expect(mockRepository.create).toHaveBeenCalledWith(createData);
     });
 
-
     it('should handle duplicate key errors', async () => {
       vi.mocked(mockRepository.create).mockRejectedValue(
         new Error('duplicate key value violates unique constraint')
@@ -149,10 +166,11 @@ describe('BaseCrudService', () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error.type).toBe('DUPLICATE_ENTRY');
-        expect(result.error.message).toBe('A record with this value already exists');
+        expect(result.error.message).toBe(
+          'A record with this value already exists'
+        );
       }
     });
-
   });
 
   describe('update', () => {
@@ -193,7 +211,9 @@ describe('BaseCrudService', () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error.type).toBe('BUSINESS_RULE_VIOLATION');
-        expect(result.error.message).toBe('Operation violates referential integrity');
+        expect(result.error.message).toBe(
+          'Operation violates referential integrity'
+        );
       }
     });
   });
@@ -224,7 +244,9 @@ describe('BaseCrudService', () => {
     });
 
     it('should handle repository errors', async () => {
-      vi.mocked(mockRepository.delete).mockRejectedValue(new Error('Database locked'));
+      vi.mocked(mockRepository.delete).mockRejectedValue(
+        new Error('Database locked')
+      );
 
       const result = await service.delete('123');
 
@@ -270,9 +292,9 @@ describe('BaseCrudService', () => {
 
       for (const { error, expectedType } of errorCases) {
         vi.mocked(mockRepository.findAll).mockRejectedValue(error);
-        
+
         const result = await service.findAll();
-        
+
         expect(result.success).toBe(false);
         if (!result.success) {
           expect(result.error.type).toBe(expectedType);

@@ -7,7 +7,10 @@ import { BaseCrudServiceImpl } from '../BaseCrudService.js';
 import type { TenantService } from './TenantService.js';
 import type { TenantRepository } from '../../repositories/tenant/TenantRepository.js';
 import type { Tenant } from '../../repositories/tenant/types.js';
-import type { CreateTenantInput, UpdateTenantInput } from '../../validation/tenant/index.js';
+import type {
+  CreateTenantInput,
+  UpdateTenantInput,
+} from '../../validation/tenant/index.js';
 import type { ServiceResult } from '../types.js';
 import {
   ServiceErrorType,
@@ -26,7 +29,8 @@ import {
  */
 export class TenantServiceImpl
   extends BaseCrudServiceImpl<Tenant, CreateTenantInput, UpdateTenantInput>
-  implements TenantService {
+  implements TenantService
+{
   constructor(private readonly tenantRepository: TenantRepository) {
     super(tenantRepository);
   }
@@ -39,7 +43,10 @@ export class TenantServiceImpl
       const tenant = await this.tenantRepository.findBySlug(slug);
       if (!tenant) {
         return createErrorResult(
-          createServiceError(ServiceErrorType.NOT_FOUND, `Tenant with slug '${slug}' not found`)
+          createServiceError(
+            ServiceErrorType.NOT_FOUND,
+            `Tenant with slug '${slug}' not found`
+          )
         );
       }
       return createSuccessResult(tenant);
@@ -56,7 +63,10 @@ export class TenantServiceImpl
     platformId: string
   ): Promise<ServiceResult<Tenant>> {
     try {
-      const tenant = await this.tenantRepository.findByPlatformId(platform, platformId);
+      const tenant = await this.tenantRepository.findByPlatformId(
+        platform,
+        platformId
+      );
       if (!tenant) {
         return createErrorResult(
           createServiceError(
@@ -90,7 +100,10 @@ export class TenantServiceImpl
     } catch (error) {
       if (error instanceof z.ZodError) {
         return createErrorResult(
-          createServiceError(ServiceErrorType.VALIDATION_ERROR, this.formatZodError(error))
+          createServiceError(
+            ServiceErrorType.VALIDATION_ERROR,
+            this.formatZodError(error)
+          )
         );
       }
       return this.handleRepositoryError(error);
@@ -100,7 +113,10 @@ export class TenantServiceImpl
   /**
    * Override update to validate with Zod
    */
-  async update(id: string, data: UpdateTenantInput): Promise<ServiceResult<Tenant>> {
+  async update(
+    id: string,
+    data: UpdateTenantInput
+  ): Promise<ServiceResult<Tenant>> {
     try {
       // Validate input with Zod
       const validatedData = UpdateTenantSchema.parse(data);
@@ -110,7 +126,10 @@ export class TenantServiceImpl
     } catch (error) {
       if (error instanceof z.ZodError) {
         return createErrorResult(
-          createServiceError(ServiceErrorType.VALIDATION_ERROR, this.formatZodError(error))
+          createServiceError(
+            ServiceErrorType.VALIDATION_ERROR,
+            this.formatZodError(error)
+          )
         );
       }
       return this.handleRepositoryError(error);
@@ -136,9 +155,12 @@ export class TenantServiceImpl
   protected handleRepositoryError(error: unknown): ServiceResult<any> {
     if (error instanceof Error) {
       const message = error.message.toLowerCase();
-      
+
       // PostgreSQL unique constraint violations with specific messages
-      if (message.includes('duplicate key') || message.includes('unique constraint')) {
+      if (
+        message.includes('duplicate key') ||
+        message.includes('unique constraint')
+      ) {
         if (message.includes('idx_tenants_slug')) {
           return createErrorResult(
             createServiceError(
@@ -157,7 +179,7 @@ export class TenantServiceImpl
         }
       }
     }
-    
+
     // Fall back to base error handling
     return super.handleRepositoryError(error);
   }

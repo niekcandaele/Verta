@@ -4,7 +4,10 @@
 
 import type { BaseCrudService, ServiceResult } from '../types.js';
 import type { Tenant } from '../../repositories/tenant/types.js';
-import type { CreateTenantInput, UpdateTenantInput } from '../../validation/tenant/index.js';
+import type {
+  CreateTenantInput,
+  UpdateTenantInput,
+} from '../../validation/tenant/index.js';
 
 /**
  * Service interface for tenant business logic

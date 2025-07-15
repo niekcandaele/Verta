@@ -5,9 +5,15 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { TenantServiceImpl } from '../TenantServiceImpl.js';
 import { TenantRepositoryImpl } from '../../../repositories/tenant/TenantRepositoryImpl.js';
-import { createTestDatabase, destroyTestDatabase } from '../../../test/testcontainers-setup.js';
+import {
+  createTestDatabase,
+  destroyTestDatabase,
+} from '../../../test/testcontainers-setup.js';
 import type { TestDatabaseContext } from '../../../test/testcontainers-setup.js';
-import type { CreateTenantInput, UpdateTenantInput } from '../../../validation/tenant/index.js';
+import type {
+  CreateTenantInput,
+  UpdateTenantInput,
+} from '../../../validation/tenant/index.js';
 import type { Tenant } from '../../../repositories/tenant/types.js';
 
 describe('TenantService', () => {
@@ -162,7 +168,7 @@ describe('TenantService', () => {
         platform: 'slack',
         platformId: 'T111111',
       });
-      
+
       if (!createResult.success) {
         throw new Error('Failed to create test tenant');
       }
@@ -235,9 +241,12 @@ describe('TenantService', () => {
 
     it('should return not found for non-existent tenant', async () => {
       // Use a valid UUID that doesn't exist
-      const result = await service.update('123e4567-e89b-12d3-a456-426614174000', {
-        name: 'Updated',
-      });
+      const result = await service.update(
+        '123e4567-e89b-12d3-a456-426614174000',
+        {
+          name: 'Updated',
+        }
+      );
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -304,7 +313,9 @@ describe('TenantService', () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error.type).toBe('NOT_FOUND');
-        expect(result.error.message).toContain("platform 'slack' with ID 'G444444'");
+        expect(result.error.message).toContain(
+          "platform 'slack' with ID 'G444444'"
+        );
       }
     });
   });

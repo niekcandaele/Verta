@@ -2,18 +2,23 @@
  * Service layer type definitions
  */
 
-import type { PaginationOptions, PaginatedResult } from '../repositories/types.js';
+import type {
+  PaginationOptions,
+  PaginatedResult,
+} from '../repositories/types.js';
 
 /**
  * Service operation result type
  */
-export type ServiceResult<T> = {
-  success: true;
-  data: T;
-} | {
-  success: false;
-  error: ServiceError;
-};
+export type ServiceResult<T> =
+  | {
+      success: true;
+      data: T;
+    }
+  | {
+      success: false;
+      error: ServiceError;
+    };
 
 /**
  * Service error types
@@ -43,7 +48,9 @@ export interface BaseCrudService<T, CreateData, UpdateData> {
   /**
    * Find all entities with optional pagination
    */
-  findAll(pagination?: PaginationOptions): Promise<ServiceResult<PaginatedResult<T>>>;
+  findAll(
+    pagination?: PaginationOptions
+  ): Promise<ServiceResult<PaginatedResult<T>>>;
 
   /**
    * Find entity by ID

@@ -2,7 +2,10 @@
  * Abstract base CRUD service implementation
  */
 
-import type { BaseCrudRepository, PaginationOptions } from '../repositories/types.js';
+import type {
+  BaseCrudRepository,
+  PaginationOptions,
+} from '../repositories/types.js';
 import type {
   BaseCrudService,
   ServiceResult,
@@ -45,7 +48,10 @@ export abstract class BaseCrudServiceImpl<T, CreateData, UpdateData>
       const entity = await this.repository.findById(id);
       if (!entity) {
         return createErrorResult(
-          createServiceError('NOT_FOUND' as ServiceErrorType, `Entity with ID ${id} not found`)
+          createServiceError(
+            'NOT_FOUND' as ServiceErrorType,
+            `Entity with ID ${id} not found`
+          )
         );
       }
       return createSuccessResult(entity);
@@ -74,7 +80,10 @@ export abstract class BaseCrudServiceImpl<T, CreateData, UpdateData>
       const updated = await this.repository.update(id, data);
       if (!updated) {
         return createErrorResult(
-          createServiceError('NOT_FOUND' as ServiceErrorType, `Entity with ID ${id} not found`)
+          createServiceError(
+            'NOT_FOUND' as ServiceErrorType,
+            `Entity with ID ${id} not found`
+          )
         );
       }
       return createSuccessResult(updated);
@@ -91,7 +100,10 @@ export abstract class BaseCrudServiceImpl<T, CreateData, UpdateData>
       const deleted = await this.repository.delete(id);
       if (!deleted) {
         return createErrorResult(
-          createServiceError('NOT_FOUND' as ServiceErrorType, `Entity with ID ${id} not found`)
+          createServiceError(
+            'NOT_FOUND' as ServiceErrorType,
+            `Entity with ID ${id} not found`
+          )
         );
       }
       return createSuccessResult(true);
@@ -107,9 +119,12 @@ export abstract class BaseCrudServiceImpl<T, CreateData, UpdateData>
     // Check for database constraint violations
     if (error instanceof Error) {
       const message = error.message.toLowerCase();
-      
+
       // PostgreSQL unique constraint violation
-      if (message.includes('duplicate key') || message.includes('unique constraint')) {
+      if (
+        message.includes('duplicate key') ||
+        message.includes('unique constraint')
+      ) {
         return createErrorResult(
           createServiceError(
             'DUPLICATE_ENTRY' as ServiceErrorType,
