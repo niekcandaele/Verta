@@ -6,12 +6,7 @@ export default defineConfig({
     environment: 'node',
     coverage: {
       reporter: ['text', 'json', 'html'],
-      exclude: [
-        'node_modules/',
-        'dist/',
-        '**/*.config.ts',
-        '**/*.config.js',
-      ],
+      exclude: ['node_modules/', 'dist/', '**/*.config.ts', '**/*.config.js'],
     },
     include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
     exclude: ['node_modules', 'dist'],
