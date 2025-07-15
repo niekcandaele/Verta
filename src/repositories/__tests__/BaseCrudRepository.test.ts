@@ -51,7 +51,7 @@ class TestRepository extends BaseCrudRepositoryImpl<
   UpdateTestEntity
 > {
   constructor(db: Kysely<TestDatabase>) {
-    super(db as any, 'tenants' as any);
+    super(db as any, 'test_entities' as any);
   }
 
   protected mapRowToEntity(row: any): TestEntity {

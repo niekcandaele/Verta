@@ -25,7 +25,7 @@
   - Write unit tests for base repository functionality
   - _Requirements: 9.2, 9.3_
 
-- [ ] 5. Implement tenant repository
+- [x] 5. Implement tenant repository
   - Create TenantRepository extending BaseCrudRepository
   - Implement tenant-specific queries (findBySlug, findByPlatformId)
   - Add row-to-entity mapping methods
