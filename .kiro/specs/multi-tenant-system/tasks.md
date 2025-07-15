@@ -6,13 +6,13 @@
   - Create environment configuration with Zod validation
   - _Requirements: 9.1, 10.1_
 
-- [ ] 2. Configure PostgreSQL and Docker setup
+- [x] 2. Configure PostgreSQL and Docker setup
   - Update docker-compose.yml to include PostgreSQL service
   - Create database connection configuration using Kysely
   - Implement database connection pooling setup
   - _Requirements: 9.1, 9.2_
 
-- [ ] 3. Create database schema and migrations
+- [x] 3. Create database schema and migrations
   - Define TypeScript interfaces for database tables
   - Create Kysely database schema types
   - Implement tenant table migration with proper indexes

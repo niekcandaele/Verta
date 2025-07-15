@@ -1,16 +1,45 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: verta-postgres
+    environment:
+      POSTGRES_DB: verta
+      POSTGRES_USER: verta_user
+      POSTGRES_PASSWORD: verta_password
+    ports:
+      - '25001:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U verta_user -d verta']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   app:
     build:
       context: .
       target: dev
     container_name: verta-app
     ports:
-      - '3000:3000'
+      - '25000:3000'
     volumes:
       - .:/app
       - /app/node_modules
+    env_file:
+      - .env
     environment:
       - NODE_ENV=development
       - PORT=3000
+      - DATABASE_URL=postgresql://verta_user:verta_password@postgres:5432/verta
+      - DATABASE_POOL_SIZE=10
+      - LOG_LEVEL=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
     command: npm run dev
     restart: unless-stopped
+
+volumes:
+  postgres_data:

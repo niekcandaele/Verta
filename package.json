@@ -13,12 +13,17 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "migrate:up": "tsx scripts/migrate.ts up",
+    "migrate:down": "tsx scripts/migrate.ts down",
+    "migrate:latest": "tsx scripts/migrate.ts latest",
+    "migrate:status": "tsx scripts/migrate.ts status"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^17.2.0",
     "express": "^5.1.0",
     "kysely": "^0.28.2",
     "pg": "^8.16.3",
@@ -33,6 +38,7 @@
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^9.1.0",
+    "kysely-ctl": "^0.13.1",
     "nodemon": "^3.1.0",
     "prettier": "^3.3.0",
     "supertest": "^7.0.0",
