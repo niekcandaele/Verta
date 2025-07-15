@@ -6,10 +6,11 @@ import { z } from 'zod';
 import { BaseCrudServiceImpl } from '../BaseCrudService.js';
 import type { TenantService } from './TenantService.js';
 import type { TenantRepository } from '../../repositories/tenant/TenantRepository.js';
-import type { Tenant, CreateTenantData, UpdateTenantData } from '../../repositories/tenant/types.js';
+import type { Tenant } from '../../repositories/tenant/types.js';
 import type { CreateTenantInput, UpdateTenantInput } from '../../validation/tenant/index.js';
 import type { ServiceResult } from '../types.js';
 import {
+  ServiceErrorType,
   createServiceError,
   createSuccessResult,
   createErrorResult,
@@ -38,7 +39,7 @@ export class TenantServiceImpl
       const tenant = await this.tenantRepository.findBySlug(slug);
       if (!tenant) {
         return createErrorResult(
-          createServiceError('NOT_FOUND', `Tenant with slug '${slug}' not found`)
+          createServiceError(ServiceErrorType.NOT_FOUND, `Tenant with slug '${slug}' not found`)
         );
       }
       return createSuccessResult(tenant);
@@ -59,7 +60,7 @@ export class TenantServiceImpl
       if (!tenant) {
         return createErrorResult(
           createServiceError(
-            'NOT_FOUND',
+            ServiceErrorType.NOT_FOUND,
             `Tenant for platform '${platform}' with ID '${platformId}' not found`
           )
         );
@@ -89,7 +90,7 @@ export class TenantServiceImpl
     } catch (error) {
       if (error instanceof z.ZodError) {
         return createErrorResult(
-          createServiceError('VALIDATION_ERROR', this.formatZodError(error))
+          createServiceError(ServiceErrorType.VALIDATION_ERROR, this.formatZodError(error))
         );
       }
       return this.handleRepositoryError(error);
@@ -109,7 +110,7 @@ export class TenantServiceImpl
     } catch (error) {
       if (error instanceof z.ZodError) {
         return createErrorResult(
-          createServiceError('VALIDATION_ERROR', this.formatZodError(error))
+          createServiceError(ServiceErrorType.VALIDATION_ERROR, this.formatZodError(error))
         );
       }
       return this.handleRepositoryError(error);
@@ -141,7 +142,7 @@ export class TenantServiceImpl
         if (message.includes('idx_tenants_slug')) {
           return createErrorResult(
             createServiceError(
-              'DUPLICATE_ENTRY',
+              ServiceErrorType.DUPLICATE_ENTRY,
               'A tenant with this slug already exists'
             )
           );
@@ -149,7 +150,7 @@ export class TenantServiceImpl
         if (message.includes('idx_tenants_platform_platform_id')) {
           return createErrorResult(
             createServiceError(
-              'DUPLICATE_ENTRY',
+              ServiceErrorType.DUPLICATE_ENTRY,
               'A tenant for this platform already exists'
             )
           );

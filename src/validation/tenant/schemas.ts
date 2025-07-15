@@ -3,7 +3,6 @@
  */
 
 import { z } from 'zod';
-import { TenantStatus, Platform } from '../../database/types.js';
 
 /**
  * Validation schema for tenant slug
@@ -83,7 +82,7 @@ export const UpdateTenantSchema = z.object({
 /**
  * Type inference for create tenant data
  */
-export type CreateTenantInput = z.infer<typeof CreateTenantSchema>;
+export type CreateTenantInput = z.input<typeof CreateTenantSchema>;
 
 /**
  * Type inference for update tenant data

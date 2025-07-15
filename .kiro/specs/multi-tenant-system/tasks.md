@@ -32,21 +32,21 @@
   - Write unit tests for tenant repository operations
   - _Requirements: 2.1, 3.1, 4.1, 7.1, 8.1_
 
-- [ ] 6. Create Zod validation schemas
+- [x] 6. Create Zod validation schemas
   - Implement CreateTenantSchema with all validation rules
   - Implement UpdateTenantSchema with partial validation
   - Create environment configuration schema
   - Write unit tests for all validation schemas
   - _Requirements: 10.1, 10.2, 10.3, 10.4_
 
-- [ ] 7. Implement base CRUD service pattern
+- [x] 7. Implement base CRUD service pattern
   - Create BaseCrudService interface and abstract implementation
   - Implement generic service operations with validation hooks
   - Add error handling for service layer operations
   - Write unit tests for base service functionality
   - _Requirements: 2.1, 3.1, 4.1, 5.1_
 
-- [ ] 8. Implement tenant service
+- [x] 8. Implement tenant service
   - Create TenantService extending BaseCrudService
   - Implement tenant-specific validation methods
   - Add slug generation functionality
@@ -61,43 +61,7 @@
   - Write unit tests for authentication middleware
   - _Requirements: 1.1, 1.2, 1.3_
 
-- [ ] 10. Implement tenant API routes
-- [ ] 10.1 Create GET /api/tenants endpoint
-  - Implement list tenants with pagination
-  - Add query parameter validation
-  - Integrate with tenant service
-  - Write integration tests for list endpoint
-  - _Requirements: 3.1, 3.4_
-
-- [ ] 10.2 Create GET /api/tenants/:id endpoint
-  - Implement get tenant by ID
-  - Add UUID validation for ID parameter
-  - Handle not found cases
-  - Write integration tests for get endpoint
-  - _Requirements: 3.2, 3.3, 3.4_
-
-- [ ] 10.3 Create POST /api/tenants endpoint
-  - Implement create tenant functionality
-  - Add request body validation with Zod
-  - Handle validation errors and duplicates
-  - Write integration tests for create endpoint
-  - _Requirements: 2.1, 2.2, 2.3, 2.4_
-
-- [ ] 10.4 Create PATCH /api/tenants/:id endpoint
-  - Implement update tenant functionality
-  - Add partial update validation
-  - Handle not found and validation errors
-  - Write integration tests for update endpoint
-  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
-
-- [ ] 10.5 Create DELETE /api/tenants/:id endpoint
-  - Implement delete tenant functionality
-  - Handle not found cases
-  - Return appropriate status codes
-  - Write integration tests for delete endpoint
-  - _Requirements: 5.1, 5.2, 5.3_
-
-- [ ] 11. Implement Express error handling middleware
+- [ ] 10. Implement Express error handling middleware
   - Create centralized error handler using Express standard pattern
   - Handle Zod validation errors with proper formatting
   - Handle database errors and constraint violations
@@ -105,7 +69,43 @@
   - Write tests for error handling scenarios
   - _Requirements: 1.2, 2.4, 4.5, 5.3_
 
-- [ ] 12. Set up Testcontainers for integration tests
+- [ ] 11. Implement tenant API routes
+- [ ] 11.1 Create GET /api/tenants endpoint
+  - Implement list tenants with pagination
+  - Add query parameter validation
+  - Integrate with tenant service and authentication middleware
+  - Write integration tests for list endpoint
+  - _Requirements: 3.1, 3.4_
+
+- [ ] 11.2 Create GET /api/tenants/:id endpoint
+  - Implement get tenant by ID
+  - Add UUID validation for ID parameter
+  - Handle not found cases
+  - Write integration tests for get endpoint
+  - _Requirements: 3.2, 3.3, 3.4_
+
+- [ ] 11.3 Create POST /api/tenants endpoint
+  - Implement create tenant functionality
+  - Add request body validation with Zod
+  - Handle validation errors and duplicates
+  - Write integration tests for create endpoint
+  - _Requirements: 2.1, 2.2, 2.3, 2.4_
+
+- [ ] 11.4 Create PATCH /api/tenants/:id endpoint
+  - Implement update tenant functionality
+  - Add partial update validation
+  - Handle not found and validation errors
+  - Write integration tests for update endpoint
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+
+- [ ] 11.5 Create DELETE /api/tenants/:id endpoint
+  - Implement delete tenant functionality
+  - Handle not found cases
+  - Return appropriate status codes
+  - Write integration tests for delete endpoint
+  - _Requirements: 5.1, 5.2, 5.3_
+
+- [x] 12. Set up Testcontainers for integration tests
   - Configure PostgreSQL testcontainer setup
   - Create test database initialization utilities
   - Implement test data seeding functions

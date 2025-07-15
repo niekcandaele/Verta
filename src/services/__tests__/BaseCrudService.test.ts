@@ -54,21 +54,23 @@ describe('BaseCrudService', () => {
     it('should return success result with paginated data', async () => {
       const paginatedResult: PaginatedResult<TestEntity> = {
         data: [testEntity],
-        total: 1,
-        page: 1,
-        pageSize: 10,
-        totalPages: 1,
+        pagination: {
+          page: 1,
+          limit: 10,
+          total: 1,
+          totalPages: 1,
+        },
       };
 
       vi.mocked(mockRepository.findAll).mockResolvedValue(paginatedResult);
 
-      const result = await service.findAll({ page: 1, pageSize: 10 });
+      const result = await service.findAll({ page: 1, limit: 10 });
 
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data).toEqual(paginatedResult);
       }
-      expect(mockRepository.findAll).toHaveBeenCalledWith({ page: 1, pageSize: 10 });
+      expect(mockRepository.findAll).toHaveBeenCalledWith({ page: 1, limit: 10 });
     });
 
     it('should handle repository errors', async () => {
