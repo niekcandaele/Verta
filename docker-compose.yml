@@ -17,6 +17,20 @@ services:
       retries: 5
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: verta-redis
+    ports:
+      - '25002:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   app:
     build:
       context: .
@@ -35,11 +49,16 @@ services:
       - DATABASE_URL=postgresql://verta_user:verta_password@postgres:5432/verta
       - DATABASE_POOL_SIZE=10
       - LOG_LEVEL=debug
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     command: npm run dev
     restart: unless-stopped
 
 volumes:
   postgres_data:
+  redis_data:

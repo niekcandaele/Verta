@@ -13,6 +13,12 @@ export const ConfigSchema = z.object({
   LOG_LEVEL: z
     .enum(['error', 'warn', 'info', 'debug', 'verbose'])
     .default('info'),
+  // Redis configuration
+  REDIS_HOST: z.string().default('localhost'),
+  REDIS_PORT: z.coerce.number().int().positive().default(6379),
+  REDIS_PASSWORD: z.string().optional(),
+  // Discord configuration
+  DISCORD_BOT_TOKEN: z.string().min(1, 'DISCORD_BOT_TOKEN is required'),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
