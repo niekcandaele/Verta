@@ -7,7 +7,7 @@ export const ConfigSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
     .default('development'),
-  PORT: z.coerce.number().int().positive().default(3000),
+  PORT: z.coerce.number().int().positive().default(25000),
   DATABASE_POOL_SIZE: z.coerce.number().int().positive().default(10),
   LOG_LEVEL: z
     .enum(['error', 'warn', 'info', 'debug', 'verbose'])

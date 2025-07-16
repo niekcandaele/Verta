@@ -30,7 +30,7 @@ describe('Environment Configuration', () => {
         ADMIN_API_KEY: 'test-api-key',
         DATABASE_URL: 'postgresql://user:pass@localhost:5432/test',
         NODE_ENV: 'test',
-        PORT: '3000',
+        PORT: '25000',
         DATABASE_POOL_SIZE: '10',
         LOG_LEVEL: 'info',
       };
@@ -41,7 +41,7 @@ describe('Environment Configuration', () => {
         ADMIN_API_KEY: 'test-api-key',
         DATABASE_URL: 'postgresql://user:pass@localhost:5432/test',
         NODE_ENV: 'test',
-        PORT: 3000,
+        PORT: 25000,
         DATABASE_POOL_SIZE: 10,
         LOG_LEVEL: 'info',
       });
@@ -62,7 +62,7 @@ describe('Environment Configuration', () => {
       const result = ConfigSchema.parse(testEnv);
 
       expect(result.NODE_ENV).toBe('development');
-      expect(result.PORT).toBe(3000);
+      expect(result.PORT).toBe(25000);
       expect(result.DATABASE_POOL_SIZE).toBe(10);
       expect(result.LOG_LEVEL).toBe('info');
     });

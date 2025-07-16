@@ -17,7 +17,9 @@
     "migrate:up": "tsx scripts/migrate.ts up",
     "migrate:down": "tsx scripts/migrate.ts down",
     "migrate:latest": "tsx scripts/migrate.ts latest",
-    "migrate:status": "tsx scripts/migrate.ts status"
+    "migrate:status": "tsx scripts/migrate.ts status",
+    "dev:data": "tsx scripts/dev-data.ts",
+    "dev:reset": "tsx scripts/dev-reset-data.ts"
   },
   "keywords": [],
   "author": "",

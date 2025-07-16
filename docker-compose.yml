@@ -23,7 +23,7 @@ services:
       target: dev
     container_name: verta-app
     ports:
-      - '25000:3000'
+      - '25000:25000'
     volumes:
       - .:/app
       - /app/node_modules
@@ -31,7 +31,7 @@ services:
       - .env
     environment:
       - NODE_ENV=development
-      - PORT=3000
+      - PORT=25000
       - DATABASE_URL=postgresql://verta_user:verta_password@postgres:5432/verta
       - DATABASE_POOL_SIZE=10
       - LOG_LEVEL=debug
