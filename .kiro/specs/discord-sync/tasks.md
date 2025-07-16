@@ -6,7 +6,7 @@
   - Set up environment variables for single Discord bot token and Redis configuration
   - _Requirements: 1.1, 2.1, 3.1, 13.1, 13.3_
 
-- [ ] 2. Create database migrations for platform sync tables
+- [x] 2. Create database migrations for platform sync tables
   - Create migration for channels table with platform-agnostic schema
   - Create migration for messages table with anonymized user IDs and reply_to_id field
   - Create migration for message_emoji_reactions table to track emoji reactions
