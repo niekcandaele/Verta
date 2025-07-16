@@ -1,10 +1,9 @@
-import { Kysely, sql } from 'kysely';
+import { Kysely } from 'kysely';
 import type {
   BaseCrudRepository,
   PaginatedResult,
   PaginationOptions,
 } from './types.js';
-import type { Database } from '../database/types.js';
 
 /**
  * Abstract base class for CRUD repository implementations
@@ -14,8 +13,8 @@ export abstract class BaseCrudRepositoryImpl<T, CreateData, UpdateData>
   implements BaseCrudRepository<T, CreateData, UpdateData>
 {
   constructor(
-    protected readonly db: Kysely<Database>,
-    protected readonly tableName: keyof Database
+    protected readonly db: Kysely<any>,
+    protected readonly tableName: string
   ) {}
 
   /**
@@ -45,7 +44,7 @@ export abstract class BaseCrudRepositoryImpl<T, CreateData, UpdateData>
       // Count query for total items
       this.db
         .selectFrom(this.tableName)
-        .select(sql<string>`count(*)`.as('count'))
+        .select((eb) => eb.fn.count('id').as('count'))
         .executeTakeFirst(),
     ]);
 
@@ -74,7 +73,7 @@ export abstract class BaseCrudRepositoryImpl<T, CreateData, UpdateData>
     const row = await this.db
       .selectFrom(this.tableName)
       .selectAll()
-      .where('id', '=', id)
+      .where('id' as any, '=', id)
       .executeTakeFirst();
 
     return row ? this.mapRowToEntity(row) : null;
@@ -109,8 +108,8 @@ export abstract class BaseCrudRepositoryImpl<T, CreateData, UpdateData>
 
     const row = await this.db
       .updateTable(this.tableName)
-      .set(dataWithTimestamp)
-      .where('id', '=', id)
+      .set(dataWithTimestamp as any)
+      .where('id' as any, '=', id)
       .returningAll()
       .executeTakeFirst();
 
@@ -123,7 +122,7 @@ export abstract class BaseCrudRepositoryImpl<T, CreateData, UpdateData>
   async delete(id: string): Promise<boolean> {
     const result = await this.db
       .deleteFrom(this.tableName)
-      .where('id', '=', id)
+      .where('id' as any, '=', id)
       .executeTakeFirst();
 
     return Number(result.numDeletedRows) > 0;
