@@ -9,3 +9,6 @@ process.env.ADMIN_API_KEY = 'test-api-key-12345';
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/verta_test';
 process.env.DATABASE_POOL_SIZE = '5';
 process.env.LOG_LEVEL = 'error'; // Minimize logging during tests
+process.env.DISCORD_BOT_TOKEN = 'test-discord-bot-token';
+process.env.REDIS_HOST = 'localhost';
+process.env.REDIS_PORT = '6379';

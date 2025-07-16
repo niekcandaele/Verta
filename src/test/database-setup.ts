@@ -12,12 +12,20 @@ import type { Database } from '../database/types.js';
 export async function setupTestDatabase(db: Kysely<Database>): Promise<void> {
   // In test environment, we import migrations directly
   // This avoids issues with FileMigrationProvider and TypeScript files
-  const { up } = await import(
+  const migration001 = await import(
     '../database/migrations/001_create_tenant_table.js'
   );
+  const migration002 = await import(
+    '../database/migrations/002_create_sync_tables.js'
+  );
+  const migration003 = await import(
+    '../database/migrations/003_add_unique_constraints.js'
+  );
 
-  // Run the migration
-  await up(db);
+  // Run the migrations in order
+  await migration001.up(db);
+  await migration002.up(db);
+  await migration003.up(db);
 }
 
 /**
@@ -26,8 +34,15 @@ export async function setupTestDatabase(db: Kysely<Database>): Promise<void> {
  * @param db - Kysely database instance
  */
 export async function cleanupTestDatabase(db: Kysely<Database>): Promise<void> {
-  // Get all table names
-  const tables = ['tenants']; // Add more tables as they're created
+  // Get all table names in reverse order of dependencies
+  const tables = [
+    'message_attachments',
+    'message_emoji_reactions',
+    'sync_progress',
+    'messages',
+    'channels',
+    'tenants',
+  ];
 
   // Truncate all tables
   for (const table of tables) {

@@ -8,8 +8,15 @@ import { ZodError } from 'zod';
 import { errorHandler, ApiError } from '../errorHandler.js';
 import { ServiceErrorType, createServiceError } from '../../services/types.js';
 
-// Mock console.error
-const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+// Mock the logger
+vi.mock('../../utils/logger.js', () => ({
+  default: {
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
 
 describe('errorHandler', () => {
   let mockReq: Partial<Request>;
@@ -17,13 +24,18 @@ describe('errorHandler', () => {
   let mockNext: NextFunction;
 
   beforeEach(() => {
-    mockReq = {};
+    mockReq = {
+      method: 'GET',
+      path: '/test',
+      ip: '127.0.0.1',
+      get: vi.fn().mockReturnValue('Mozilla/5.0'),
+    };
     mockRes = {
       status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
     };
     mockNext = vi.fn() as unknown as NextFunction;
-    consoleErrorSpy.mockClear();
+    vi.clearAllMocks();
   });
 
   describe('ZodError handling', () => {
@@ -290,11 +302,23 @@ describe('errorHandler', () => {
     });
   });
 
-  it('should log all errors', () => {
+  it('should log all errors', async () => {
     const error = new Error('Test error');
+    const logger = await import('../../utils/logger.js');
 
     errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Error:', error);
+    expect(logger.default.error).toHaveBeenCalledWith(
+      'Request error',
+      expect.objectContaining({
+        error: 'Test error',
+        method: 'GET',
+        path: '/test',
+        ip: '127.0.0.1',
+        userAgent: 'Mozilla/5.0',
+        stack: expect.stringContaining('Test error'),
+        name: 'Error',
+      })
+    );
   });
 });

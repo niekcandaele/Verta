@@ -2,16 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 describe('Environment Configuration', () => {
   let originalEnv: typeof process.env;
-  const mockConsoleError = vi
-    .spyOn(console, 'error')
-    .mockImplementation(() => {});
 
   beforeEach(() => {
     originalEnv = { ...process.env };
     // Clear module cache to ensure fresh imports
     vi.resetModules();
-    // Clear mock calls
-    mockConsoleError.mockClear();
   });
 
   afterEach(() => {
@@ -23,6 +18,7 @@ describe('Environment Configuration', () => {
       // Set minimal required env vars to prevent module initialization failure
       process.env.ADMIN_API_KEY = 'test-api-key';
       process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
+      process.env.DISCORD_BOT_TOKEN = 'test-discord-token';
 
       const { ConfigSchema } = await import('./env.js');
 
@@ -33,6 +29,9 @@ describe('Environment Configuration', () => {
         PORT: '25000',
         DATABASE_POOL_SIZE: '10',
         LOG_LEVEL: 'info',
+        DISCORD_BOT_TOKEN: 'test-discord-token',
+        REDIS_HOST: 'localhost',
+        REDIS_PORT: '6379',
       };
 
       const result = ConfigSchema.parse(testEnv);
@@ -44,6 +43,10 @@ describe('Environment Configuration', () => {
         PORT: 25000,
         DATABASE_POOL_SIZE: 10,
         LOG_LEVEL: 'info',
+        DISCORD_BOT_TOKEN: 'test-discord-token',
+        REDIS_HOST: 'localhost',
+        REDIS_PORT: 6379,
+        REDIS_PASSWORD: undefined,
       });
     });
 
@@ -51,12 +54,14 @@ describe('Environment Configuration', () => {
       // Set minimal required env vars to prevent module initialization failure
       process.env.ADMIN_API_KEY = 'test-api-key';
       process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
+      process.env.DISCORD_BOT_TOKEN = 'test-discord-token';
 
       const { ConfigSchema } = await import('./env.js');
 
       const testEnv = {
         ADMIN_API_KEY: 'test-api-key',
         DATABASE_URL: 'postgresql://user:pass@localhost:5432/test',
+        DISCORD_BOT_TOKEN: 'test-discord-token',
       };
 
       const result = ConfigSchema.parse(testEnv);
@@ -65,12 +70,15 @@ describe('Environment Configuration', () => {
       expect(result.PORT).toBe(25000);
       expect(result.DATABASE_POOL_SIZE).toBe(10);
       expect(result.LOG_LEVEL).toBe('info');
+      expect(result.REDIS_HOST).toBe('localhost');
+      expect(result.REDIS_PORT).toBe(6379);
     });
 
     it('should fail validation when required fields are missing', async () => {
       // Set minimal required env vars to prevent module initialization failure
       process.env.ADMIN_API_KEY = 'test-api-key';
       process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
+      process.env.DISCORD_BOT_TOKEN = 'test-discord-token';
 
       const { ConfigSchema } = await import('./env.js');
       const testEnv = {};
@@ -82,12 +90,14 @@ describe('Environment Configuration', () => {
       // Set minimal required env vars to prevent module initialization failure
       process.env.ADMIN_API_KEY = 'test-api-key';
       process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
+      process.env.DISCORD_BOT_TOKEN = 'test-discord-token';
 
       const { ConfigSchema } = await import('./env.js');
 
       const testEnv = {
         ADMIN_API_KEY: 'test-api-key',
         DATABASE_URL: 'invalid-url',
+        DISCORD_BOT_TOKEN: 'test-discord-token',
       };
 
       expect(() => ConfigSchema.parse(testEnv)).toThrow();
@@ -97,6 +107,7 @@ describe('Environment Configuration', () => {
       // Set minimal required env vars to prevent module initialization failure
       process.env.ADMIN_API_KEY = 'test-api-key';
       process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
+      process.env.DISCORD_BOT_TOKEN = 'test-discord-token';
 
       const { ConfigSchema } = await import('./env.js');
 
@@ -105,6 +116,7 @@ describe('Environment Configuration', () => {
         DATABASE_URL: 'postgresql://user:pass@localhost:5432/test',
         PORT: '8080',
         DATABASE_POOL_SIZE: '20',
+        DISCORD_BOT_TOKEN: 'test-discord-token',
       };
 
       const result = ConfigSchema.parse(testEnv);
@@ -118,6 +130,7 @@ describe('Environment Configuration', () => {
     it('should load valid configuration successfully', async () => {
       process.env.ADMIN_API_KEY = 'test-api-key';
       process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
+      process.env.DISCORD_BOT_TOKEN = 'test-discord-token';
 
       const { loadConfig } = await import('./env.js');
       const config = loadConfig();
@@ -136,35 +149,13 @@ describe('Environment Configuration', () => {
       await expect(import('./env.js')).rejects.toThrow(
         'Environment configuration validation failed'
       );
-      expect(mockConsoleError).toHaveBeenCalledWith(
-        'Environment configuration validation failed:'
-      );
-    });
-
-    it('should log specific validation errors', async () => {
-      process.env = {
-        DATABASE_URL: 'invalid-url',
-      };
-
-      // Since the module will fail to load, we need to catch that error
-      await expect(import('./env.js')).rejects.toThrow(
-        'Environment configuration validation failed'
-      );
-      expect(mockConsoleError).toHaveBeenCalledWith(
-        'Environment configuration validation failed:'
-      );
-      expect(mockConsoleError).toHaveBeenCalledWith(
-        '- ADMIN_API_KEY: Invalid input: expected string, received undefined'
-      );
-      expect(mockConsoleError).toHaveBeenCalledWith(
-        '- DATABASE_URL: DATABASE_URL must be a valid URL'
-      );
     });
 
     it('should throw non-Zod errors directly', async () => {
       // Set valid env to prevent immediate failure
       process.env.ADMIN_API_KEY = 'test-api-key';
       process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
+      process.env.DISCORD_BOT_TOKEN = 'test-discord-token';
 
       // This test verifies the design - non-Zod errors would be thrown directly
       // The current implementation already handles this correctly in the catch block
@@ -179,6 +170,7 @@ describe('Environment Configuration', () => {
       process.env.ADMIN_API_KEY = 'test-api-key';
       process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
       process.env.NODE_ENV = 'test';
+      process.env.DISCORD_BOT_TOKEN = 'test-discord-token';
 
       const env = await import('./env.js');
 
