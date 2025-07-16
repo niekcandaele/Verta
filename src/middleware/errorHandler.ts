@@ -5,6 +5,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { ServiceError, ServiceErrorType } from '../services/types.js';
+import logger from '../utils/logger.js';
+import { getRequestId } from './requestLogger.js';
 
 /**
  * Standard error response format
@@ -82,12 +84,30 @@ export class ApiError extends Error {
  */
 export function errorHandler(
   err: Error | ApiError | ServiceError,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ): void {
-  // Log error for debugging (in production, use proper logging service)
-  console.error('Error:', err);
+  // Log error with request context
+  const requestId = getRequestId(req);
+  const errorInfo: any = {
+    error: err.message,
+    requestId,
+    method: req.method,
+    path: req.path,
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+  };
+
+  // Add stack and name if they exist (Error objects have them, ServiceError might not)
+  if ('stack' in err) {
+    errorInfo.stack = err.stack;
+  }
+  if ('name' in err) {
+    errorInfo.name = err.name;
+  }
+
+  logger.error('Request error', errorInfo);
 
   const timestamp = new Date().toISOString();
 

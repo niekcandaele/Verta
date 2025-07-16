@@ -20,7 +20,7 @@ graph TB
     SlackAdapter --> SlackSDK[Slack SDK - Future]
     Worker --> DB[(PostgreSQL)]
     Scheduler[Cron Scheduler] --> Queue
-    
+
     subgraph "Database Tables"
         DB --> Tenants[tenants]
         DB --> Channels[channels]
@@ -43,6 +43,7 @@ graph TB
 ### 1. Database Schema Extensions
 
 #### Channels Table (Platform-Agnostic)
+
 ```sql
 CREATE TABLE channels (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -55,7 +56,7 @@ CREATE TABLE channels (
   platform_metadata JSONB, -- Platform-specific data
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  
+
   UNIQUE(tenant_id, platform_id),
   INDEX idx_channels_tenant_id (tenant_id),
   INDEX idx_channels_type (type),
@@ -64,6 +65,7 @@ CREATE TABLE channels (
 ```
 
 #### Messages Table (Platform-Agnostic)
+
 ```sql
 CREATE TABLE messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -77,7 +79,7 @@ CREATE TABLE messages (
   platform_created_at TIMESTAMP NOT NULL,
   platform_metadata JSONB, -- Platform-specific data
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  
+
   UNIQUE(tenant_id, platform_id),
   INDEX idx_messages_tenant_channel (tenant_id, channel_id),
   INDEX idx_messages_platform_created_at (platform_created_at),
@@ -86,6 +88,7 @@ CREATE TABLE messages (
 ```
 
 #### Message Emoji Reactions Table
+
 ```sql
 CREATE TABLE message_emoji_reactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -96,7 +99,7 @@ CREATE TABLE message_emoji_reactions (
   emoji_value VARCHAR(100) NOT NULL, -- Standard emoji character or custom emoji string
   platform_metadata JSONB, -- Platform-specific reaction data
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  
+
   UNIQUE(tenant_id, message_id, user_hash, emoji_value),
   INDEX idx_message_emoji_reactions_message_id (message_id),
   INDEX idx_message_emoji_reactions_tenant_id (tenant_id)
@@ -104,6 +107,7 @@ CREATE TABLE message_emoji_reactions (
 ```
 
 #### Message Attachments Table
+
 ```sql
 CREATE TABLE message_attachments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -115,13 +119,14 @@ CREATE TABLE message_attachments (
   url TEXT NOT NULL, -- Platform-provided URL
   platform_metadata JSONB, -- Platform-specific attachment data
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  
+
   INDEX idx_message_attachments_message_id (message_id),
   INDEX idx_message_attachments_tenant_id (tenant_id)
 );
 ```
 
 #### Sync Progress Table (Granular Recovery State)
+
 ```sql
 CREATE TABLE sync_progress (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -137,7 +142,7 @@ CREATE TABLE sync_progress (
   last_error TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  
+
   UNIQUE(tenant_id, channel_platform_id),
   INDEX idx_sync_progress_tenant_id (tenant_id),
   INDEX idx_sync_progress_status (sync_status),
@@ -148,17 +153,24 @@ CREATE TABLE sync_progress (
 ### 2. Service Layer
 
 #### Platform Sync Service (Main Orchestrator)
+
 ```typescript
 interface PlatformSyncService {
   // Queue management
-  queueSync(tenantId: string, type: 'scheduled' | 'manual' | 'initial'): Promise<string>;
+  queueSync(
+    tenantId: string,
+    type: 'scheduled' | 'manual' | 'initial'
+  ): Promise<string>;
   getSyncStatus(tenantId: string): Promise<SyncStatus>;
   cancelSync(tenantId: string): Promise<boolean>;
-  
+
   // Sync operations
   performSync(tenantId: string, jobId: string): Promise<SyncResult>;
-  resumeSync(tenantId: string, lastCheckpoint: SyncCheckpoint): Promise<SyncResult>;
-  
+  resumeSync(
+    tenantId: string,
+    lastCheckpoint: SyncCheckpoint
+  ): Promise<SyncResult>;
+
   // Scheduling
   scheduleRecurringSync(tenantId: string): Promise<void>;
   unscheduleRecurringSync(tenantId: string): Promise<void>;
@@ -166,21 +178,28 @@ interface PlatformSyncService {
 ```
 
 #### Platform Adapter Interface (Abstract)
+
 ```typescript
 interface PlatformAdapter {
   // Platform identification
   readonly platform: 'discord' | 'slack';
-  
+
   // Authentication (uses centrally configured credentials)
   authenticate(): Promise<boolean>;
-  
+
   // Channel operations
   getChannels(workspaceId: string): Promise<PlatformChannel[]>;
-  getChannelMessages(channelId: string, options?: FetchOptions): Promise<PlatformMessage[]>;
-  
+  getChannelMessages(
+    channelId: string,
+    options?: FetchOptions
+  ): Promise<PlatformMessage[]>;
+
   // Thread/nested content operations
   getThreads(channelId: string): Promise<PlatformChannel[]>;
-  getThreadMessages(threadId: string, options?: FetchOptions): Promise<PlatformMessage[]>;
+  getThreadMessages(
+    threadId: string,
+    options?: FetchOptions
+  ): Promise<PlatformMessage[]>;
 }
 
 interface FetchOptions {
@@ -191,74 +210,106 @@ interface FetchOptions {
 ```
 
 #### Discord Adapter (Implementation)
+
 ```typescript
 interface DiscordAdapter extends PlatformAdapter {
   platform: 'discord';
-  
+
   // Discord-specific operations
   getGuildChannels(guildId: string): Promise<PlatformChannel[]>;
   getForumPosts(channelId: string): Promise<PlatformChannel[]>;
-  getForumPostMessages(postId: string, options?: FetchOptions): Promise<PlatformMessage[]>;
+  getForumPostMessages(
+    postId: string,
+    options?: FetchOptions
+  ): Promise<PlatformMessage[]>;
 }
 ```
 
 ### 3. Repository Layer
 
 #### Channel Repository (Platform-Agnostic)
+
 ```typescript
 interface ChannelRepository extends BaseCrudRepository<Channel> {
   findByTenantId(tenantId: string): Promise<Channel[]>;
-  findByPlatformId(tenantId: string, platformId: string): Promise<Channel | null>;
+  findByPlatformId(
+    tenantId: string,
+    platformId: string
+  ): Promise<Channel | null>;
   upsertChannel(channelData: CreateChannelData): Promise<Channel>;
   findByType(tenantId: string, type: string): Promise<Channel[]>;
 }
 ```
 
 #### Message Repository (Platform-Agnostic)
+
 ```typescript
 interface MessageRepository extends BaseCrudRepository<Message> {
   findByChannelId(channelId: string, limit?: number): Promise<Message[]>;
   findLatestByChannel(channelId: string): Promise<Message | null>;
   bulkInsertMessages(messages: CreateMessageData[]): Promise<void>;
   getMessageCountByTenant(tenantId: string): Promise<number>;
-  findByDateRange(tenantId: string, startDate: Date, endDate: Date): Promise<Message[]>;
+  findByDateRange(
+    tenantId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<Message[]>;
 }
 ```
 
 #### Message Emoji Reaction Repository
+
 ```typescript
-interface MessageEmojiReactionRepository extends BaseCrudRepository<MessageEmojiReaction> {
+interface MessageEmojiReactionRepository
+  extends BaseCrudRepository<MessageEmojiReaction> {
   findByMessageId(messageId: string): Promise<MessageEmojiReaction[]>;
-  bulkInsertReactions(reactions: CreateMessageEmojiReactionData[]): Promise<void>;
+  bulkInsertReactions(
+    reactions: CreateMessageEmojiReactionData[]
+  ): Promise<void>;
   deleteByMessageId(messageId: string): Promise<void>; // For updating reactions
   findByTenantId(tenantId: string): Promise<MessageEmojiReaction[]>;
 }
 ```
 
 #### Message Attachment Repository
+
 ```typescript
-interface MessageAttachmentRepository extends BaseCrudRepository<MessageAttachment> {
+interface MessageAttachmentRepository
+  extends BaseCrudRepository<MessageAttachment> {
   findByMessageId(messageId: string): Promise<MessageAttachment[]>;
-  bulkInsertAttachments(attachments: CreateMessageAttachmentData[]): Promise<void>;
+  bulkInsertAttachments(
+    attachments: CreateMessageAttachmentData[]
+  ): Promise<void>;
   findByTenantId(tenantId: string): Promise<MessageAttachment[]>;
   getAttachmentCountByTenant(tenantId: string): Promise<number>;
 }
 ```
 
 #### Sync Progress Repository
+
 ```typescript
 interface SyncProgressRepository extends BaseCrudRepository<SyncProgress> {
-  findByTenantAndChannel(tenantId: string, channelPlatformId: string): Promise<SyncProgress | null>;
+  findByTenantAndChannel(
+    tenantId: string,
+    channelPlatformId: string
+  ): Promise<SyncProgress | null>;
   findByTenantId(tenantId: string): Promise<SyncProgress[]>;
   updateChannelProgress(
-    tenantId: string, 
-    channelPlatformId: string, 
-    lastMessageId: string, 
+    tenantId: string,
+    channelPlatformId: string,
+    lastMessageId: string,
     lastMessageTimestamp: Date,
     messageCount: number
   ): Promise<void>;
-  markChannelCompleted(tenantId: string, channelPlatformId: string): Promise<void>;
-  markChannelFailed(tenantId: string, channelPlatformId: string, error: string): Promise<void>;
+  markChannelCompleted(
+    tenantId: string,
+    channelPlatformId: string
+  ): Promise<void>;
+  markChannelFailed(
+    tenantId: string,
+    channelPlatformId: string,
+    error: string
+  ): Promise<void>;
   getIncompleteChannels(tenantId: string): Promise<SyncProgress[]>;
   resetFailedChannels(tenantId: string): Promise<void>;
 }
@@ -267,6 +318,7 @@ interface SyncProgressRepository extends BaseCrudRepository<SyncProgress> {
 ### 4. Queue System
 
 #### BullMQ Configuration
+
 ```typescript
 interface SyncQueueConfig {
   redis: {
@@ -284,6 +336,7 @@ interface SyncQueueConfig {
 ```
 
 #### Job Types
+
 ```typescript
 interface SyncJobData {
   tenantId: string;
@@ -302,6 +355,7 @@ interface SyncCheckpoint {
 ## Data Models
 
 ### Core Types (Platform-Agnostic)
+
 ```typescript
 interface Channel {
   id: string;
@@ -371,6 +425,7 @@ interface SyncProgress {
 ```
 
 ### Platform-Specific Adapter Types
+
 ```typescript
 interface PlatformChannel {
   id: string;
@@ -393,6 +448,7 @@ interface PlatformMessage {
 ```
 
 ### ID Anonymization
+
 ```typescript
 interface IdHasher {
   hashUserId(userId: string): string;
@@ -401,10 +457,7 @@ interface IdHasher {
 // Implementation using crypto
 class CryptoIdHasher implements IdHasher {
   hashUserId(userId: string): string {
-    return crypto
-      .createHash('sha256')
-      .update(userId)
-      .digest('hex');
+    return crypto.createHash('sha256').update(userId).digest('hex');
   }
 }
 ```
@@ -412,6 +465,7 @@ class CryptoIdHasher implements IdHasher {
 ## Error Handling
 
 ### Sync Error Categories
+
 1. **Authentication Errors**: Invalid platform credentials (bot token, API key)
 2. **Permission Errors**: Insufficient access to channels/workspaces
 3. **Rate Limiting**: Platform API rate limits exceeded
@@ -420,42 +474,48 @@ class CryptoIdHasher implements IdHasher {
 6. **Platform-Specific Errors**: Adapter-specific error conditions
 
 ### Error Recovery Strategy
+
 ```typescript
 interface ErrorRecoveryStrategy {
   // Simple retry with exponential backoff (3 attempts max)
-  retryWithBackoff<T>(operation: () => Promise<T>, maxRetries: number): Promise<T>;
-  
+  retryWithBackoff<T>(
+    operation: () => Promise<T>,
+    maxRetries: number
+  ): Promise<T>;
+
   // Handle rate limits by exiting and relying on next sync
   handleRateLimit(): Promise<never>;
-  
+
   // Log errors and bail out after max retries
   handleMaxRetriesExceeded(error: Error): Promise<never>;
 }
 ```
 
 ### Resilience Mechanisms
+
 - **Checkpointing**: Save progress after each channel for granular recovery
 - **Simple Retry Logic**: Exponential backoff with 3 max retries (1s, 2s, 4s)
 - **Rate Limit Handling**: Exit immediately on rate limits, retry on next sync
 - **Error Logging**: Log all errors to database and console before bailing out
 
-
-
 ## Security Considerations
 
 ### Data Privacy
+
 - **ID Anonymization**: All Discord IDs hashed with tenant-specific salt
 - **Content Filtering**: Option to exclude sensitive content patterns
 - **Access Control**: Sync jobs isolated by tenant
 - **Audit Logging**: Track all sync operations
 
 ### API Security
+
 - **Authentication**: Require valid API key for manual sync triggers
 - **Rate Limiting**: Prevent abuse of manual sync endpoints
 - **Input Validation**: Validate all tenant and job parameters
 - **Error Sanitization**: Don't expose internal errors in API responses
 
 ### Discord Bot Security
+
 - **Token Management**: Secure storage of Discord bot tokens
 - **Permission Scoping**: Request minimal required permissions
 - **Guild Validation**: Verify bot has access to tenant's guild

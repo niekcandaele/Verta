@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import winston from 'winston';
 
 // Environment configuration schema with Zod validation
 export const ConfigSchema = z.object({
@@ -16,15 +17,31 @@ export const ConfigSchema = z.object({
 
 export type Config = z.infer<typeof ConfigSchema>;
 
+// Create a temporary logger for config loading phase
+const configLogger = winston.createLogger({
+  level: 'error',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.Console({
+      format: winston.format.json(),
+    }),
+  ],
+});
+
 // Load and validate environment configuration
 export function loadConfig(): Config {
   try {
     return ConfigSchema.parse(process.env);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('Environment configuration validation failed:');
-      error.issues.forEach((issue) => {
-        console.error(`- ${issue.path.join('.')}: ${issue.message}`);
+      configLogger.error('Environment configuration validation failed', {
+        issues: error.issues.map((issue) => ({
+          path: issue.path.join('.'),
+          message: issue.message,
+        })),
       });
       throw new Error('Environment configuration validation failed');
     }

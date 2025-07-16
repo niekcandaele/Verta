@@ -1,5 +1,6 @@
 import { sql } from 'kysely';
 import { db } from './index.js';
+import logger from '../utils/logger.js';
 
 /**
  * Test database connectivity
@@ -8,10 +9,12 @@ import { db } from './index.js';
 export async function testConnection(): Promise<boolean> {
   try {
     const result = await sql<{ now: Date }>`SELECT NOW()`.execute(db);
-    console.log('Database connection established at:', result.rows[0].now);
+    logger.info('Database connection established', {
+      timestamp: result.rows[0].now,
+    });
     return true;
   } catch (error) {
-    console.error('Database connection failed:', error);
+    logger.error('Database connection failed', { error });
     return false;
   }
 }
@@ -23,9 +26,9 @@ export async function testConnection(): Promise<boolean> {
 export async function closeDatabase(): Promise<void> {
   try {
     await db.destroy();
-    console.log('Database connections closed successfully');
+    logger.info('Database connections closed successfully');
   } catch (error) {
-    console.error('Error closing database connections:', error);
+    logger.error('Error closing database connections', { error });
     throw error;
   }
 }
@@ -50,9 +53,11 @@ export async function initializeDatabase(
 
     retries++;
     if (retries < maxRetries) {
-      console.log(
-        `Database connection failed. Retrying in ${retryDelay}ms... (${retries}/${maxRetries})`
-      );
+      logger.warn('Database connection failed, retrying', {
+        retryDelay,
+        attempt: retries,
+        maxRetries,
+      });
       await new Promise((resolve) => global.setTimeout(resolve, retryDelay));
     }
   }

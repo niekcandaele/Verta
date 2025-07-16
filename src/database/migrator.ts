@@ -3,6 +3,7 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { db } from './index.js';
+import logger from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,15 +26,18 @@ export async function migrateToLatest() {
 
   results?.forEach((it) => {
     if (it.status === 'Success') {
-      console.log(`migration "${it.migrationName}" was executed successfully`);
+      logger.info('Migration executed successfully', {
+        migration: it.migrationName,
+      });
     } else if (it.status === 'Error') {
-      console.error(`failed to execute migration "${it.migrationName}"`);
+      logger.error('Failed to execute migration', {
+        migration: it.migrationName,
+      });
     }
   });
 
   if (error) {
-    console.error('failed to migrate');
-    console.error(error);
+    logger.error('Failed to migrate', { error });
     throw error;
   }
 }
@@ -46,17 +50,18 @@ export async function migrateDown() {
 
   results?.forEach((it) => {
     if (it.status === 'Success') {
-      console.log(
-        `migration "${it.migrationName}" was rolled back successfully`
-      );
+      logger.info('Migration rolled back successfully', {
+        migration: it.migrationName,
+      });
     } else if (it.status === 'Error') {
-      console.error(`failed to rollback migration "${it.migrationName}"`);
+      logger.error('Failed to rollback migration', {
+        migration: it.migrationName,
+      });
     }
   });
 
   if (error) {
-    console.error('failed to rollback migration');
-    console.error(error);
+    logger.error('Failed to rollback migration', { error });
     throw error;
   }
 }
@@ -68,20 +73,20 @@ export async function getMigrationStatus() {
   try {
     const migrations = await migrator.getMigrations();
 
-    console.log('Migration Status:');
-    console.log('=================');
+    logger.info('Migration Status');
 
     for (const migration of migrations) {
       const status = migration.executedAt ? 'Executed' : 'Pending';
-      const executedAt = migration.executedAt
-        ? ` at ${migration.executedAt.toISOString()}`
-        : '';
-      console.log(`${migration.name}: ${status}${executedAt}`);
+      logger.info('Migration', {
+        name: migration.name,
+        status,
+        executedAt: migration.executedAt?.toISOString() || null,
+      });
     }
 
     return migrations;
   } catch (error) {
-    console.error('Failed to get migration status:', error);
+    logger.error('Failed to get migration status', { error });
     throw error;
   }
 }
@@ -95,15 +100,18 @@ export async function migrateUp(_count: number = 1) {
 
   results?.forEach((it) => {
     if (it.status === 'Success') {
-      console.log(`migration "${it.migrationName}" was executed successfully`);
+      logger.info('Migration executed successfully', {
+        migration: it.migrationName,
+      });
     } else if (it.status === 'Error') {
-      console.error(`failed to execute migration "${it.migrationName}"`);
+      logger.error('Failed to execute migration', {
+        migration: it.migrationName,
+      });
     }
   });
 
   if (error) {
-    console.error('failed to migrate up');
-    console.error(error);
+    logger.error('Failed to migrate up', { error });
     throw error;
   }
 }
