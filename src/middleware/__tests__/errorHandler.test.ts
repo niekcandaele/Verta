@@ -94,7 +94,6 @@ describe('errorHandler', () => {
       expect(mockRes.json).toHaveBeenCalledWith({
         error: 'Not Found',
         message: 'Tenant not found',
-        details: { id: '123' },
         timestamp: expect.any(String),
       });
     });
@@ -131,8 +130,7 @@ describe('errorHandler', () => {
       expect(mockRes.status).toHaveBeenCalledWith(400);
       expect(mockRes.json).toHaveBeenCalledWith({
         error: 'validation error',
-        message: 'Invalid input data',
-        details: { field: 'email' },
+        message: 'Invalid request data.',
         timestamp: expect.any(String),
       });
     });
@@ -153,7 +151,7 @@ describe('errorHandler', () => {
       expect(mockRes.status).toHaveBeenCalledWith(404);
       expect(mockRes.json).toHaveBeenCalledWith({
         error: 'not found',
-        message: 'Resource not found',
+        message: 'Resource not found.',
         timestamp: expect.any(String),
       });
     });
@@ -174,7 +172,7 @@ describe('errorHandler', () => {
       expect(mockRes.status).toHaveBeenCalledWith(409);
       expect(mockRes.json).toHaveBeenCalledWith({
         error: 'duplicate entry',
-        message: 'Slug already exists',
+        message: 'Resource already exists.',
         timestamp: expect.any(String),
       });
     });
@@ -195,7 +193,7 @@ describe('errorHandler', () => {
       expect(mockRes.status).toHaveBeenCalledWith(422);
       expect(mockRes.json).toHaveBeenCalledWith({
         error: 'business rule violation',
-        message: 'Cannot delete active tenant',
+        message: 'Request cannot be processed.',
         timestamp: expect.any(String),
       });
     });
@@ -216,7 +214,7 @@ describe('errorHandler', () => {
       expect(mockRes.status).toHaveBeenCalledWith(500);
       expect(mockRes.json).toHaveBeenCalledWith({
         error: 'database error',
-        message: 'Database connection failed',
+        message: 'An error occurred. Please try again.',
         timestamp: expect.any(String),
       });
     });
@@ -233,7 +231,7 @@ describe('errorHandler', () => {
       expect(mockRes.status).toHaveBeenCalledWith(409);
       expect(mockRes.json).toHaveBeenCalledWith({
         error: 'Duplicate Entry',
-        message: 'A resource with the same unique constraint already exists',
+        message: 'Resource already exists.',
         timestamp: expect.any(String),
       });
     });
@@ -246,7 +244,7 @@ describe('errorHandler', () => {
       expect(mockRes.status).toHaveBeenCalledWith(400);
       expect(mockRes.json).toHaveBeenCalledWith({
         error: 'Invalid Reference',
-        message: 'The referenced resource does not exist',
+        message: 'Invalid request data.',
         timestamp: expect.any(String),
       });
     });
@@ -294,7 +292,7 @@ describe('errorHandler', () => {
       expect(mockRes.status).toHaveBeenCalledWith(500);
       expect(mockRes.json).toHaveBeenCalledWith({
         error: 'Internal Server Error',
-        message: 'Something went wrong',
+        message: 'An error occurred. Please try again.',
         timestamp: expect.any(String),
       });
 

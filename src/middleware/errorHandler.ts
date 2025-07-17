@@ -128,7 +128,8 @@ export function errorHandler(
       message: err.message,
       timestamp,
     };
-    if (err.details) {
+    // Only include details in development mode
+    if (err.details && process.env.NODE_ENV === 'development') {
       response.details = err.details;
     }
     res.status(err.statusCode).json(response);
@@ -139,15 +140,59 @@ export function errorHandler(
   if ('type' in err && 'message' in err) {
     const serviceError = err as ServiceError;
     const statusCode = getStatusCodeForServiceError(serviceError.type);
+
+    // Use generic messages in production
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    let message = serviceError.message;
+
+    if (!isDevelopment) {
+      // Map to generic messages based on error type
+      switch (serviceError.type) {
+        case ServiceErrorType.VALIDATION_ERROR:
+          message = 'Invalid request data.';
+          break;
+        case ServiceErrorType.NOT_FOUND:
+          message = 'Resource not found.';
+          break;
+        case ServiceErrorType.DUPLICATE_ENTRY:
+          message = 'Resource already exists.';
+          break;
+        case ServiceErrorType.BUSINESS_RULE_VIOLATION:
+          message = 'Request cannot be processed.';
+          break;
+        case ServiceErrorType.DATABASE_ERROR:
+        case ServiceErrorType.INTERNAL_ERROR:
+        default:
+          message = 'An error occurred. Please try again.';
+          break;
+      }
+    }
+
     const response: ErrorResponse = {
       error: serviceError.type.replace(/_/g, ' ').toLowerCase(),
-      message: serviceError.message,
+      message,
       timestamp,
     };
-    if (serviceError.details) {
+
+    // Only include details in development mode
+    if (serviceError.details && isDevelopment) {
       response.details = serviceError.details;
     }
+
     res.status(statusCode).json(response);
+    return;
+  }
+
+  // Handle rate limit errors
+  if (
+    err.message?.includes('RATE_LIMIT_EXCEEDED') ||
+    err.message?.includes('rate limit')
+  ) {
+    res.status(429).json({
+      error: 'Rate Limit Exceeded',
+      message: 'Rate limit exceeded. Please try again later.',
+      timestamp,
+    });
     return;
   }
 
@@ -155,7 +200,7 @@ export function errorHandler(
   if (err.message?.includes('duplicate key')) {
     res.status(409).json({
       error: 'Duplicate Entry',
-      message: 'A resource with the same unique constraint already exists',
+      message: 'Resource already exists.',
       timestamp,
     });
     return;
@@ -164,7 +209,7 @@ export function errorHandler(
   if (err.message?.includes('violates foreign key')) {
     res.status(400).json({
       error: 'Invalid Reference',
-      message: 'The referenced resource does not exist',
+      message: 'Invalid request data.',
       timestamp,
     });
     return;
@@ -174,7 +219,9 @@ export function errorHandler(
   const isDevelopment = process.env.NODE_ENV === 'development';
   const response: ErrorResponse = {
     error: 'Internal Server Error',
-    message: isDevelopment ? err.message : 'Something went wrong',
+    message: isDevelopment
+      ? err.message
+      : 'An error occurred. Please try again.',
     timestamp,
   };
 
