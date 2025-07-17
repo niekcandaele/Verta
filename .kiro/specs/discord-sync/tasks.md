@@ -19,7 +19,7 @@
   - Create CryptoIdHasher class with consistent user ID hashing (no salt)
   - _Requirements: 4.4_
 
-- [ ] 4. Create platform-agnostic data models and types
+- [x] 4. Create platform-agnostic data models and types
   - Define Channel, Message, and SyncProgress TypeScript interfaces
   - Define MessageEmojiReaction and MessageAttachment TypeScript interfaces
   - Create PlatformChannel and PlatformMessage adapter types
@@ -27,7 +27,7 @@
   - Write validation schemas using Zod for all data types
   - _Requirements: 4.1, 4.2, 10.1, 10.3, 11.1, 11.4, 12.1, 12.2, 12.3_
 
-- [ ] 5. Implement platform-agnostic repository layer
+- [x] 5. Implement platform-agnostic repository layer
   - Create ChannelRepository interface and implementation using Kysely
   - Create MessageRepository with bulk insert capabilities
   - Create MessageEmojiReactionRepository for storing emoji reactions
