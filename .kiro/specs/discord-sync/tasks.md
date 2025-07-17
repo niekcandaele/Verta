@@ -56,7 +56,7 @@
   - Handle rate limit errors by exiting immediately (rely on next hourly sync)
   - _Requirements: 5.4, 5.5, 6.4, 14.2, 14.3, 14.4_
 
-- [ ] 9. Create platform sync service orchestrator
+- [x] 9. Create platform sync service orchestrator
   - Implement PlatformSyncService with queue management methods
   - Add sync job queuing for scheduled, manual, and initial syncs
   - Implement sync status checking using BullMQ job state
@@ -80,21 +80,21 @@
   - Update sync_progress after each successful channel sync
   - _Requirements: 1.2, 1.3, 1.5, 1.6, 4.4, 5.2, 5.3, 5.5, 10.1, 10.3, 11.1, 11.3, 12.1, 12.2, 12.3, 14.2, 14.3, 15.1, 15.2, 15.4_
 
-- [ ] 11. Add scheduled sync functionality
+- [x] 11. Add scheduled sync functionality
   - Create cron scheduler for hourly tenant syncs
   - Implement tenant filtering for Discord platform only
   - Add recurring sync job scheduling and management
   - Implement sync job deduplication to prevent overlaps
   - _Requirements: 1.1_
 
-- [ ] 12. Implement manual sync API endpoints
+- [x] 12. Implement manual sync API endpoints
   - Create POST /api/tenants/{tenantId}/sync endpoint
   - Add sync job queuing with immediate execution
   - Implement sync status checking endpoints
   - Add proper authentication and input validation
   - _Requirements: 2.1, 2.2, 2.4_
 
-- [ ] 13. Add initial sync on tenant creation
+- [x] 13. Add initial sync on tenant creation
   - Modify tenant creation service to trigger Discord sync
   - Implement initial sync job queuing for Discord tenants
   - Add sync status tracking during tenant onboarding

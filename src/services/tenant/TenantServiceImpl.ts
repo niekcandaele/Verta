@@ -22,6 +22,8 @@ import {
   CreateTenantSchema,
   UpdateTenantSchema,
 } from '../../validation/tenant/index.js';
+import { SyncServiceImpl } from '../sync/index.js';
+import logger from '../../utils/logger.js';
 
 /**
  * Concrete implementation of TenantService
@@ -31,8 +33,11 @@ export class TenantServiceImpl
   extends BaseCrudServiceImpl<Tenant, CreateTenantInput, UpdateTenantInput>
   implements TenantService
 {
+  private syncService: SyncServiceImpl;
+
   constructor(private readonly tenantRepository: TenantRepository) {
     super(tenantRepository);
+    this.syncService = new SyncServiceImpl();
   }
 
   /**
@@ -82,7 +87,7 @@ export class TenantServiceImpl
   }
 
   /**
-   * Override create to handle slug generation
+   * Override create to handle slug generation and trigger initial sync
    */
   async create(data: CreateTenantInput): Promise<ServiceResult<Tenant>> {
     try {
@@ -96,7 +101,37 @@ export class TenantServiceImpl
       const validatedData = CreateTenantSchema.parse(dataWithSlug);
 
       // Use parent create method which will call our validation hooks
-      return super.create(validatedData);
+      const result = await super.create(validatedData);
+
+      // If creation was successful and it's a Discord tenant, trigger initial sync
+      if (result.success && result.data.platform === 'discord') {
+        try {
+          const syncResult = await this.syncService.startSync(result.data.id, {
+            syncType: 'full', // Initial sync should be full
+          });
+
+          if (syncResult.success) {
+            logger.info('Initial sync triggered for new Discord tenant', {
+              tenantId: result.data.id,
+              jobId: syncResult.data.jobId,
+            });
+          } else {
+            // Log sync failure but don't fail tenant creation
+            logger.error('Failed to trigger initial sync for Discord tenant', {
+              tenantId: result.data.id,
+              error: syncResult.error,
+            });
+          }
+        } catch (syncError) {
+          // Log error but don't fail tenant creation
+          logger.error('Error triggering initial sync for Discord tenant', {
+            tenantId: result.data.id,
+            error: syncError,
+          });
+        }
+      }
+
+      return result;
     } catch (error) {
       if (error instanceof z.ZodError) {
         return createErrorResult(

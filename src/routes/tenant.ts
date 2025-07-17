@@ -6,6 +6,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { validateApiKey, asyncHandler, ApiError } from '../middleware/index.js';
 import { TenantServiceImpl } from '../services/tenant/index.js';
+import { SyncServiceImpl } from '../services/sync/index.js';
 import { TenantRepositoryImpl } from '../repositories/tenant/index.js';
 import {
   CreateTenantSchema,
@@ -26,6 +27,7 @@ export function createTenantRouter(database?: Kysely<Database>): Router {
   const dbInstance = database || db;
   const tenantRepository = new TenantRepositoryImpl(dbInstance);
   const tenantService = new TenantServiceImpl(tenantRepository);
+  const syncService = new SyncServiceImpl();
 
   const router = Router();
 
@@ -262,6 +264,122 @@ export function createTenantRouter(database?: Kysely<Database>): Router {
       }
 
       res.status(204).send();
+    })
+  );
+
+  // Manual sync for a specific tenant
+  router.post(
+    '/:id/sync',
+    asyncHandler(async (req: Request, res: Response) => {
+      const { id } = req.params;
+
+      // Validate UUID format
+      const validatedId = z.string().uuid('Invalid tenant ID format').parse(id);
+
+      // Verify tenant exists and is active
+      const tenantResult = await tenantService.findById(validatedId);
+      if (!tenantResult.success) {
+        if (tenantResult.error.type === ServiceErrorType.NOT_FOUND) {
+          throw new ApiError(404, 'Not Found', tenantResult.error.message);
+        }
+        throw new ApiError(
+          500,
+          'Internal Server Error',
+          tenantResult.error.message
+        );
+      }
+
+      const tenant = tenantResult.data;
+      if (tenant.status !== 'ACTIVE') {
+        throw new ApiError(
+          400,
+          'Bad Request',
+          'Tenant is not active and cannot be synced'
+        );
+      }
+
+      // Only Discord tenants can be synced
+      if (tenant.platform !== 'discord') {
+        throw new ApiError(
+          400,
+          'Bad Request',
+          'Only Discord tenants support sync operations'
+        );
+      }
+
+      // Start sync job
+      const syncResult = await syncService.startSync(validatedId, {
+        syncType: req.body.syncType || 'incremental',
+      });
+
+      if (!syncResult.success) {
+        throw new ApiError(
+          500,
+          'Internal Server Error',
+          syncResult.error?.message || 'Failed to start sync'
+        );
+      }
+
+      res.status(201).json({
+        jobId: syncResult.data.jobId,
+        message: 'Sync job started successfully',
+      });
+    })
+  );
+
+  // Get sync status for a tenant
+  router.get(
+    '/:id/sync/status',
+    asyncHandler(async (req: Request, res: Response) => {
+      const { id } = req.params;
+
+      // Validate UUID format
+      const validatedId = z.string().uuid('Invalid tenant ID format').parse(id);
+
+      // Get sync history for the tenant
+      const historyResult = await syncService.getSyncHistory(validatedId, 1);
+
+      if (!historyResult.success) {
+        throw new ApiError(
+          500,
+          'Internal Server Error',
+          historyResult.error?.message || 'Failed to get sync status'
+        );
+      }
+
+      const latestSync = historyResult.data[0];
+      if (!latestSync) {
+        res.json({
+          status: 'never_synced',
+          message: 'This tenant has never been synced',
+        });
+        return;
+      }
+
+      // Get current job status if it's active
+      if (latestSync.status === 'active' || latestSync.status === 'waiting') {
+        const jobStatusResult = await syncService.getJobStatus(
+          latestSync.jobId
+        );
+        if (jobStatusResult.success) {
+          res.json({
+            status: jobStatusResult.data.status,
+            progress: jobStatusResult.data.progress,
+            jobId: latestSync.jobId,
+            startedAt: latestSync.startedAt,
+          });
+          return;
+        }
+      }
+
+      // Return the latest sync information
+      res.json({
+        status: latestSync.status,
+        jobId: latestSync.jobId,
+        startedAt: latestSync.startedAt,
+        completedAt: latestSync.completedAt,
+        result: latestSync.result,
+      });
     })
   );
 

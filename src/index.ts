@@ -3,12 +3,14 @@ import { initializeDatabase, closeDatabase } from './database/connection.js';
 import { migrateToLatest } from './database/migrator.js';
 import { config } from './config/env.js';
 import logger from './utils/logger.js';
-import { SyncWorker } from './workers/index.js';
+import { SyncWorker, HourlyTriggerWorker } from './workers/index.js';
+import { syncScheduler } from './scheduler/index.js';
 
 const PORT = config.PORT;
 
-// Global reference to sync worker
+// Global references to workers
 let syncWorker: SyncWorker | null = null;
+let hourlyTriggerWorker: HourlyTriggerWorker | null = null;
 
 /**
  * Start the application
@@ -26,12 +28,24 @@ async function startServer() {
       logger.info('Database migrations completed');
     }
 
-    // Start sync worker
+    // Start workers and scheduler
     if (config.NODE_ENV !== 'test') {
+      // Start sync worker
       logger.info('Starting sync worker...');
       syncWorker = new SyncWorker();
       await syncWorker.start();
       logger.info('Sync worker started');
+
+      // Start hourly trigger worker
+      logger.info('Starting hourly trigger worker...');
+      hourlyTriggerWorker = new HourlyTriggerWorker();
+      await hourlyTriggerWorker.start();
+      logger.info('Hourly trigger worker started');
+
+      // Start sync scheduler
+      logger.info('Starting sync scheduler...');
+      await syncScheduler.start();
+      logger.info('Sync scheduler started');
     }
 
     // Create and start Express app
@@ -53,6 +67,18 @@ async function startServer() {
         logger.info('HTTP server closed');
 
         try {
+          // Stop sync scheduler
+          logger.info('Stopping sync scheduler...');
+          await syncScheduler.stop();
+          logger.info('Sync scheduler stopped');
+
+          // Stop hourly trigger worker
+          if (hourlyTriggerWorker) {
+            logger.info('Stopping hourly trigger worker...');
+            await hourlyTriggerWorker.stop();
+            logger.info('Hourly trigger worker stopped');
+          }
+
           // Stop sync worker
           if (syncWorker) {
             logger.info('Stopping sync worker...');
