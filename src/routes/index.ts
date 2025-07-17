@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { createTenantRouter } from './tenant.js';
+import syncRouter from './sync.js';
 import type { Kysely } from 'kysely';
 import type { Database } from '../database/types.js';
 
@@ -16,6 +17,9 @@ export function createRouter(database?: Kysely<Database>): Router {
   // Mount tenant routes with the provided database
   const tenantRouter = createTenantRouter(database);
   router.use('/tenants', tenantRouter);
+
+  // Mount sync routes
+  router.use('/api', syncRouter);
 
   return router;
 }

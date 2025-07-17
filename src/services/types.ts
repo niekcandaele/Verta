@@ -38,6 +38,7 @@ export enum ServiceErrorType {
 export interface ServiceError {
   type: ServiceErrorType;
   message: string;
+  code?: string;
   details?: unknown;
 }
 

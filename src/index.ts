@@ -3,8 +3,12 @@ import { initializeDatabase, closeDatabase } from './database/connection.js';
 import { migrateToLatest } from './database/migrator.js';
 import { config } from './config/env.js';
 import logger from './utils/logger.js';
+import { SyncWorker } from './workers/index.js';
 
 const PORT = config.PORT;
+
+// Global reference to sync worker
+let syncWorker: SyncWorker | null = null;
 
 /**
  * Start the application
@@ -20,6 +24,14 @@ async function startServer() {
       logger.info('Running database migrations...');
       await migrateToLatest();
       logger.info('Database migrations completed');
+    }
+
+    // Start sync worker
+    if (config.NODE_ENV !== 'test') {
+      logger.info('Starting sync worker...');
+      syncWorker = new SyncWorker();
+      await syncWorker.start();
+      logger.info('Sync worker started');
     }
 
     // Create and start Express app
@@ -41,6 +53,13 @@ async function startServer() {
         logger.info('HTTP server closed');
 
         try {
+          // Stop sync worker
+          if (syncWorker) {
+            logger.info('Stopping sync worker...');
+            await syncWorker.stop();
+            logger.info('Sync worker stopped');
+          }
+
           // Close database connections
           await closeDatabase();
           logger.info('Graceful shutdown completed');
