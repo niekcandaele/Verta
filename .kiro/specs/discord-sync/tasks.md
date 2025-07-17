@@ -63,7 +63,7 @@
   - Add job cancellation and cleanup functionality
   - _Requirements: 1.1, 2.1, 2.2, 5.1_
 
-- [ ] 10. Implement Discord sync logic with incremental sync support
+- [x] 10. Implement Discord sync logic with incremental sync support
   - Create per-channel sync progress tracking with message-level checkpoints
   - Implement incremental sync: start from last synced message timestamp/ID (or from beginning if first sync)
   - Process channels sequentially (no parallelization) to avoid rate limits
@@ -101,7 +101,7 @@
   - Handle initial sync failures with basic error logging
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 14. Add sync monitoring and status endpoints
+- [x] 14. Add sync monitoring and status endpoints
   - Create GET /api/tenants/{tenantId}/sync/status endpoint
   - Implement sync progress and performance metrics collection
   - Add sync history and error reporting capabilities

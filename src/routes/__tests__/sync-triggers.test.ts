@@ -303,7 +303,7 @@ describe('Sync Trigger Methods (Simplified)', () => {
       const createdTenantId = response.body.id;
 
       // Wait a bit for async sync trigger
-      await new Promise<void>((resolve) => setTimeout(resolve, 100));
+      await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 100));
 
       // Verify syncQueue.add was called for initial sync
       expect(mockSyncQueueAdd).toHaveBeenCalledWith(
@@ -332,7 +332,7 @@ describe('Sync Trigger Methods (Simplified)', () => {
       expect(response.status).toBe(201);
 
       // Wait a bit to ensure no async calls
-      await new Promise<void>((resolve) => setTimeout(resolve, 100));
+      await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 100));
 
       // Verify syncQueue.add was NOT called
       expect(mockSyncQueueAdd).not.toHaveBeenCalled();

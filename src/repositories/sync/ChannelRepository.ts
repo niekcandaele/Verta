@@ -51,6 +51,13 @@ export class ChannelRepositoryImpl
   }
 
   /**
+   * Find all channels for a tenant (alias for findByTenant)
+   */
+  async findByTenantId(tenantId: string): Promise<Channel[]> {
+    return this.findByTenant(tenantId);
+  }
+
+  /**
    * Find child channels of a parent channel
    */
   async findByParentId(parentChannelId: string): Promise<Channel[]> {

@@ -10,6 +10,7 @@ import {
   type GuildBasedChannel,
   type Message,
   ChannelType,
+  PermissionsBitField,
 } from 'discord.js';
 import logger from '../../utils/logger.js';
 import type {
@@ -110,8 +111,19 @@ export class DiscordAdapter implements PlatformAdapter {
       const guild = await this.client.guilds.fetch(platformId);
       const channels = await guild.channels.fetch();
 
+      // Get the @everyone role (it has the same ID as the guild)
+      const everyoneRole = guild.roles.everyone;
+
       return channels
-        .filter((channel) => channel !== null)
+        .filter((channel) => {
+          if (!channel) return false;
+
+          // Check if @everyone has VIEW_CHANNEL permission
+          const permissions = channel.permissionsFor(everyoneRole);
+          return (
+            permissions?.has(PermissionsBitField.Flags.ViewChannel) ?? false
+          );
+        })
         .map((channel) => this.mapDiscordChannelToPlatform(channel!))
         .filter((channel): channel is PlatformChannel => channel !== null);
     } catch (error) {
@@ -158,7 +170,14 @@ export class DiscordAdapter implements PlatformAdapter {
         limit: Math.min(options?.limit || 100, 100), // Discord API limit
       };
 
-      if (options?.afterMessageId) {
+      // For Discord, when doing historical sync (no afterTimestamp),
+      // we need to paginate backwards using 'before'
+      // The afterMessageId in this case represents the oldest message we've seen
+      if (options?.afterMessageId && !options?.afterTimestamp) {
+        // Use 'before' to get older messages
+        fetchOptions.before = options.afterMessageId;
+      } else if (options?.afterMessageId && options?.afterTimestamp) {
+        // For incremental sync, use 'after' to get newer messages
         fetchOptions.after = options.afterMessageId;
       }
 
@@ -172,6 +191,15 @@ export class DiscordAdapter implements PlatformAdapter {
 
       const messages = await channel.messages.fetch(fetchOptions);
 
+      logger.debug('Discord fetch result', {
+        channelId,
+        messageCount: messages.size,
+        fetchOptions,
+        firstMessageId: messages.first()?.id,
+        lastMessageId: messages.last()?.id,
+        hasMore: messages.size === fetchOptions.limit,
+      });
+
       // Convert to platform messages
       const platformMessages = await Promise.all(
         messages.map((msg) => this.mapDiscordMessageToPlatform(msg))
@@ -182,20 +210,38 @@ export class DiscordAdapter implements PlatformAdapter {
         (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
       );
 
-      return {
+      // For pagination:
+      // - When doing historical sync (no afterTimestamp), always use oldest message as checkpoint
+      // - When doing incremental sync (with afterTimestamp), use newest message
+      const isIncrementalSync = !!options?.afterTimestamp;
+      const checkpointMessageIndex = isIncrementalSync
+        ? platformMessages.length - 1
+        : 0;
+
+      const result = {
         messages: platformMessages,
         hasMore: messages.size === fetchOptions.limit,
         checkpoint:
-          messages.size > 0
+          platformMessages.length > 0
             ? {
                 channelId,
-                lastMessageId: messages.last()!.id,
-                lastMessageTimestamp: messages.last()!.createdAt,
-                messagesProcessed: messages.size,
+                lastMessageId: platformMessages[checkpointMessageIndex].id,
+                lastMessageTimestamp:
+                  platformMessages[checkpointMessageIndex].createdAt,
+                messagesProcessed: platformMessages.length,
                 hasMoreMessages: messages.size === fetchOptions.limit,
               }
             : undefined,
       };
+
+      logger.debug('Returning fetch result', {
+        channelId,
+        hasMore: result.hasMore,
+        checkpointMessageId: result.checkpoint?.lastMessageId,
+        messagesReturned: platformMessages.length,
+      });
+
+      return result;
     } catch (error) {
       // Check if it's a rate limit error
       const classifiedError = classifyError(error);

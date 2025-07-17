@@ -30,6 +30,11 @@ export interface ChannelRepository
   /**
    * Find all channels for a tenant
    */
+  findByTenantId(tenantId: string): Promise<Channel[]>;
+
+  /**
+   * Find all channels for a tenant
+   */
   findByTenant(tenantId: string): Promise<Channel[]>;
 
   /**

@@ -240,8 +240,42 @@ export class SyncWorker {
     logger.info('Syncing channels', { tenantId, platformId });
 
     try {
+      // Get channels visible to @everyone from Discord
       const platformChannels = await adapter.fetchChannels(platformId);
+      const platformChannelIds = new Set(platformChannels.map((c) => c.id));
 
+      // Get all existing channels from DB for this tenant
+      const existingChannels = await this.channelRepo.findByTenantId(tenantId);
+
+      // Find channels that are no longer visible (need to be deleted)
+      const channelsToDelete = existingChannels.filter(
+        (channel) => !platformChannelIds.has(channel.platformChannelId)
+      );
+
+      // Delete channels that are no longer visible to @everyone
+      for (const channel of channelsToDelete) {
+        try {
+          await this.channelRepo.delete(channel.id);
+          logger.info('Deleted channel no longer visible to @everyone', {
+            channelId: channel.platformChannelId,
+            channelName: channel.name,
+            tenantId,
+          });
+        } catch (error) {
+          logger.error('Failed to delete channel', {
+            channelId: channel.id,
+            platformChannelId: channel.platformChannelId,
+            error,
+          });
+          result.errors.push({
+            channelId: channel.platformChannelId,
+            error: `Failed to delete channel: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            timestamp: new Date(),
+          });
+        }
+      }
+
+      // Process visible channels (add or update)
       for (const platformChannel of platformChannels) {
         try {
           // Skip channels that don't have a supported type in the database
@@ -276,6 +310,11 @@ export class SyncWorker {
               type: platformChannel.type as ChannelType,
               parentChannelId: platformChannel.parentId || null,
               metadata: platformChannel.metadata || {},
+            });
+            logger.info('Added new channel visible to @everyone', {
+              channelId: platformChannel.id,
+              channelName: platformChannel.name,
+              tenantId,
             });
           }
 
@@ -353,11 +392,24 @@ export class SyncWorker {
       let afterMessageId = lastMessageId;
 
       while (hasMore) {
+        logger.debug('Fetching messages batch', {
+          channelId: platformChannelId,
+          afterMessageId,
+          iteration: result.messagesProcessed,
+        });
+
         const fetchResult = await adapter.fetchMessages(platformChannelId, {
           afterMessageId,
           afterTimestamp: options.startDate,
           beforeTimestamp: options.endDate,
           limit: 100,
+        });
+
+        logger.debug('Fetch result received', {
+          channelId: platformChannelId,
+          messageCount: fetchResult.messages.length,
+          hasMore: fetchResult.hasMore,
+          checkpointId: fetchResult.checkpoint?.lastMessageId,
         });
 
         // Process messages
@@ -390,6 +442,13 @@ export class SyncWorker {
         }
 
         hasMore = fetchResult.hasMore;
+
+        logger.debug('Batch complete', {
+          channelId: platformChannelId,
+          hasMore,
+          nextAfterMessageId: afterMessageId,
+          totalMessagesProcessed: result.messagesProcessed,
+        });
       }
 
       // Mark sync as completed
