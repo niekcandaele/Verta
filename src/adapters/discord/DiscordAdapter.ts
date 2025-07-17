@@ -20,6 +20,7 @@ import type {
 } from '../types.js';
 import type { PlatformChannel, PlatformMessage } from '../../types/sync.js';
 import { config } from '../../config/env.js';
+import { SyncErrorClassification, classifyError } from '../../types/errors.js';
 
 /**
  * Discord adapter implementation for syncing Discord data
@@ -80,6 +81,18 @@ export class DiscordAdapter implements PlatformAdapter {
       const guild = await this.client.guilds.fetch(platformId);
       return guild !== null;
     } catch (error) {
+      // Check if it's a rate limit error
+      const classifiedError = classifyError(error);
+      if (
+        classifiedError.classification === SyncErrorClassification.RATE_LIMIT
+      ) {
+        logger.error('Rate limit hit while verifying Discord connection', {
+          platformId,
+          error,
+        });
+        throw classifiedError;
+      }
+
       logger.warn('Failed to verify Discord connection', {
         platformId,
         error,
@@ -102,11 +115,24 @@ export class DiscordAdapter implements PlatformAdapter {
         .map((channel) => this.mapDiscordChannelToPlatform(channel!))
         .filter((channel): channel is PlatformChannel => channel !== null);
     } catch (error) {
+      // Check if it's a rate limit error
+      const classifiedError = classifyError(error);
+      if (
+        classifiedError.classification === SyncErrorClassification.RATE_LIMIT
+      ) {
+        logger.error('Rate limit hit while fetching Discord channels', {
+          platformId,
+          error,
+        });
+        throw classifiedError;
+      }
+
       logger.error('Failed to fetch Discord channels', {
         platformId,
         error,
+        errorType: classifiedError.type,
       });
-      throw new Error('Failed to fetch Discord channels');
+      throw classifiedError;
     }
   }
 
@@ -171,11 +197,24 @@ export class DiscordAdapter implements PlatformAdapter {
             : undefined,
       };
     } catch (error) {
+      // Check if it's a rate limit error
+      const classifiedError = classifyError(error);
+      if (
+        classifiedError.classification === SyncErrorClassification.RATE_LIMIT
+      ) {
+        logger.error('Rate limit hit while fetching Discord messages', {
+          channelId,
+          error,
+        });
+        throw classifiedError;
+      }
+
       logger.error('Failed to fetch Discord messages', {
         channelId,
         error,
+        errorType: classifiedError.type,
       });
-      throw new Error('Failed to fetch Discord messages');
+      throw classifiedError;
     }
   }
 

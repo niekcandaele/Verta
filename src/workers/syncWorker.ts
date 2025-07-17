@@ -7,6 +7,7 @@ import logger from '../utils/logger.js';
 import { redisConfig } from '../config/redis.js';
 import { SYNC_QUEUE_NAME } from '../queues/syncQueue.js';
 import { PlatformAdapterFactory } from '../adapters/index.js';
+import type { PlatformAdapter } from '../adapters/types.js';
 import { db } from '../database/index.js';
 import type { TenantRepository } from '../repositories/tenant/index.js';
 import { TenantRepositoryImpl } from '../repositories/tenant/index.js';
@@ -23,7 +24,8 @@ import type {
   SyncJobResult,
   PlatformMessage,
 } from '../types/sync.js';
-import type { Platform } from '../database/types.js';
+import type { Platform, ChannelType } from '../database/types.js';
+import { isRateLimitError, classifyError } from '../types/errors.js';
 
 /**
  * Sync worker implementation
@@ -152,9 +154,17 @@ export class SyncWorker {
               result
             );
           } catch (error) {
+            // Re-throw rate limit errors to stop the entire job
+            if (isRateLimitError(error)) {
+              throw error;
+            }
+
+            const classifiedError = classifyError(error);
             logger.error('Failed to sync channel messages', {
               channelId,
-              error,
+              error: error instanceof Error ? error.message : 'Unknown error',
+              errorType: classifiedError.type,
+              errorClassification: classifiedError.classification,
             });
             result.errors.push({
               channelId,
@@ -168,15 +178,42 @@ export class SyncWorker {
         await adapter.cleanup();
       }
     } catch (error) {
+      // Check if it's a rate limit error
+      if (isRateLimitError(error)) {
+        logger.error('Rate limit hit during sync job - exiting immediately', {
+          jobId: job.id,
+          tenantId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+
+        result.errors.push({
+          error: 'Rate limit exceeded - will retry on next scheduled sync',
+          timestamp: new Date(),
+        });
+
+        // Mark job as failed with a special indicator
+        const rateLimitError = new Error('RATE_LIMIT_EXCEEDED');
+        (rateLimitError as unknown as Record<string, boolean>).skipRetry = true;
+        throw rateLimitError;
+      }
+
+      // Classify the error for better logging
+      const classifiedError = classifyError(error);
+
       logger.error('Sync job failed', {
         jobId: job.id,
         tenantId,
-        error,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        errorType: classifiedError.type,
+        errorClassification: classifiedError.classification,
+        retryable: classifiedError.retryable,
       });
+
       result.errors.push({
         error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date(),
       });
+
       throw error; // Re-throw to mark job as failed
     }
 
@@ -195,7 +232,7 @@ export class SyncWorker {
    * Sync channels from the platform
    */
   private async syncChannels(
-    adapter: any,
+    adapter: PlatformAdapter,
     tenantId: string,
     platformId: string,
     result: SyncJobResult
@@ -207,6 +244,15 @@ export class SyncWorker {
 
       for (const platformChannel of platformChannels) {
         try {
+          // Skip channels that don't have a supported type in the database
+          if (!['text', 'thread', 'forum'].includes(platformChannel.type)) {
+            logger.debug('Skipping unsupported channel type', {
+              channelId: platformChannel.id,
+              channelType: platformChannel.type,
+            });
+            continue;
+          }
+
           // Check if channel already exists
           const existingChannel = await this.channelRepo.findByPlatformId(
             tenantId,
@@ -217,7 +263,7 @@ export class SyncWorker {
             // Update existing channel
             await this.channelRepo.update(existingChannel.id, {
               name: platformChannel.name,
-              type: platformChannel.type,
+              type: platformChannel.type as ChannelType,
               parentChannelId: platformChannel.parentId || null,
               metadata: platformChannel.metadata || {},
             });
@@ -227,7 +273,7 @@ export class SyncWorker {
               tenantId,
               platformChannelId: platformChannel.id,
               name: platformChannel.name,
-              type: platformChannel.type,
+              type: platformChannel.type as ChannelType,
               parentChannelId: platformChannel.parentId || null,
               metadata: platformChannel.metadata || {},
             });
@@ -256,7 +302,7 @@ export class SyncWorker {
    * Sync messages for a specific channel
    */
   private async syncChannelMessages(
-    adapter: any,
+    adapter: PlatformAdapter,
     tenantId: string,
     platformChannelId: string,
     options: {
@@ -455,10 +501,18 @@ export class SyncWorker {
     });
 
     this.worker.on('failed', (job, error) => {
+      // Check if it's a rate limit error that should skip retry
+      const isRateLimit =
+        error instanceof Error &&
+        (error.message === 'RATE_LIMIT_EXCEEDED' ||
+          (error as unknown as Record<string, unknown>).skipRetry);
+
       logger.error('Sync job failed', {
         jobId: job?.id,
         tenantId: job?.data.tenantId,
-        error,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        isRateLimit,
+        willRetry: !isRateLimit && job?.attemptsMade && job.attemptsMade < 3,
       });
     });
 

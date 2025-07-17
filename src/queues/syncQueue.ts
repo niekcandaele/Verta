@@ -16,7 +16,7 @@ export const syncQueue = new Queue(SYNC_QUEUE_NAME, {
     attempts: 3,
     backoff: {
       type: 'exponential',
-      delay: 1000, // Start with 1 second
+      delay: 1000, // Start with 1 second (1s, 2s, 4s)
     },
   },
 });
