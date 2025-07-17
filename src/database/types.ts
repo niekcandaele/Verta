@@ -124,6 +124,20 @@ export interface SyncProgressTable {
 }
 
 /**
+ * Database table schema for tenant branding
+ */
+export interface TenantBrandingTable {
+  id: Generated<string>;
+  tenant_id: string;
+  logo: string | null;
+  primary_color: string;
+  secondary_color: string;
+  accent_color: string;
+  created_at: ColumnType<Date, string | undefined, never>;
+  updated_at: ColumnType<Date, string | undefined, string>;
+}
+
+/**
  * Database schema interface
  */
 export interface Database {
@@ -133,6 +147,7 @@ export interface Database {
   message_emoji_reactions: MessageEmojiReactionsTable;
   message_attachments: MessageAttachmentsTable;
   sync_progress: SyncProgressTable;
+  tenant_branding: TenantBrandingTable;
 }
 
 /**
@@ -174,3 +189,10 @@ export type NewMessageAttachment = Insertable<MessageAttachmentsTable>;
 export type SyncProgress = Selectable<SyncProgressTable>;
 export type NewSyncProgress = Insertable<SyncProgressTable>;
 export type SyncProgressUpdate = Updateable<SyncProgressTable>;
+
+/**
+ * Type helpers for working with tenant branding records
+ */
+export type TenantBranding = Selectable<TenantBrandingTable>;
+export type NewTenantBranding = Insertable<TenantBrandingTable>;
+export type TenantBrandingUpdate = Updateable<TenantBrandingTable>;
