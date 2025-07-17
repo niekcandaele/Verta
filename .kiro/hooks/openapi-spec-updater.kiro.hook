@@ -1,0 +1,20 @@
+{
+  "enabled": true,
+  "name": "OpenAPI Spec Updater",
+  "description": "Automatically updates the OpenAPI YAML specification whenever routes, controllers, validation schemas, or API-related files are modified",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/routes/**/*.ts",
+      "src/validation/**/*.ts",
+      "src/middleware/**/*.ts",
+      "src/services/**/*.ts",
+      "src/types/**/*.ts"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "The API routes, validation schemas, or related files have been modified. Please analyze the current codebase and update the OpenAPI YAML specification to reflect any new routes, request/response schemas, authentication requirements, or other API changes. Make sure to include proper documentation for all endpoints, parameters, and data models."
+  }
+}

@@ -1,0 +1,793 @@
+openapi: 3.0.3
+info:
+  title: Verta API
+  description: |
+    Verta is a modern multi-tenant system built as a TypeScript Express API. 
+    The application provides tenant management capabilities with full CRUD operations, 
+    authentication via API keys, and PostgreSQL database integration.
+
+    ## Key Features
+    - Multi-tenant architecture with tenant isolation
+    - RESTful API for tenant management
+    - API key-based authentication
+    - Database-backed persistence with connection pooling
+    - Comprehensive validation and error handling
+    - Platform data synchronization (Discord/Slack)
+  version: 1.0.0
+  contact:
+    name: Verta API Support
+  license:
+    name: ISC
+
+servers:
+  - url: http://localhost:3000
+    description: Development server
+  - url: https://api.verta.example.com
+    description: Production server
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /:
+    get:
+      summary: API Health Check
+      description: Returns basic API information and version
+      security: []
+      responses:
+        '200':
+          description: API information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: 'Welcome to Verta API'
+                  version:
+                    type: string
+                    example: '1.0.0'
+
+  /tenants:
+    get:
+      summary: List all tenants
+      description: Retrieve a paginated list of all tenants with optional sorting
+      parameters:
+        - name: page
+          in: query
+          description: Page number (1-based)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: sortBy
+          in: query
+          description: Field to sort by
+          schema:
+            type: string
+            enum: [created_at, updated_at, name]
+            default: created_at
+        - name: sortOrder
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: List of tenants
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Tenant'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      summary: Create a new tenant
+      description: Create a new tenant with the provided information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTenantRequest'
+      responses:
+        '201':
+          description: Tenant created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /tenants/{id}:
+    get:
+      summary: Get tenant by ID
+      description: Retrieve a specific tenant by its UUID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Tenant UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Tenant details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      summary: Update tenant
+      description: Update an existing tenant with partial data
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Tenant UUID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTenantRequest'
+      responses:
+        '200':
+          description: Tenant updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      summary: Delete tenant
+      description: Delete a tenant by its UUID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Tenant UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Tenant deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /tenants/{id}/sync:
+    post:
+      summary: Start tenant sync
+      description: Start a synchronization job for a specific tenant (Discord only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Tenant UUID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                syncType:
+                  type: string
+                  enum: [full, incremental]
+                  default: incremental
+                  description: Type of synchronization to perform
+      responses:
+        '201':
+          description: Sync job started successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                    description: Unique identifier for the sync job
+                  message:
+                    type: string
+                    example: 'Sync job started successfully'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /tenants/{id}/sync/status:
+    get:
+      summary: Get tenant sync status
+      description: Get the current synchronization status for a tenant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Tenant UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Sync status information
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: [never_synced]
+                      message:
+                        type: string
+                        example: 'This tenant has never been synced'
+                  - type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: [active, waiting, completed, failed]
+                      progress:
+                        type: number
+                        minimum: 0
+                        maximum: 100
+                        description: Sync progress percentage
+                      jobId:
+                        type: string
+                        description: Current or last job ID
+                      startedAt:
+                        type: string
+                        format: date-time
+                      completedAt:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      result:
+                        type: object
+                        nullable: true
+                        description: Sync result details
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/sync:
+    post:
+      summary: Start sync job
+      description: Start a synchronization job for a tenant with detailed options
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartSyncRequest'
+      responses:
+        '201':
+          description: Sync job started successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                    description: Unique identifier for the sync job
+                  message:
+                    type: string
+                    example: 'Sync job started successfully'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/sync/jobs/{jobId}:
+    get:
+      summary: Get sync job status
+      description: Get the status of a specific sync job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: Sync job ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job status information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncJobStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      summary: Cancel sync job
+      description: Cancel a running sync job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: Sync job ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: 'Job cancelled successfully'
+                  cancelled:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/sync/jobs/{jobId}/retry:
+    post:
+      summary: Retry failed sync job
+      description: Retry a failed synchronization job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: Sync job ID to retry
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Job retried successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                    description: New job ID for the retry
+                  message:
+                    type: string
+                    example: 'Job retried successfully'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/sync/history/{tenantId}:
+    get:
+      summary: Get sync history
+      description: Get synchronization history for a specific tenant
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          description: Tenant UUID
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          description: Number of history records to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+      responses:
+        '200':
+          description: Sync history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  history:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SyncHistoryItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+
+  schemas:
+    Tenant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique tenant identifier
+        name:
+          type: string
+          description: Tenant display name
+          maxLength: 255
+        slug:
+          type: string
+          description: URL-friendly unique identifier
+          pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+          minLength: 3
+          maxLength: 50
+        status:
+          type: string
+          enum: [ACTIVE, CANCELLED, MAINTENANCE]
+          description: Current tenant status
+        platform:
+          type: string
+          enum: [slack, discord]
+          description: Integration platform
+        platformId:
+          type: string
+          description: Platform-specific identifier
+          maxLength: 255
+        createdAt:
+          type: string
+          format: date-time
+          description: Tenant creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+      required:
+        - id
+        - name
+        - slug
+        - status
+        - platform
+        - platformId
+        - createdAt
+        - updatedAt
+
+    CreateTenantRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Tenant display name
+          minLength: 1
+          maxLength: 255
+        slug:
+          type: string
+          description: URL-friendly unique identifier
+          pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+          minLength: 3
+          maxLength: 50
+        platform:
+          type: string
+          enum: [slack, discord]
+          description: Integration platform
+        platformId:
+          type: string
+          description: Platform-specific identifier
+          minLength: 1
+          maxLength: 255
+        status:
+          type: string
+          enum: [ACTIVE, CANCELLED, MAINTENANCE]
+          description: Initial tenant status
+          default: ACTIVE
+      required:
+        - name
+        - slug
+        - platform
+        - platformId
+
+    UpdateTenantRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Tenant display name
+          minLength: 1
+          maxLength: 255
+        slug:
+          type: string
+          description: URL-friendly unique identifier
+          pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+          minLength: 3
+          maxLength: 50
+        platform:
+          type: string
+          enum: [slack, discord]
+          description: Integration platform
+        platformId:
+          type: string
+          description: Platform-specific identifier
+          minLength: 1
+          maxLength: 255
+        status:
+          type: string
+          enum: [ACTIVE, CANCELLED, MAINTENANCE]
+          description: Tenant status
+      minProperties: 1
+
+    StartSyncRequest:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+          description: Tenant UUID to sync
+        syncType:
+          type: string
+          enum: [full, incremental]
+          default: incremental
+          description: Type of synchronization
+        channelIds:
+          type: array
+          items:
+            type: string
+          description: Specific channel IDs to sync (optional)
+        startDate:
+          type: string
+          format: date-time
+          description: Start date for sync range (optional)
+        endDate:
+          type: string
+          format: date-time
+          description: End date for sync range (optional)
+      required:
+        - tenantId
+
+    SyncJobStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [waiting, active, completed, failed, cancelled]
+          description: Current job status
+        progress:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Job progress percentage
+        startedAt:
+          type: string
+          format: date-time
+          description: Job start timestamp
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Job completion timestamp
+        result:
+          type: object
+          nullable: true
+          description: Job result details
+        error:
+          type: string
+          nullable: true
+          description: Error message if job failed
+
+    SyncHistoryItem:
+      type: object
+      properties:
+        jobId:
+          type: string
+          description: Sync job identifier
+        status:
+          type: string
+          enum: [waiting, active, completed, failed, cancelled]
+          description: Job status
+        startedAt:
+          type: string
+          format: date-time
+          description: Job start timestamp
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Job completion timestamp
+        result:
+          type: object
+          nullable: true
+          description: Job result details
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          description: Current page number
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Items per page
+        total:
+          type: integer
+          minimum: 0
+          description: Total number of items
+        totalPages:
+          type: integer
+          minimum: 0
+          description: Total number of pages
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code
+        details:
+          type: object
+          description: Additional error details
+      required:
+        - error
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: 'Validation failed'
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: array
+                items:
+                  oneOf:
+                    - type: string
+                    - type: number
+              message:
+                type: string
+              code:
+                type: string
+      required:
+        - error
+        - details
+
+  responses:
+    BadRequest:
+      description: Bad request - validation error or malformed request
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/Error'
+              - $ref: '#/components/schemas/ValidationError'
+
+    Unauthorized:
+      description: Unauthorized - invalid or missing API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: 'Unauthorized'
+            code: 'INVALID_API_KEY'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: 'Resource not found'
+            code: 'NOT_FOUND'
+
+    Conflict:
+      description: Conflict - resource already exists
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: 'Resource already exists'
+            code: 'DUPLICATE_ENTRY'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: 'Internal server error'
+            code: 'INTERNAL_ERROR'
+
+tags:
+  - name: Tenants
+    description: Tenant management operations
+  - name: Sync
+    description: Platform data synchronization operations
+  - name: Health
+    description: API health and status endpoints
