@@ -3,7 +3,11 @@ import { initializeDatabase, closeDatabase } from './database/connection.js';
 import { migrateToLatest } from './database/migrator.js';
 import { config } from './config/env.js';
 import logger from './utils/logger.js';
-import { SyncWorker, HourlyTriggerWorker } from './workers/index.js';
+import {
+  SyncWorker,
+  HourlyTriggerWorker,
+  ExportWorker,
+} from './workers/index.js';
 import { syncScheduler } from './scheduler/index.js';
 
 const PORT = config.PORT;
@@ -11,6 +15,7 @@ const PORT = config.PORT;
 // Global references to workers
 let syncWorker: SyncWorker | null = null;
 let hourlyTriggerWorker: HourlyTriggerWorker | null = null;
+let exportWorker: ExportWorker | null = null;
 
 /**
  * Start the application
@@ -41,6 +46,12 @@ async function startServer() {
       hourlyTriggerWorker = new HourlyTriggerWorker();
       await hourlyTriggerWorker.start();
       logger.info('Hourly trigger worker started');
+
+      // Start export worker
+      logger.info('Starting export worker...');
+      exportWorker = new ExportWorker();
+      await exportWorker.start();
+      logger.info('Export worker started');
 
       // Start sync scheduler
       logger.info('Starting sync scheduler...');
@@ -77,6 +88,13 @@ async function startServer() {
             logger.info('Stopping hourly trigger worker...');
             await hourlyTriggerWorker.stop();
             logger.info('Hourly trigger worker stopped');
+          }
+
+          // Stop export worker
+          if (exportWorker) {
+            logger.info('Stopping export worker...');
+            await exportWorker.stop();
+            logger.info('Export worker stopped');
           }
 
           // Stop sync worker

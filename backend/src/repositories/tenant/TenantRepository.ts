@@ -1,10 +1,6 @@
-/**
- * Tenant repository interface
- */
-
 import type { BaseCrudRepository } from '../types.js';
 import type { Platform } from '../../database/types.js';
-import type { Tenant, CreateTenantData, UpdateTenantData } from './types.js';
+import type { Tenant, CreateTenantData, UpdateTenantData } from 'shared-types';
 
 /**
  * Repository interface for tenant-specific database operations

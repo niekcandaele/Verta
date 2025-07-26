@@ -12,7 +12,7 @@ import type {
   CreateMessageAttachmentData,
   CreateSyncProgressData,
   UpdateSyncProgressData,
-} from '../../types/sync.js';
+} from 'shared-types';
 
 /**
  * Channel repository interface

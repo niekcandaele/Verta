@@ -5,7 +5,7 @@
 import { Kysely, sql } from 'kysely';
 import { BaseCrudRepositoryImpl } from '../BaseCrudRepository.js';
 import type { TenantRepository } from './TenantRepository.js';
-import type { Tenant, CreateTenantData, UpdateTenantData } from './types.js';
+import type { Tenant, CreateTenantData, UpdateTenantData } from 'shared-types';
 import type { Database, Platform } from '../../database/types.js';
 
 /**

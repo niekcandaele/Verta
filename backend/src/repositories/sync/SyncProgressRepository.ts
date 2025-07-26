@@ -5,7 +5,7 @@ import type {
   SyncProgress,
   CreateSyncProgressData,
   UpdateSyncProgressData,
-} from '../../types/sync.js';
+} from 'shared-types';
 import type { Database, SyncStatus } from '../../database/types.js';
 
 /**

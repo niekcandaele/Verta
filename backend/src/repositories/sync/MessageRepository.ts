@@ -2,7 +2,7 @@ import { Kysely, sql } from 'kysely';
 import { BaseCrudRepositoryImpl } from '../BaseCrudRepository.js';
 import type { MessageRepository } from './types.js';
 import type { PaginatedResult } from '../types.js';
-import type { Message, CreateMessageData } from '../../types/sync.js';
+import type { Message, CreateMessageData } from 'shared-types';
 import type { Database } from '../../database/types.js';
 
 /**

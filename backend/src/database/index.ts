@@ -42,6 +42,13 @@ const createDatabase = (): Kysely<Database> => {
 export const db = createDatabase();
 
 /**
+ * Get database instance
+ */
+export async function getDatabase(): Promise<Kysely<Database>> {
+  return db;
+}
+
+/**
  * Export database types for use in other modules
  */
 export type { Database } from './types.js';

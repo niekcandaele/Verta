@@ -14,14 +14,14 @@
   - Update documentation to reflect new structure
   - _Requirements: Project organization_
 
-- [ ] 3. Create shared-types package
+- [x] 3. Create shared-types package
   - Initialize new TypeScript package in shared-types/ directory
   - Define tenant, channel, message, and archive types
   - Configure package.json for use by both backend and frontend
   - Set up build process for type definitions
   - _Requirements: 10.1, 10.2, 10.3_
 
-- [ ] 4. Update existing backend to use shared-types
+- [x] 4. Update existing backend to use shared-types
   - Update TenantRepository to use shared types
   - Update ChannelRepository to use shared types
   - Update MessageRepository to use shared types
@@ -29,14 +29,14 @@
   - Ensure type consistency across backend codebase
   - _Requirements: 10.2, 10.4_
 
-- [ ] 5. Implement tenant branding repository
+- [x] 5. Implement tenant branding repository
   - Create TenantBrandingRepository interface in backend
   - Implement repository using Kysely following existing patterns
   - Add CRUD operations for tenant branding configuration
   - Add validation for color hex codes and base64 logo data
   - _Requirements: 8.1, 8.2, 8.3_
 
-- [ ] 6. Implement backend data export service
+- [x] 6. Implement backend data export service
   - Create DataExportService in backend/src/services/dataExport/
   - Implement exportAllTenants() method to loop through active tenants
   - Implement exportTenant() method for individual tenant export
@@ -47,7 +47,7 @@
   - Ensure exported files have open permissions (chmod 777)
   - _Requirements: 4.1, 4.2, 4.3_
 
-- [ ] 7. Add HTTP API endpoints for export
+- [x] 7. Add HTTP API endpoints for export
   - Create POST /api/export/all-tenants endpoint
   - Create POST /api/export/tenant/:tenantId endpoint
   - Create GET /api/export/status/:jobId endpoint
@@ -56,14 +56,14 @@
   - Implement job status tracking and reporting
   - _Requirements: 11.1, 11.2, 11.3, 11.4, 12.1, 12.2_
 
-- [ ] 8. Add export npm scripts
+- [x] 8. Add export npm scripts
   - Add "export:tenants" script that calls HTTP endpoint
   - Add "export:tenant" script that calls HTTP endpoint
   - Add "export:status" script to check job status
   - Create simple CLI wrapper scripts
   - _Requirements: 11.5_
 
-- [ ] 9. Implement error handling and retry logic
+- [x] 9. Implement error handling and retry logic
   - Add retry mechanism (3 retries with exponential backoff)
   - Implement proper error logging and reporting
   - Handle partial export failures gracefully

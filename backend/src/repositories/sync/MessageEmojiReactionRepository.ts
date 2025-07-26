@@ -4,7 +4,7 @@ import type { MessageEmojiReactionRepository } from './types.js';
 import type {
   MessageEmojiReaction,
   CreateMessageEmojiReactionData,
-} from '../../types/sync.js';
+} from 'shared-types';
 import type { Database } from '../../database/types.js';
 
 /**
