@@ -1,4 +1,5 @@
 import type { MessageWithExtras } from '@/lib/data';
+import { generateAvatarUrl } from '@/lib/avatars';
 
 interface MessageProps {
   message: MessageWithExtras;
@@ -11,11 +12,12 @@ export default function Message({ message }: MessageProps) {
 
   return (
     <div className="chat chat-start mb-4">
-      <div className="chat-image avatar placeholder">
-        <div className="bg-neutral text-neutral-content rounded-full w-10">
-          <span className="text-xs">
-            {message.anonymizedAuthorId.slice(0, 2).toUpperCase()}
-          </span>
+      <div className="chat-image avatar">
+        <div className="w-10 rounded-full">
+          <img 
+            src={generateAvatarUrl(message.anonymizedAuthorId)} 
+            alt={`Avatar for ${message.anonymizedAuthorId}`}
+          />
         </div>
       </div>
       

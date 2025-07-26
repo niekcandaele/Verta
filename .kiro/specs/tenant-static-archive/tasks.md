@@ -132,7 +132,7 @@
 
 ## Phase 4: Features & Polish
 
-- [ ] 18. Implement avatar generation
+- [x] 18. Implement avatar generation
   - Install @dicebear/core and @dicebear/collection packages
   - Create avatars.ts utility in frontend/lib/
   - Use anonymized user IDs directly as seeds
