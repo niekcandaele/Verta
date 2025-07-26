@@ -139,7 +139,7 @@
   - Integrate avatars into Message components
   - _Requirements: 3.1, 3.2, 3.3, 3.5_
 
-- [ ] 19. Add white labeling support
+- [x] 19. Add white labeling support
   - Read branding data from metadata.json
   - Implement dynamic theming using CSS variables
   - Apply tenant logo in header

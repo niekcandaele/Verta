@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Default theme colors if not set by JavaScript */
+:root {
+  --p: 259 94% 51%; /* Default primary (purple) */
+  --s: 314 100% 47%; /* Default secondary (pink) */
+  --a: 174 60% 51%; /* Default accent (teal) */
+  
+  /* Hex values for direct use */
+  --brand-primary: #570df8;
+  --brand-secondary: #f000b8;
+  --brand-accent: #37cdbe;
+}
+
 html,
 body {
   max-width: 100vw;
