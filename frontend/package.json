@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "build:tenant": "bash -c 'TENANT_SLUG=$1 OUTPUT_DIR=../_data/next-export/$1 npm run build' -- ",
+    "build:all": "cd ../backend && npm run build:all-tenants",
     "export:tenant": "bash -c 'cd ../backend && npm run export:tenant $1 && cd ../frontend && npm run build:tenant $1' -- "
   },
   "dependencies": {
@@ -20,6 +21,10 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.21",
+    "daisyui": "^5.0.47",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
     "typescript": "^5"
   }
 }

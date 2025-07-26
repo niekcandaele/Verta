@@ -41,10 +41,12 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+      - ./_data:/data
     env_file:
       - .env
     environment:
       - NODE_ENV=development
+      - DOCKERIZED=true
       - PORT=25000
       - DATABASE_URL=postgresql://verta_user:verta_password@postgres:5432/verta
       - DATABASE_POOL_SIZE=10

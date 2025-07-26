@@ -1,6 +1,12 @@
 import { readFile } from 'fs/promises';
 import path from 'path';
-import type { Tenant, TenantBranding, Channel, Message } from 'shared-types';
+import type { Tenant, TenantBranding, Channel, Message, MessageAttachment, MessageEmojiReaction } from 'shared-types';
+
+// Extended message type that includes attachments and reactions
+export interface MessageWithExtras extends Message {
+  attachments: MessageAttachment[];
+  reactions: MessageEmojiReaction[];
+}
 
 // Get the tenant slug from environment variable or build parameter
 export function getTenantSlug(): string {
@@ -13,7 +19,7 @@ export function getTenantSlug(): string {
 
 // Get the base path for data export files
 export function getDataBasePath(): string {
-  // During build, we read from the backend's data export directory
+  // During build, we read from the backend _data directory (temporary until we fix the backend path)
   const basePath = process.env.DATA_EXPORT_PATH || '../backend/_data/data-export';
   return path.resolve(basePath);
 }
@@ -34,7 +40,7 @@ export interface MessagePageData {
   channelType: string;
   page: number;
   totalPages: number;
-  messages: Message[];
+  messages: MessageWithExtras[];
 }
 
 // Load tenant metadata

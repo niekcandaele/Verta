@@ -3,7 +3,9 @@
  */
 
 import { mkdir, writeFile, chmod } from 'fs/promises';
-import { join } from 'path';
+import { join, resolve } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import type { DataExportService, ExportResult } from './DataExportService.js';
 import type {
   TenantRepository,
@@ -23,7 +25,17 @@ import type {
 import logger from '../../utils/logger.js';
 
 const MESSAGES_PER_PAGE = 1000;
-const EXPORT_BASE_PATH = '_data/data-export';
+
+// Get the absolute path to the project root
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const projectRoot = resolve(__dirname, '..', '..', '..');
+
+// Use /data mount when running in Docker, otherwise use root _data
+const EXPORT_BASE_PATH =
+  process.env.DOCKERIZED === 'true' || process.env.NODE_ENV === 'production'
+    ? '/data/data-export'
+    : join(projectRoot, '_data', 'data-export');
 
 export class DataExportServiceImpl implements DataExportService {
   constructor(

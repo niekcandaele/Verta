@@ -2,59 +2,89 @@ import { GetStaticProps, GetStaticPaths } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { 
+  getTenantMetadata,
   getChannels, 
   getChannel,
   getChannelMessages, 
   getChannelPageNumbers,
-  type MessagePageData 
+  type MessagePageData,
+  type TenantMetadata 
 } from '@/lib/data';
 import type { Channel } from 'shared-types';
+import Layout from '@/components/Layout';
+import MessageList from '@/components/MessageList';
 
 interface ChannelPageProps {
+  metadata: TenantMetadata;
   channel: Channel;
   pageData: MessagePageData;
   currentPage: number;
 }
 
-export default function ChannelPage({ channel, pageData, currentPage }: ChannelPageProps) {
+export default function ChannelPage({ metadata, channel, pageData, currentPage }: ChannelPageProps) {
   const router = useRouter();
   
   if (router.isFallback) {
-    return <div>Loading...</div>;
+    return (
+      <Layout metadata={metadata}>
+        <div className="flex items-center justify-center h-64">
+          <span className="loading loading-spinner loading-lg"></span>
+        </div>
+      </Layout>
+    );
   }
   
   return (
-    <div>
-      <h1>Channel: {channel.name}</h1>
-      <p>Type: {channel.type}</p>
-      <p>Channel ID: {channel.id}</p>
-      <p>Page {currentPage} of {pageData.totalPages}</p>
-      
-      <nav>
-        <Link href="/">← Back to channels</Link>
-        {' | '}
-        {currentPage > 1 && (
-          <>
-            <Link href={`/channel/${channel.id}/${currentPage - 1}`}>
-              ← Previous
-            </Link>
-            {' | '}
-          </>
-        )}
-        {currentPage < pageData.totalPages && (
-          <Link href={`/channel/${channel.id}/${currentPage + 1}`}>
-            Next →
-          </Link>
-        )}
-      </nav>
-      
-      <h2>Messages ({pageData.messages.length})</h2>
-      
-      <h3>Raw Page Data (Debug)</h3>
-      <pre style={{ overflow: 'auto', maxHeight: '600px' }}>
-        {JSON.stringify(pageData, null, 2)}
-      </pre>
-    </div>
+    <Layout metadata={metadata} currentChannelId={channel.id}>
+      <div className="max-w-4xl mx-auto">
+        {/* Channel Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">{channel.name}</h1>
+          <div className="flex items-center gap-4">
+            <span className="badge badge-lg">{channel.type}</span>
+            <span className="text-sm text-base-content/60">
+              Page {currentPage} of {pageData.totalPages}
+            </span>
+          </div>
+        </div>
+
+        {/* Pagination */}
+        <div className="flex justify-between items-center mb-6">
+          <div className="btn-group">
+            {currentPage > 1 ? (
+              <Link 
+                href={`/channel/${channel.id}/${currentPage - 1}`}
+                className="btn btn-sm"
+              >
+                « Previous
+              </Link>
+            ) : (
+              <button className="btn btn-sm btn-disabled">« Previous</button>
+            )}
+            
+            <button className="btn btn-sm btn-active">Page {currentPage}</button>
+            
+            {currentPage < pageData.totalPages ? (
+              <Link 
+                href={`/channel/${channel.id}/${currentPage + 1}`}
+                className="btn btn-sm"
+              >
+                Next »
+              </Link>
+            ) : (
+              <button className="btn btn-sm btn-disabled">Next »</button>
+            )}
+          </div>
+          
+          <div className="text-sm text-base-content/60">
+            {pageData.messages.length} messages on this page
+          </div>
+        </div>
+
+        {/* Messages */}
+        <MessageList messages={pageData.messages} />
+      </div>
+    </Layout>
   );
 }
 
@@ -93,7 +123,11 @@ export const getStaticProps: GetStaticProps<ChannelPageProps> = async ({ params 
     return { notFound: true };
   }
   
-  const channel = await getChannel(channelId);
+  const [metadata, channel] = await Promise.all([
+    getTenantMetadata(),
+    getChannel(channelId),
+  ]);
+  
   if (!channel) {
     return { notFound: true };
   }
@@ -105,6 +139,7 @@ export const getStaticProps: GetStaticProps<ChannelPageProps> = async ({ params 
   
   return {
     props: {
+      metadata,
       channel,
       pageData,
       currentPage,

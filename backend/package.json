@@ -23,6 +23,7 @@
     "export:all": "tsx scripts/export-cli.ts all",
     "export:tenant": "tsx scripts/export-cli.ts tenant",
     "export:status": "tsx scripts/export-cli.ts status",
+    "build:all-tenants": "tsx scripts/build-all-tenants.ts",
     "worker:export": "tsx src/workers/exportWorker.ts"
   },
   "keywords": [],
@@ -42,6 +43,7 @@
     "zod": "^4.0.5"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.11",
     "@testcontainers/postgresql": "^11.2.1",
     "@types/express": "^5.0.3",
     "@types/node": "^24.0.0",

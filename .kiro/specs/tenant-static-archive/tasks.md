@@ -102,28 +102,28 @@
 
 ## Phase 3: Styling & Components
 
-- [ ] 14. Install and configure DaisyUI
+- [x] 14. Install and configure DaisyUI
   - Install Tailwind CSS and DaisyUI
   - Configure tailwind.config.js with DaisyUI plugin
   - Set up global styles with default theme
   - Add responsive design utilities
   - _Requirements: 6.4, 6.5_
 
-- [ ] 15. Create basic layout and navigation
+- [x] 15. Create basic layout and navigation
   - Create Layout component with header
   - Add sidebar for channel navigation
   - Implement responsive design
   - Apply default theme colors
   - _Requirements: 2.1_
 
-- [ ] 16. Build channel list component
+- [x] 16. Build channel list component
   - Create ChannelList with DaisyUI menu
   - Add channel type indicators
   - Show message counts as badges
   - Group channels by type
   - _Requirements: 2.1, 7.4_
 
-- [ ] 17. Create message display components
+- [x] 17. Create message display components
   - Build MessageList component
   - Create Message component with basic styling
   - Add timestamps and author display (no avatars yet)
