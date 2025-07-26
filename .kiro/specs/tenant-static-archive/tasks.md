@@ -4,146 +4,155 @@
   - Create migration for tenant_branding table with logo, colors, and tenant relationship
   - Add foreign key constraint to tenants table
   - Include proper indexes for efficient tenant lookups
-  - _Requirements: 9.1, 9.2_
+  - _Requirements: 8.1, 8.2_
 
-- [ ] 2. Create static site generation queue infrastructure
-  - Implement StaticSiteQueue class following existing syncQueue pattern
-  - Define StaticSiteJobData and StaticSiteJobResult interfaces
-  - Configure Bull queue with appropriate job options and retry logic
-  - Export queue instance for use by workers and job schedulers
-  - _Requirements: 4.1, 4.2_
+- [x] 2. Restructure project into backend and frontend directories
+  - Move all existing code to backend/ directory
+  - Keep specs at root level
+  - Update documentation to reflect new structure
+  - _Requirements: Project organization_
 
-- [ ] 3. Implement tenant branding repository and service layer
-  - Create TenantBrandingRepository interface and implementation
+- [ ] 3. Implement tenant branding repository
+  - Create TenantBrandingRepository interface in backend
+  - Implement repository using Kysely following existing patterns
   - Add CRUD operations for tenant branding configuration
-  - Implement TenantBrandingService for business logic
   - Add validation for color hex codes and base64 logo data
-  - _Requirements: 9.1, 9.2, 9.3_
+  - _Requirements: 8.1, 8.2, 8.3_
 
-- [ ] 4. Create tenant data aggregator for paginated archive data
-  - Implement TenantDataAggregator class to fetch and structure tenant data
-  - Create methods to generate TenantMetadata with channel summaries
-  - Implement pagination logic for channel messages (250 messages per page)
-  - Add support for fetching tenant branding configuration
-  - Include message reactions and attachments in paginated data
-  - _Requirements: 2.1, 2.2, 2.5, 9.3_
+- [ ] 4. Create shared-types package
+  - Initialize new TypeScript package in shared-types/ directory
+  - Define tenant, channel, message, and archive types
+  - Configure package.json for use by both backend and frontend
+  - Set up build process for type definitions
+  - _Requirements: 10.1, 10.2, 10.3_
 
-- [ ] 5. Build avatar generation service using Dicebear NPM library
+- [ ] 5. Implement backend data export service
+  - Create DataExportService in backend/src/services/dataExport/
+  - Implement exportAllTenants() method to loop through active tenants
+  - Implement exportTenant() method for individual tenant export
+  - Use existing repositories to fetch all tenant data
+  - Include tenant branding data in export
+  - _Requirements: 4.1, 4.2, 4.3_
+
+- [ ] 6. Create data export file generation logic
+  - Implement JSON file generation with 1000 messages per file
+  - Create directory structure: backend/data-export/{tenant-slug}/
+  - Generate metadata.json with tenant info and channel summaries
+  - Create paginated channel message files
+  - Handle large datasets with streaming/batching
+  - _Requirements: 4.3, 4.4, 4.5_
+
+- [ ] 7. Add backend export scripts
+  - Add "export:tenants" script to backend package.json
+  - Add "export:tenant" script for individual tenant export
+  - Create CLI entry points for the export commands
+  - Add progress logging during export
+  - _Requirements: 4.1_
+
+- [ ] 8. Create frontend NextJS project
+  - Initialize new NextJS project in frontend/ directory
+  - Configure TypeScript and static export in next.config.js
+  - Install shared-types package as dependency
+  - Set up project structure without database dependencies
+  - _Requirements: 1.1, 1.2_
+
+- [ ] 9. Configure data loading from JSON files
+  - Create data loading utilities in frontend/lib/data.ts
+  - Implement functions to read from backend/data-export/
+  - Add logic to select tenant based on build configuration
+  - Handle missing data gracefully
+  - _Requirements: 4.7, 5.1_
+
+- [ ] 10. Install and configure DaisyUI
+  - Install Tailwind CSS and DaisyUI
+  - Configure tailwind.config.js with DaisyUI plugin
+  - Set up global styles with DaisyUI theme
+  - Add responsive design utilities
+  - _Requirements: 6.4, 6.5_
+
+- [ ] 11. Build avatar generation service using Dicebear
   - Install @dicebear/core and @dicebear/collection packages
-  - Implement AvatarService with generateAvatarSvg and generateAvatarDataUrl methods
-  - Use MD5 hash of anonymized user ID as consistent seed
+  - Create avatars.ts utility in frontend/lib/
+  - Implement consistent avatar generation using anonymized user IDs
   - Configure shapes style with appropriate options
-  - Add error handling for avatar generation failures
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 6. Create NextJS template project structure
-  - Initialize NextJS project with TypeScript configuration
-  - Set up pages structure with index.tsx and channel/[id]/[page].tsx
-  - Configure next.config.js for static site generation
-  - Add package.json with required dependencies including DaisyUI and Dicebear packages
-  - Install and configure Tailwind CSS with DaisyUI plugin
-  - _Requirements: 7.1, 7.2_
+- [ ] 12. Create NextJS pages and routing
+  - Implement index.tsx for channel list page
+  - Create channel/[id]/[page].tsx for paginated messages
+  - Set up getStaticProps for data loading from JSON files
+  - Configure getStaticPaths for all routes based on exported data
+  - _Requirements: 2.1, 2.2_
 
-- [ ] 7. Create static site worker for job processing
-  - Implement StaticSiteWorker class with Bull worker integration
-  - Add processSiteGenerationJob method with comprehensive error handling
-  - Implement data fetching, file generation, and NextJS build orchestration
-  - Add progress reporting and logging throughout the process
-  - Handle graceful degradation for missing data scenarios
-  - _Requirements: 4.3, 4.4, 5.4_
+- [ ] 13. Build React components with DaisyUI
+  - Create Layout component with navigation
+  - Implement ChannelList with menu and badges
+  - Build MessageList with appropriate styling for channel types
+  - Create Message component with chat bubbles
+  - Add Pagination component
+  - _Requirements: 2.3, 7.1, 7.2, 7.3_
 
-- [ ] 8. Implement file system operations for static site generation
-  - Create utility functions for generating paginated JSON files
-  - Implement directory structure creation for tenant sites
-  - Add file writing operations for metadata.json and channel page files
-  - Include proper error handling for file system operations
-  - Add cleanup functionality for failed builds
-  - _Requirements: 5.1, 5.2_
+- [ ] 14. Implement white labeling support
+  - Read branding data from metadata.json
+  - Implement dynamic theming using CSS variables
+  - Apply tenant logo in header
+  - Use brand colors throughout components
+  - Add fallback for default branding
+  - _Requirements: 8.4, 8.5, 8.6, 8.7_
 
-- [ ] 9. Build React components for archive interface using DaisyUI
-  - Create Layout component using DaisyUI navbar and drawer components
-  - Implement ChannelList using DaisyUI menu and badge components
-  - Build MessageList using DaisyUI card and timeline components for different channel types
-  - Create Message component using DaisyUI chat bubble and badge components
-  - Add Pagination using DaisyUI pagination component
-  - _Requirements: 2.2, 2.3, 8.1, 8.2, 8.3_
+- [ ] 15. Implement message threading and replies
+  - Add reply relationship visualization
+  - Create thread expansion/collapse functionality
+  - Style nested messages appropriately
+  - Maintain context in paginated views
+  - _Requirements: 9.1, 9.2, 9.3, 9.4_
 
-- [ ] 10. Implement avatar integration with DaisyUI components
-  - Create Avatar component using DaisyUI avatar component and AvatarService
-  - Integrate avatar generation in Message components with DaisyUI styling
-  - Add fallback handling for avatar generation failures using DaisyUI placeholder
-  - Ensure consistent avatar display across all message views
-  - _Requirements: 3.1, 3.2, 3.3_
+- [ ] 16. Add comprehensive error handling
+  - Handle missing JSON files gracefully
+  - Add validation for data integrity
+  - Create fallback UI for missing data
+  - Log errors appropriately
+  - _Requirements: 4.6, 4.7_
 
-- [ ] 11. Add white labeling support to NextJS template
-  - Implement branding context provider for theme configuration
-  - Add CSS custom properties for dynamic color theming
-  - Create logo display component with base64 image support
-  - Apply branding consistently across all pages and components
-  - Add fallback styling when no branding is configured
-  - _Requirements: 9.3, 9.4, 9.5, 9.6_
+- [ ] 17. Create documentation
+  - Write README.md for shared-types package
+  - Document backend export process
+  - Create frontend build and deployment guide
+  - Include troubleshooting section
+  - _Requirements: Documentation_
 
-- [ ] 12. Build data loading utilities for static site
-  - Create data.ts utility functions for loading metadata and channel pages
-  - Implement getStaticProps functions for NextJS pages
-  - Add error handling for missing or corrupted data files
-  - Create helper functions for pagination navigation
-  - _Requirements: 2.1, 2.2, 7.2_
+- [ ] 18. Write unit tests
+  - Test TenantBrandingRepository implementation
+  - Test data export service logic
+  - Add tests for avatar generation consistency
+  - Test React components with sample data
+  - Verify pagination logic
+  - _Requirements: Testing_
 
-- [ ] 13. Implement responsive design and mobile support with DaisyUI
-  - Configure DaisyUI responsive utilities for mobile and desktop layouts
-  - Use DaisyUI responsive navigation components for touch-friendly interfaces
-  - Optimize message display using DaisyUI responsive grid and card components
-  - Implement mobile-friendly pagination using DaisyUI responsive pagination
-  - _Requirements: 7.4_
+- [ ] 19. Create integration tests
+  - Test full workflow from data export to static build
+  - Verify JSON file generation and structure
+  - Test static site functionality with exported data
+  - Check performance with large datasets
+  - _Requirements: 5.4, 6.1_
 
-- [ ] 14. Integrate static site generation with sync worker
-  - Modify existing SyncWorker to schedule static site jobs on successful completion
-  - Add job scheduling logic with tenant ID and slug parameters
-  - Implement error handling for job scheduling failures
-  - Add logging for static site job scheduling events
-  - _Requirements: 4.1, 4.2_
+- [ ] 20. Optimize build performance
+  - Implement efficient data loading strategies
+  - Optimize image loading and avatars
+  - Add code splitting for better performance
+  - Minimize bundle sizes
+  - _Requirements: 6.1, 6.2, 6.3_
 
-- [ ] 15. Create nginx configuration for serving static sites
-  - Write nginx.conf with tenant slug-based routing
-  - Add proper error handling for missing tenant directories
-  - Configure static file serving with appropriate headers
-  - Add health check endpoint for monitoring
-  - _Requirements: 5.1, 5.3, 5.4, 5.5_
+- [ ] 21. Handle edge cases
+  - Empty tenants with no data
+  - Very large channels with thousands of messages
+  - Missing or corrupted JSON files
+  - Attachment URLs that have expired
+  - _Requirements: 4.6_
 
-- [ ] 16. Update docker-compose.yml with nginx container
-  - Add nginx service to docker-compose configuration
-  - Configure volume mounting for generated static sites
-  - Set up proper networking between services
-  - Add environment variables for nginx configuration
-  - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
-
-- [ ] 17. Implement comprehensive error handling and logging
-  - Create StaticSiteError class with detailed error context
-  - Add structured logging throughout the generation process
-  - Implement retry logic for transient failures
-  - Add monitoring and alerting for build failures
-  - _Requirements: 4.5_
-
-- [ ] 18. Add unit tests for core functionality
-  - Write tests for TenantDataAggregator with various data scenarios
-  - Test AvatarService for consistent avatar generation
-  - Add tests for StaticSiteWorker job processing logic
-  - Test React components with sample archive data
-  - _Requirements: 2.1, 2.2, 3.1, 3.2_
-
-- [ ] 19. Create API route for manual static site generation
-  - Add POST /api/tenants/:tenantId/generate-archive endpoint
-  - Implement request validation for tenant ID parameter
-  - Add authentication middleware to protect the endpoint
-  - Schedule static site generation job and return job ID
-  - Include proper error handling and response formatting
-  - _Requirements: 4.2, 4.3_
-
-- [ ] 20. Create integration tests for end-to-end workflow
-  - Test complete flow from sync completion to static site generation
-  - Add tests for nginx routing with different tenant slugs
-  - Test static site functionality with real database data
-  - Add performance tests for large dataset scenarios
-  - Test manual API trigger for static site generation
-  - _Requirements: 4.1, 4.2, 5.1, 7.1_
+- [ ] 22. Final testing and documentation
+  - Complete end-to-end testing
+  - Update all documentation
+  - Create deployment checklist
+  - Prepare for production use
+  - _Requirements: All_

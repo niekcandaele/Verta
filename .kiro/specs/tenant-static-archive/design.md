@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Tenant Static Archive feature generates fully static NextJS websites for each tenant that serve as comprehensive archives of all chat messages. The system integrates with the existing multi-tenant architecture, leveraging the current sync infrastructure to trigger static site generation jobs after Discord sync completion. Each tenant gets a dedicated static website accessible via their slug, served through an nginx container.
+The Tenant Static Archive feature generates fully static NextJS websites for each tenant that serve as comprehensive archives of all chat messages. The system consists of three main components: a backend data export job that aggregates tenant data into JSON files, a shared-types package for type safety across components, and a frontend NextJS application that builds static sites from the exported JSON data. This architecture ensures clean separation of concerns with the frontend having no direct database access.
 
 ## Architecture
 
@@ -10,96 +10,122 @@ The Tenant Static Archive feature generates fully static NextJS websites for eac
 
 ```mermaid
 graph TB
-    A[Discord Sync Job] --> B[Sync Worker]
-    B --> C[Static Site Generation Job]
-    C --> D[Static Site Worker]
-    D --> E[Data Fetcher]
-    D --> F[NextJS Builder]
-    E --> G[(PostgreSQL)]
-    F --> H[Static Files]
-    H --> I["./dist/generated/tenant-slug/"]
-    I --> J[Nginx Server]
-    J --> K[User Browser]
-
-    L[Bull Queue] --> C
-    L --> A
+    A[Backend Export Job] --> B[Data Export Service]
+    B --> C[(PostgreSQL)]
+    B --> D[TenantBrandingRepo]
+    B --> E[ChannelRepo]
+    B --> F[MessageRepo]
+    B --> G[JSON Files]
+    G --> H[backend/data-export/tenant-slug/]
+    
+    I[Admin User] --> J[npm run build]
+    J --> K[NextJS Builder]
+    H --> K
+    K --> L[Static Files]
+    L --> M[frontend/out/]
+    M --> N[Deploy to Static Host]
+    N --> O[User Browser]
+    
+    P[shared-types] --> B
+    P --> K
 ```
 
 ### Component Integration
 
-The static site generation system integrates with existing components:
+The static site generation system consists of three integrated components:
 
-- **Sync Worker**: Modified to schedule static site generation jobs upon successful completion
-- **Bull Queue System**: Extended with a new queue for static site generation jobs
-- **Repository Layer**: Utilized to fetch tenant data for static site generation
-- **Docker Compose**: Extended with nginx container for serving static sites
+- **Backend Data Export**: Service that runs in the backend, leveraging existing repositories to export tenant data
+- **Shared Types Package**: Common TypeScript definitions used by both backend and frontend
+- **Frontend NextJS App**: Reads exported JSON files and generates static sites without database access
+- **Data Flow**: Backend exports → JSON files → Frontend reads → Static site output
 
 ## Components and Interfaces
 
-### 1. Static Site Generation Queue
+### 1. Backend Data Export Service
 
-**Purpose**: Manages static site generation jobs using the existing Bull/Redis infrastructure.
+**Purpose**: Backend service that exports all tenant data to structured JSON files for static site generation.
 
 **Interface**:
 
 ```typescript
-export interface StaticSiteJobData {
-  tenantId: string;
-  tenantSlug: string;
-  force?: boolean; // Force regeneration even if up-to-date
+// backend/src/services/dataExport/DataExportService.ts
+export interface DataExportService {
+  exportAllTenants(): Promise<ExportResult[]>;
+  exportTenant(tenantId: string): Promise<ExportResult>;
 }
 
-export interface StaticSiteJobResult {
+export interface ExportResult {
   tenantId: string;
   tenantSlug: string;
-  generatedAt: Date;
+  channelsExported: number;
+  messagesExported: number;
   filesGenerated: number;
-  buildTimeMs: number;
-  errors: Array<{
-    error: string;
-    timestamp: Date;
-  }>;
+  exportPath: string;
+  executionTimeMs: number;
+  errors: string[];
 }
 ```
 
 **Implementation**:
 
-- New queue `STATIC_SITE_QUEUE_NAME = 'static-site-generation'`
-- Similar configuration to existing sync queue
-- Jobs triggered automatically after successful sync completion
+- Loops through all active tenants
+- Uses existing repositories (ChannelRepository, MessageRepository, etc.)
+- Fetches tenant branding from TenantBrandingRepository
+- Generates paginated JSON files (1000 messages per file)
+- Saves output to `backend/data-export/{tenant-slug}/` directory
 
-### 2. Static Site Worker
+### 2. Shared Types Package
 
-**Purpose**: Processes static site generation jobs by fetching tenant data and building NextJS sites.
+**Purpose**: Provides common TypeScript type definitions shared between backend and frontend.
 
-**Key Responsibilities**:
+**Package Structure**:
 
-- Fetch all tenant data (channels, messages, reactions, attachments)
-- Generate static data files for NextJS consumption
-- Execute NextJS build process
-- Store generated files in tenant-specific directories
+```
+shared-types/
+├── package.json
+├── tsconfig.json
+└── src/
+    ├── index.ts
+    ├── tenant.ts      // Tenant and branding types
+    ├── channel.ts     // Channel types
+    ├── message.ts     // Message, reaction, attachment types
+    └── archive.ts     // Static archive data structures
+```
 
-**Interface**:
+**Key Types**:
 
 ```typescript
-export class StaticSiteWorker {
-  async processSiteGenerationJob(
-    job: Job<StaticSiteJobData>
-  ): Promise<StaticSiteJobResult>;
-  private async fetchTenantData(tenantId: string): Promise<TenantArchiveData>;
-  private async generateStaticSite(
-    tenantData: TenantArchiveData,
-    outputPath: string
-  ): Promise<void>;
-  private async buildNextJSSite(sitePath: string): Promise<void>;
+// shared-types/src/archive.ts
+export interface ArchiveMetadata {
+  tenant: TenantInfo;
+  branding: TenantBranding | null;
+  channels: ChannelSummary[];
+  generatedAt: string;
+  dataVersion: string;
+}
+
+export interface ChannelPageData {
+  channelId: string;
+  channelName: string;
+  channelType: ChannelType;
+  page: number;
+  totalPages: number;
+  messages: ArchiveMessage[];
+}
+
+export interface ArchiveMessage {
+  id: string;
+  platformMessageId: string;
+  anonymizedAuthorId: string;
+  content: string;
+  replyToId: string | null;
+  platformCreatedAt: string;
+  reactions: MessageReaction[];
+  attachments: MessageAttachment[];
 }
 ```
 
-### 3. Tenant Data Aggregator
-
-**Purpose**: Aggregates all tenant data into a structured format suitable for static site generation.
-
-**Data Structure**:
+### 3. Tenant Data Structure
 
 ```typescript
 // Main tenant metadata file
@@ -127,7 +153,7 @@ export interface TenantMetadata {
   generatedAt: Date;
 }
 
-// Individual channel page data (250 messages per page)
+// Individual channel page data (1000 messages per page)
 export interface ChannelPageData {
   channelId: string;
   channelName: string;
@@ -140,14 +166,14 @@ export interface ChannelPageData {
     anonymizedAuthorId: string;
     content: string;
     replyToId: string | null;
-    platformCreatedAt: Date;
+    platformCreatedAt: string; // ISO string for JSON compatibility
     reactions: Array<{
       emoji: string;
       anonymizedUserId: string;
     }>;
     attachments: Array<{
       filename: string;
-      fileSize: bigint;
+      fileSize: number; // JSON doesn't support bigint
       contentType: string;
       url: string;
     }>;
@@ -155,9 +181,9 @@ export interface ChannelPageData {
 }
 ```
 
-### 4. NextJS Static Site Template
+### 3. NextJS Static Site Application
 
-**Purpose**: Provides the NextJS application template that renders the archived chat data.
+**Purpose**: Standalone NextJS application that generates static sites from aggregated tenant data.
 
 **Key Features**:
 
@@ -166,12 +192,12 @@ export interface ChannelPageData {
 - Channel navigation with different layouts for text/forum/thread channels
 - Message threading and reply visualization
 - Dicebear avatar integration with consistent hashing
-- Pagination with 250 messages per page for optimal performance
+- Pagination with 1000 messages per page for optimal performance
 
 **File Structure**:
 
 ```
-template/
+frontend/
 ├── package.json
 ├── next.config.js
 ├── pages/
@@ -190,19 +216,22 @@ template/
 │   └── avatars.ts                   # Dicebear integration
 ├── styles/
 │   └── globals.css
-└── data/
+└── out/                             # NextJS build output (gitignored)
+
+backend/data-export/                 # Exported tenant data
+└── {tenant-slug}/
     ├── metadata.json                # Tenant and channel metadata
     └── channels/
         ├── {channel-id}/
-        │   ├── page-1.json          # First 250 messages
-        │   ├── page-2.json          # Next 250 messages
+        │   ├── page-1.json          # First 1000 messages
+        │   ├── page-2.json          # Next 1000 messages
         │   └── ...
         └── {another-channel-id}/
             ├── page-1.json
             └── ...
 ```
 
-### 5. Avatar Generation Service
+### 4. Avatar Generation Service
 
 **Purpose**: Generates consistent Dicebear avatars using the "shapes" style via the NPM library.
 
@@ -234,40 +263,24 @@ export class AvatarService {
 }
 ```
 
-### 6. Nginx Configuration
-
-**Purpose**: Serves static sites based on tenant slugs with proper routing and error handling.
-
-**Configuration**:
-
-```nginx
-server {
-    listen 80;
-    server_name localhost;
-
-    location ~ ^/([^/]+)/?(.*)$ {
-        set $tenant_slug $1;
-        set $path $2;
-
-        root /var/www/generated/$tenant_slug;
-
-        # Try to serve the file, fallback to index.html for SPA routing
-        try_files /$path /$path/ /index.html =404;
-
-        # Handle missing tenant directories
-        if (!-d /var/www/generated/$tenant_slug) {
-            return 404;
-        }
-    }
-
-    # Health check endpoint
-    location /health {
-        return 200 "OK";
-    }
-}
-```
 
 ## Data Models
+
+### TenantBrandingRepository
+
+**Purpose**: Manages tenant branding configuration for white labeling static archives.
+
+**Interface**:
+
+```typescript
+// backend/src/repositories/tenant/TenantBrandingRepository.ts
+export interface TenantBrandingRepository {
+  findByTenantId(tenantId: string): Promise<TenantBranding | null>;
+  create(data: CreateTenantBrandingData): Promise<TenantBranding>;
+  update(id: string, data: UpdateTenantBrandingData): Promise<TenantBranding>;
+  delete(id: string): Promise<void>;
+}
+```
 
 ### White Labeling Configuration
 
@@ -286,19 +299,27 @@ export interface TenantBranding {
 }
 ```
 
-### Extended Sync Job Integration
+### Data Export and Build Workflow
 
-The existing `SyncWorker` will be modified to schedule static site generation jobs:
+The static site generation consists of two phases:
 
-```typescript
-// In SyncWorker.processSyncJob()
-if (result.errors.length === 0) {
-  // Schedule static site generation job
-  await staticSiteQueue.add('generate-site', {
-    tenantId: tenant.id,
-    tenantSlug: tenant.slug,
-  });
-}
+**Phase 1: Backend Data Export**
+```bash
+# Run from backend directory
+npm run export:tenants   # Exports all active tenants
+# OR
+npm run export:tenant <tenantId>  # Export specific tenant
+
+# Data is exported to backend/data-export/{tenant-slug}/
+```
+
+**Phase 2: Frontend Static Site Generation**
+```bash
+# Run from frontend directory
+npm run build   # Builds static site from exported data
+npm run export  # Exports to static files
+
+# Static files are now available in frontend/out/
 ```
 
 ### Static Site Data Schema
@@ -366,26 +387,35 @@ The static site will consume multiple JSON files with a paginated structure:
 
 ## Error Handling
 
+### Script Execution Failures
+
+- **Invalid Tenant ID**: Display clear error message and exit gracefully
+- **Database Connection Errors**: Log connection details and suggest troubleshooting steps
+- **Data Fetching Errors**: Log specific queries that failed, continue with partial data if possible
+- **File System Errors**: Check write permissions, ensure data directory exists
+- **Out of Memory**: Process data in smaller batches for large tenants
+
 ### Build Failures
 
-- **Data Fetching Errors**: Retry with exponential backoff, log specific database errors
-- **NextJS Build Errors**: Capture build logs, provide fallback empty site generation
-- **File System Errors**: Ensure proper permissions, handle disk space issues
-- **Template Errors**: Validate template integrity before build process
+- **Missing Data Files**: Verify data aggregation completed successfully
+- **NextJS Build Errors**: Display build logs with clear error messages
+- **Template Errors**: Validate component integrity during development
 
-### Runtime Error Handling
+### Error Handling in Scripts
 
 ```typescript
-export class StaticSiteError extends Error {
-  constructor(
-    message: string,
-    public readonly tenantId: string,
-    public readonly phase: 'data-fetch' | 'build' | 'deploy',
-    public readonly originalError?: Error
-  ) {
-    super(message);
-    this.name = 'StaticSiteError';
+// Example error handling in tenantDataAggregator.ts
+try {
+  const tenant = await getTenant(tenantId);
+  if (!tenant) {
+    console.error(`Error: Tenant with ID '${tenantId}' not found`);
+    process.exit(1);
   }
+  // Continue processing...
+} catch (error) {
+  console.error('Failed to connect to database:', error);
+  console.error('Please check your DATABASE_URL environment variable');
+  process.exit(1);
 }
 ```
 

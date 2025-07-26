@@ -42,16 +42,17 @@ This feature will generate static NextJS websites for each tenant that serve as 
 
 ### Requirement 4
 
-**User Story:** As a system administrator, I want the static website generation to be triggered automatically after Discord sync completion, so that archives are always up-to-date with the latest chat data.
+**User Story:** As a system administrator, I want the backend to export all tenant data as structured JSON files that can be consumed by the frontend static site generator, so that the frontend doesn't need database access.
 
 #### Acceptance Criteria
 
-1. WHEN a Discord sync job completes successfully THEN the system SHALL automatically schedule a static site generation job
-2. WHEN the static site generation job runs THEN it SHALL accept a tenant ID as input
-3. WHEN generation starts THEN the system SHALL fetch all relevant data for the specified tenant
-4. WHEN data fetching is complete THEN the system SHALL build the NextJS static site with the bundled data
-5. WHEN the build completes THEN the system SHALL store the generated files in `./dist/generated/{tenant-slug}/` directory structure
-6. IF the tenant has no data THEN the system SHALL generate an empty archive with appropriate messaging
+1. WHEN I run a backend data export job THEN it SHALL loop over all active tenants and export their data
+2. WHEN exporting data for a tenant THEN the system SHALL aggregate all channels, messages, reactions, attachments, and branding configuration
+3. WHEN generating JSON files THEN the system SHALL create files with up to 1000 messages per file for efficient processing
+4. WHEN the export is complete THEN the JSON files SHALL be saved to `backend/data-export/{tenant-slug}/` directory
+5. WHEN exporting tenant data THEN the system SHALL include tenant branding information (logo, colors) in the metadata
+6. IF a tenant has no data THEN the system SHALL generate minimal JSON files with empty arrays
+7. WHEN the frontend builds THEN it SHALL read these JSON files from the data-export directory without requiring database access
 
 ### Requirement 5
 
@@ -59,25 +60,13 @@ This feature will generate static NextJS websites for each tenant that serve as 
 
 #### Acceptance Criteria
 
-1. WHEN I navigate to a tenant-specific URL THEN the system SHALL serve the static archive for that tenant
-2. WHEN the static files are generated THEN they SHALL be stored in `./dist/generated/{tenant-slug}/` directory
-3. WHEN I access the archive URL THEN an nginx server SHALL serve the static files based on the tenant slug
-4. WHEN the tenant slug is invalid THEN the system SHALL return an appropriate 404 error page
-5. WHEN multiple tenants exist THEN each SHALL have their own isolated static archive accessible via their unique slug
+1. WHEN the static site is built THEN NextJS SHALL output the files to `frontend/out/` directory
+2. WHEN the build is complete THEN the static files SHALL be ready for deployment to any static hosting service
+3. WHEN accessing the archive THEN all navigation SHALL work with client-side routing
+4. WHEN the archive is deployed THEN it SHALL function as a completely static website with no server requirements
+5. WHEN multiple tenants need archives THEN each SHALL require a separate build process with their specific data
 
 ### Requirement 6
-
-**User Story:** As a system administrator, I want an nginx container to serve the static archives, so that tenants can access their archives through web URLs without additional infrastructure setup.
-
-#### Acceptance Criteria
-
-1. WHEN the docker-compose environment starts THEN it SHALL include an nginx container configured to serve static files
-2. WHEN nginx receives a request THEN it SHALL route requests based on tenant slug to the appropriate static archive directory
-3. WHEN a tenant archive exists THEN nginx SHALL serve the static files from `./dist/generated/{tenant-slug}/`
-4. WHEN a tenant archive doesn't exist THEN nginx SHALL return a 404 error page
-5. WHEN the nginx container starts THEN it SHALL be accessible on a designated port for archive access
-
-### Requirement 7
 
 **User Story:** As a tenant user, I want the archive website to be performant and responsive, so that I can efficiently browse through large amounts of chat history.
 
@@ -89,7 +78,7 @@ This feature will generate static NextJS websites for each tenant that serve as 
 4. WHEN the site is accessed on mobile devices THEN it SHALL be fully responsive using DaisyUI components
 5. WHEN the interface is displayed THEN it SHALL use DaisyUI component library for consistent styling and user experience
 
-### Requirement 8
+### Requirement 7
 
 **User Story:** As a tenant user, I want different channel types to be displayed with appropriate visual styling and organization, so that I can easily understand the context and structure of different conversation formats.
 
@@ -101,7 +90,7 @@ This feature will generate static NextJS websites for each tenant that serve as 
 4. WHEN viewing different channel types THEN each SHALL have distinct visual styling to indicate the channel type
 5. WHEN navigating between channel types THEN the interface SHALL adapt to show the most appropriate layout for that channel type
 
-### Requirement 9
+### Requirement 8
 
 **User Story:** As a tenant administrator, I want to customize the appearance of my static archive with my logo and brand colors, so that the archive reflects my organization's visual identity.
 
@@ -109,12 +98,13 @@ This feature will generate static NextJS websites for each tenant that serve as 
 
 1. WHEN I configure a logo for my tenant THEN the system SHALL store it as base64 data in the PostgreSQL database
 2. WHEN I configure brand colors for my tenant THEN the system SHALL store the color scheme in the database
-3. WHEN the static site is generated THEN it SHALL use my configured logo and colors throughout the interface
-4. WHEN I haven't configured custom branding THEN the system SHALL use default styling
-5. WHEN the static site loads THEN my logo SHALL appear in the header/navigation area
-6. WHEN viewing the archive THEN the color scheme SHALL be applied consistently across all pages and components
+3. WHEN the tenantDataAggregator script runs THEN it SHALL include the branding configuration in the exported data
+4. WHEN the static site is generated THEN it SHALL use my configured logo and colors throughout the interface
+5. WHEN I haven't configured custom branding THEN the system SHALL use default styling
+6. WHEN the static site loads THEN my logo SHALL appear in the header/navigation area
+7. WHEN viewing the archive THEN the color scheme SHALL be applied consistently across all pages and components
 
-### Requirement 10
+### Requirement 9
 
 **User Story:** As a tenant administrator, I want the static archive to preserve message threading and reply relationships, so that conversation context is maintained in the archive.
 
@@ -124,3 +114,15 @@ This feature will generate static NextJS websites for each tenant that serve as 
 2. WHEN viewing threaded conversations THEN replies SHALL be properly nested or linked to parent messages
 3. WHEN a message thread exists THEN users SHALL be able to expand/collapse thread views
 4. WHEN displaying replies THEN the system SHALL show which message is being replied to
+
+### Requirement 10
+
+**User Story:** As a developer, I want shared type definitions between backend and frontend to ensure type safety across the static archive system.
+
+#### Acceptance Criteria
+
+1. WHEN developing the system THEN a shared-types package SHALL provide common type definitions
+2. WHEN the backend exports data THEN it SHALL use types from the shared-types package
+3. WHEN the frontend reads data THEN it SHALL use the same types from the shared-types package
+4. WHEN types are updated THEN both backend and frontend SHALL use the updated definitions
+5. WHEN building either backend or frontend THEN TypeScript SHALL validate against the shared types
