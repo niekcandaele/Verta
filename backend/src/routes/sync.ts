@@ -23,7 +23,7 @@ const startSyncSchema = z.object({
 /**
  * Start a sync job for a tenant
  */
-router.post('/sync', validateApiKey, async (req, res, next) => {
+router.post('/', validateApiKey, async (req, res, next) => {
   try {
     const validationResult = startSyncSchema.safeParse(req.body);
 
@@ -69,7 +69,7 @@ router.post('/sync', validateApiKey, async (req, res, next) => {
 /**
  * Get sync job status
  */
-router.get('/sync/jobs/:jobId', validateApiKey, async (req, res, next) => {
+router.get('/jobs/:jobId', validateApiKey, async (req, res, next) => {
   try {
     const { jobId } = req.params;
 
@@ -91,7 +91,7 @@ router.get('/sync/jobs/:jobId', validateApiKey, async (req, res, next) => {
 /**
  * Cancel a sync job
  */
-router.delete('/sync/jobs/:jobId', validateApiKey, async (req, res, next) => {
+router.delete('/jobs/:jobId', validateApiKey, async (req, res, next) => {
   try {
     const { jobId } = req.params;
 
@@ -118,64 +118,56 @@ router.delete('/sync/jobs/:jobId', validateApiKey, async (req, res, next) => {
 /**
  * Get sync history for a tenant
  */
-router.get(
-  '/sync/history/:tenantId',
-  validateApiKey,
-  async (req, res, next) => {
-    try {
-      const { tenantId } = req.params;
-      const limit = parseInt(req.query.limit as string) || 10;
+router.get('/history/:tenantId', validateApiKey, async (req, res, next) => {
+  try {
+    const { tenantId } = req.params;
+    const limit = parseInt(req.query.limit as string) || 10;
 
-      const result = await syncService.getSyncHistory(tenantId, limit);
+    const result = await syncService.getSyncHistory(tenantId, limit);
 
-      if (!result.success) {
-        return res.status(400).json({
-          error: result.error?.message || 'Failed to get sync history',
-          code: result.error?.code,
-        });
-      }
-
-      return res.json({
-        history: result.data,
+    if (!result.success) {
+      return res.status(400).json({
+        error: result.error?.message || 'Failed to get sync history',
+        code: result.error?.code,
       });
-    } catch (error) {
-      return next(error);
     }
+
+    return res.json({
+      history: result.data,
+    });
+  } catch (error) {
+    return next(error);
   }
-);
+});
 
 /**
  * Retry a failed sync job
  */
-router.post(
-  '/sync/jobs/:jobId/retry',
-  validateApiKey,
-  async (req, res, next) => {
-    try {
-      const { jobId } = req.params;
+router.post('/jobs/:jobId/retry', validateApiKey, async (req, res, next) => {
+  try {
+    const { jobId } = req.params;
 
-      const result = await syncService.retryJob(jobId);
+    const result = await syncService.retryJob(jobId);
 
-      if (!result.success) {
-        return res.status(400).json({
-          error: result.error?.message || 'Failed to retry job',
-          code: result.error?.code,
-        });
-      }
-
-      logger.info('Sync job retried', {
-        originalJobId: jobId,
-        newJobId: result.data.jobId,
+    if (!result.success) {
+      return res.status(400).json({
+        error: result.error?.message || 'Failed to retry job',
+        code: result.error?.code,
       });
-
-      return res.status(201).json({
-        jobId: result.data.jobId,
-        message: 'Job retried successfully',
-      });
-    } catch (error) {
-      return next(error);
     }
+
+    logger.info('Sync job retried', {
+      originalJobId: jobId,
+      newJobId: result.data.jobId,
+    });
+
+    return res.status(201).json({
+      jobId: result.data.jobId,
+      message: 'Job retried successfully',
+    });
+  } catch (error) {
+    return next(error);
   }
-);
+});
 
 export default router;

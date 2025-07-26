@@ -12,7 +12,9 @@ import {
 } from '@/lib/data';
 import type { Channel } from 'shared-types';
 import Layout from '@/components/Layout';
-import MessageList from '@/components/MessageList';
+import TextChannelView from '@/components/channels/TextChannelView';
+import ForumChannelView from '@/components/channels/ForumChannelView';
+import ThreadChannelView from '@/components/channels/ThreadChannelView';
 
 interface ChannelPageProps {
   metadata: TenantMetadata;
@@ -81,8 +83,16 @@ export default function ChannelPage({ metadata, channel, pageData, currentPage }
           </div>
         </div>
 
-        {/* Messages */}
-        <MessageList messages={pageData.messages} />
+        {/* Messages - Render based on channel type */}
+        {channel.type === 'text' && (
+          <TextChannelView messages={pageData.messages} channelName={channel.name} />
+        )}
+        {channel.type === 'forum' && (
+          <ForumChannelView messages={pageData.messages} channelName={channel.name} />
+        )}
+        {channel.type === 'thread' && (
+          <ThreadChannelView messages={pageData.messages} channelName={channel.name} />
+        )}
       </div>
     </Layout>
   );

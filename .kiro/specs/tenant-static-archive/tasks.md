@@ -147,7 +147,7 @@
   - Implement default theme fallback
   - _Requirements: 8.4, 8.5, 8.6, 8.7_
 
-- [ ] 20. Implement channel type layouts
+- [x] 20. Implement channel type layouts
   - Create different layouts for text channels
   - Add forum channel layout with post grouping
   - Implement thread channel with hierarchy

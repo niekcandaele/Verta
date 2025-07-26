@@ -12,6 +12,8 @@
     "export:tenant": "bash -c 'cd ../backend && npm run export:tenant $1 && cd ../frontend && npm run build:tenant $1' -- "
   },
   "dependencies": {
+    "@dicebear/collection": "^9.2.3",
+    "@dicebear/core": "^9.2.3",
     "next": "15.4.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
