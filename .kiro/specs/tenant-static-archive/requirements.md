@@ -36,9 +36,10 @@ This feature will generate static NextJS websites for each tenant that serve as 
 #### Acceptance Criteria
 
 1. WHEN displaying a message author THEN the system SHALL show a Dicebear avatar using the "shapes" style
-2. WHEN generating avatars THEN the system SHALL use a hash of the author identifier to ensure consistency
+2. WHEN generating avatars THEN the system SHALL use the existing anonymized user ID directly as the seed for Dicebear
 3. WHEN the same author appears multiple times THEN they SHALL always have the same avatar across all messages
 4. WHEN the static site is rebuilt THEN author avatars SHALL remain consistent between builds
+5. WHEN avatars are generated THEN they SHALL be created during the NextJS build process, not in the backend
 
 ### Requirement 4
 
@@ -46,13 +47,15 @@ This feature will generate static NextJS websites for each tenant that serve as 
 
 #### Acceptance Criteria
 
-1. WHEN I run a backend data export job THEN it SHALL loop over all active tenants and export their data
-2. WHEN exporting data for a tenant THEN the system SHALL aggregate all channels, messages, reactions, attachments, and branding configuration
-3. WHEN generating JSON files THEN the system SHALL create files with up to 1000 messages per file for efficient processing
-4. WHEN the export is complete THEN the JSON files SHALL be saved to `backend/data-export/{tenant-slug}/` directory
-5. WHEN exporting tenant data THEN the system SHALL include tenant branding information (logo, colors) in the metadata
-6. IF a tenant has no data THEN the system SHALL generate minimal JSON files with empty arrays
-7. WHEN the frontend builds THEN it SHALL read these JSON files from the data-export directory without requiring database access
+1. WHEN I trigger a data export via HTTP endpoint THEN the system SHALL create a BullMQ job for tracking
+2. WHEN the export job runs THEN it SHALL loop over all active tenants and export their data
+3. WHEN exporting data for a tenant THEN the system SHALL aggregate all channels, messages, reactions, attachments, and branding configuration
+4. WHEN generating JSON files THEN the system SHALL create files with up to 1000 messages per file for efficient processing
+5. WHEN the export is complete THEN the JSON files SHALL be saved to `_data/data-export/{tenant-slug}/` directory
+6. WHEN exporting tenant data THEN the system SHALL include tenant branding information (logo, colors) in the metadata
+7. IF a tenant has no data THEN the system SHALL generate minimal JSON files with empty arrays
+8. WHEN the frontend builds THEN it SHALL read these JSON files from the _data/data-export directory without requiring database access
+9. WHEN running npm scripts THEN they SHALL trigger exports via HTTP calls to the backend API
 
 ### Requirement 5
 
@@ -60,11 +63,12 @@ This feature will generate static NextJS websites for each tenant that serve as 
 
 #### Acceptance Criteria
 
-1. WHEN the static site is built THEN NextJS SHALL output the files to `frontend/out/` directory
-2. WHEN the build is complete THEN the static files SHALL be ready for deployment to any static hosting service
-3. WHEN accessing the archive THEN all navigation SHALL work with client-side routing
-4. WHEN the archive is deployed THEN it SHALL function as a completely static website with no server requirements
-5. WHEN multiple tenants need archives THEN each SHALL require a separate build process with their specific data
+1. WHEN the static site is built for a specific tenant THEN NextJS SHALL output the files to `_data/next-export/{tenant-slug}/` directory
+2. WHEN building archives THEN each tenant SHALL have a completely separate static site build
+3. WHEN the build is complete THEN the static files SHALL be ready for deployment to any static hosting service
+4. WHEN accessing the archive THEN all navigation SHALL work with client-side routing
+5. WHEN the archive is deployed THEN it SHALL function as a completely static website with no server requirements
+6. WHEN building multiple tenant archives THEN wrapper scripts SHALL facilitate tenant-specific builds
 
 ### Requirement 6
 
@@ -100,7 +104,7 @@ This feature will generate static NextJS websites for each tenant that serve as 
 2. WHEN I configure brand colors for my tenant THEN the system SHALL store the color scheme in the database
 3. WHEN the tenantDataAggregator script runs THEN it SHALL include the branding configuration in the exported data
 4. WHEN the static site is generated THEN it SHALL use my configured logo and colors throughout the interface
-5. WHEN I haven't configured custom branding THEN the system SHALL use default styling
+5. WHEN I haven't configured custom branding THEN the system SHALL use a well-defined default theme with standard colors and placeholder logo
 6. WHEN the static site loads THEN my logo SHALL appear in the header/navigation area
 7. WHEN viewing the archive THEN the color scheme SHALL be applied consistently across all pages and components
 
@@ -126,3 +130,29 @@ This feature will generate static NextJS websites for each tenant that serve as 
 3. WHEN the frontend reads data THEN it SHALL use the same types from the shared-types package
 4. WHEN types are updated THEN both backend and frontend SHALL use the updated definitions
 5. WHEN building either backend or frontend THEN TypeScript SHALL validate against the shared types
+
+### Requirement 11
+
+**User Story:** As a system administrator, I want to trigger data exports via HTTP API endpoints, so that I can integrate the export process with automation tools and track job progress.
+
+#### Acceptance Criteria
+
+1. WHEN I send a POST request to `/api/export/all-tenants` THEN the system SHALL create BullMQ jobs for all active tenants
+2. WHEN I send a POST request to `/api/export/tenant/:tenantId` THEN the system SHALL create a BullMQ job for that specific tenant
+3. WHEN an export job is created THEN it SHALL be trackable through the job queue system
+4. WHEN an export job is running THEN the system SHALL process it asynchronously without blocking the API response
+5. WHEN npm scripts are used for exports THEN they SHALL make HTTP calls to these endpoints instead of running processes directly
+6. WHEN export jobs fail THEN they SHALL be retryable through the BullMQ interface
+
+### Requirement 12
+
+**User Story:** As a system administrator, I want to check the status of export jobs, so that I can monitor progress and troubleshoot failures.
+
+#### Acceptance Criteria
+
+1. WHEN I send a GET request to `/api/export/status/:jobId` THEN the system SHALL return the current job status
+2. WHEN a job is in progress THEN the status SHALL include completion percentage and current operation
+3. WHEN a job has failed THEN the status SHALL include error details and retry information
+4. WHEN a job has completed THEN the status SHALL include execution time and summary statistics
+5. WHEN multiple jobs are running THEN each SHALL have independent status tracking
+6. WHEN a job ID doesn't exist THEN the system SHALL return an appropriate 404 error

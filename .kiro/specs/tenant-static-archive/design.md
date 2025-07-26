@@ -10,24 +10,29 @@ The Tenant Static Archive feature generates fully static NextJS websites for eac
 
 ```mermaid
 graph TB
-    A[Backend Export Job] --> B[Data Export Service]
-    B --> C[(PostgreSQL)]
-    B --> D[TenantBrandingRepo]
-    B --> E[ChannelRepo]
-    B --> F[MessageRepo]
-    B --> G[JSON Files]
-    G --> H[backend/data-export/tenant-slug/]
+    A[HTTP API Call] --> B[Export Controller]
+    B --> C[BullMQ Job Queue]
+    C --> D[Export Job Processor]
+    D --> E[Data Export Service]
+    E --> F[(PostgreSQL)]
+    E --> G[TenantBrandingRepo]
+    E --> H[ChannelRepo]
+    E --> I[MessageRepo]
+    E --> J[JSON Files]
+    J --> K[_data/data-export/tenant-slug/]
     
-    I[Admin User] --> J[npm run build]
-    J --> K[NextJS Builder]
-    H --> K
-    K --> L[Static Files]
-    L --> M[frontend/out/]
-    M --> N[Deploy to Static Host]
-    N --> O[User Browser]
+    L[Admin User] --> M[npm run export:tenant]
+    M --> A
     
-    P[shared-types] --> B
-    P --> K
+    N[npm run build:tenant] --> O[NextJS Builder]
+    K --> O
+    O --> P[Static Files]
+    P --> Q[_data/next-export/tenant-slug/]
+    Q --> R[Deploy to Static Host]
+    R --> S[User Browser]
+    
+    T[shared-types] --> E
+    T --> O
 ```
 
 ### Component Integration
@@ -68,11 +73,13 @@ export interface ExportResult {
 
 **Implementation**:
 
-- Loops through all active tenants
+- Triggered via HTTP endpoints or BullMQ jobs
+- Loops through all active tenants (or processes a single tenant)
 - Uses existing repositories (ChannelRepository, MessageRepository, etc.)
 - Fetches tenant branding from TenantBrandingRepository
 - Generates paginated JSON files (1000 messages per file)
-- Saves output to `backend/data-export/{tenant-slug}/` directory
+- Saves output to `_data/data-export/{tenant-slug}/` directory
+- Ensures all exported files have open permissions (chmod 777) for container compatibility
 
 ### 2. Shared Types Package
 
@@ -189,9 +196,10 @@ export interface ChannelPageData {
 
 - Server-side generation (SSG) with all data bundled at build time
 - DaisyUI component library for consistent, responsive design
+- Default theme for tenants without custom branding
 - Channel navigation with different layouts for text/forum/thread channels
 - Message threading and reply visualization
-- Dicebear avatar integration with consistent hashing
+- Dicebear avatar generation during build time using anonymized user IDs
 - Pagination with 1000 messages per page for optimal performance
 
 **File Structure**:
@@ -213,52 +221,102 @@ frontend/
 │   └── Layout.tsx           # DaisyUI navbar and drawer components
 ├── lib/
 │   ├── data.ts                      # Data loading utilities
-│   └── avatars.ts                   # Dicebear integration
+│   └── avatars.ts                   # Dicebear integration (client-side)
 ├── styles/
 │   └── globals.css
 └── out/                             # NextJS build output (gitignored)
 
-backend/data-export/                 # Exported tenant data
-└── {tenant-slug}/
-    ├── metadata.json                # Tenant and channel metadata
-    └── channels/
-        ├── {channel-id}/
-        │   ├── page-1.json          # First 1000 messages
-        │   ├── page-2.json          # Next 1000 messages
-        │   └── ...
-        └── {another-channel-id}/
-            ├── page-1.json
-            └── ...
+_data/
+├── data-export/                     # Backend exported tenant data
+│   └── {tenant-slug}/
+│       ├── metadata.json            # Tenant and channel metadata
+│       └── channels/
+│           ├── {channel-id}/
+│           │   ├── page-1.json      # First 1000 messages
+│           │   ├── page-2.json      # Next 1000 messages
+│           │   └── ...
+│           └── {another-channel-id}/
+│               ├── page-1.json
+│               └── ...
+└── next-export/                     # Frontend static site output
+    └── {tenant-slug}/
+        └── ... (NextJS static files)
 ```
 
-### 4. Avatar Generation Service
+### 4. Avatar Generation in Frontend
 
-**Purpose**: Generates consistent Dicebear avatars using the "shapes" style via the NPM library.
+**Purpose**: Generate consistent Dicebear avatars during NextJS build time using existing anonymized user IDs.
 
 **Implementation**:
 
 ```typescript
+// frontend/lib/avatars.ts
 import { createAvatar } from '@dicebear/core';
 import { shapes } from '@dicebear/collection';
-import { createHash } from 'crypto';
 
-export class AvatarService {
-  static generateAvatarSvg(anonymizedUserId: string): string {
-    // Use anonymized user ID as seed for consistent avatars
-    const seed = createHash('md5').update(anonymizedUserId).digest('hex');
+export function generateAvatar(anonymizedUserId: string): string {
+  // Use the already-hashed anonymized user ID directly as seed
+  const avatar = createAvatar(shapes, {
+    seed: anonymizedUserId,
+    // Additional styling options can be configured here
+  });
 
-    const avatar = createAvatar(shapes, {
-      seed,
-      // Additional styling options can be configured here
-    });
+  return avatar.toString();
+}
 
-    return avatar.toString();
+// Used in React components during build time
+export function AvatarComponent({ userId }: { userId: string }) {
+  const avatarSvg = generateAvatar(userId);
+  return <div dangerouslySetInnerHTML={{ __html: avatarSvg }} />;
+}
+```
+
+### 5. HTTP Export API Endpoints
+
+**Purpose**: Provides HTTP endpoints to trigger and monitor data export jobs asynchronously.
+
+**Implementation**:
+
+```typescript
+// backend/src/routes/export.ts
+export interface ExportRoutes {
+  POST: {
+    '/api/export/all-tenants': {
+      response: { jobIds: string[] }
+    };
+    '/api/export/tenant/:tenantId': {
+      params: { tenantId: string };
+      response: { jobId: string }
+    };
+  };
+  GET: {
+    '/api/export/status/:jobId': {
+      params: { jobId: string };
+      response: {
+        jobId: string;
+        status: 'pending' | 'processing' | 'completed' | 'failed';
+        progress?: number; // 0-100
+        currentOperation?: string;
+        error?: string;
+        retryCount?: number;
+        executionTimeMs?: number;
+        result?: ExportResult;
+      }
+    };
+  };
+}
+
+// backend/src/services/export/ExportJobProcessor.ts
+export class ExportJobProcessor {
+  async processExportTenant(job: Job<ExportTenantJobData>) {
+    const { tenantId } = job.data;
+    const exportService = new DataExportService();
+    return await exportService.exportTenant(tenantId);
   }
 
-  static generateAvatarDataUrl(anonymizedUserId: string): string {
-    const svg = this.generateAvatarSvg(anonymizedUserId);
-    const base64 = Buffer.from(svg).toString('base64');
-    return `data:image/svg+xml;base64,${base64}`;
+  async processExportAllTenants(job: Job<ExportAllTenantsJobData>) {
+    const exportService = new DataExportService();
+    return await exportService.exportAllTenants();
   }
 }
 ```
@@ -291,12 +349,20 @@ export interface TenantBranding {
   id: string;
   tenantId: string;
   logo: string | null; // Base64 encoded image data
-  primaryColor: string; // Hex color code
-  secondaryColor: string; // Hex color code
-  accentColor: string; // Hex color code
+  primaryColor: string; // Hex color code (default: #3b82f6)
+  secondaryColor: string; // Hex color code (default: #64748b)
+  accentColor: string; // Hex color code (default: #10b981)
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Default theme when no branding is configured
+export const DEFAULT_THEME = {
+  logo: null,
+  primaryColor: '#3b82f6',   // Blue
+  secondaryColor: '#64748b', // Gray
+  accentColor: '#10b981'     // Green
+};
 ```
 
 ### Data Export and Build Workflow
@@ -305,21 +371,20 @@ The static site generation consists of two phases:
 
 **Phase 1: Backend Data Export**
 ```bash
-# Run from backend directory
-npm run export:tenants   # Exports all active tenants
-# OR
-npm run export:tenant <tenantId>  # Export specific tenant
+# Trigger export via HTTP (npm scripts make these calls)
+npm run export:tenants          # Triggers POST /api/export/all-tenants
+npm run export:tenant <tenantId> # Triggers POST /api/export/tenant/:tenantId
 
-# Data is exported to backend/data-export/{tenant-slug}/
+# Data is exported to _data/data-export/{tenant-slug}/
 ```
 
 **Phase 2: Frontend Static Site Generation**
 ```bash
-# Run from frontend directory
-npm run build   # Builds static site from exported data
-npm run export  # Exports to static files
+# Build for specific tenant
+npm run build:tenant <tenant-slug>  # Builds static site for specific tenant
+npm run export:tenant <tenant-slug> # Exports to static files
 
-# Static files are now available in frontend/out/
+# Static files are now available in _data/next-export/{tenant-slug}/
 ```
 
 ### Static Site Data Schema
@@ -451,50 +516,78 @@ try {
 - Various channel types (text, forum, thread)
 - Messages with attachments and reactions
 
-### Performance Testing
+## Deployment Constraints
 
-- **Build Time**: Measure generation time for various data sizes
-- **Memory Usage**: Monitor memory consumption during build process
-- **Concurrent Jobs**: Test multiple static site generations simultaneously
-- **Static Site Performance**: Measure load times and navigation speed
+### Shared Volume Requirement
 
-## Security Considerations
+The architecture requires that both the backend and frontend have access to a shared filesystem volume:
 
-### Data Privacy
+- Backend writes to `_data/data-export/{tenant-slug}/`
+- Frontend reads from `_data/data-export/{tenant-slug}/`
+- In Docker deployments, this requires mounting the same volume to both containers
+- The `_data` directory must be accessible to both services
 
-- All user IDs remain anonymized in static sites
-- No platform-specific identifiers exposed in generated sites
-- Attachment URLs may need proxy/caching strategy for privacy
+### File Permissions
 
-### Access Control
+To avoid container permission issues:
 
-- Static sites are publicly accessible once generated
-- No authentication required for viewing archives
-- Consider tenant-level privacy settings for future enhancement
+```typescript
+// In DataExportService after writing files
+import { chmod } from 'fs/promises';
 
-### File System Security
+// After writing each JSON file
+await chmod(filePath, 0o777); // Ensure open permissions
+```
 
-- Generated files stored in isolated tenant directories
-- Proper file permissions to prevent cross-tenant access
-- Input validation for tenant slugs to prevent directory traversal
+## Error Handling and Retry Logic
 
-## Performance Optimization
+### Export Job Error Handling
 
-### Build Performance
+```typescript
+export interface ExportJobOptions {
+  attempts: 3; // Total number of attempts
+  backoff: {
+    type: 'exponential';
+    delay: 2000; // Initial delay in ms
+  };
+}
 
-- **Full Regeneration**: Always perform complete rebuilds to maintain simplicity and consistency
-- **Parallel Processing**: Process multiple channels concurrently
-- **Memory Management**: Stream large datasets to avoid memory issues
-- **Build Optimization**: Optimize NextJS build process for faster generation
+// Job processor handles errors
+async processExportTenant(job: Job<ExportTenantJobData>) {
+  try {
+    const result = await exportService.exportTenant(job.data.tenantId);
+    return result;
+  } catch (error) {
+    // Log error details
+    logger.error('Export failed', { 
+      jobId: job.id, 
+      tenantId: job.data.tenantId, 
+      attempt: job.attemptsMade,
+      error 
+    });
+    
+    // Store error in job data for status endpoint
+    await job.updateData({
+      ...job.data,
+      lastError: error.message
+    });
+    
+    throw error; // Let BullMQ handle retry
+  }
+}
+```
 
-### Static Site Performance
+### Failure Scenarios
 
-- **Code Splitting**: Split JavaScript bundles by route
-- **Image Optimization**: Optimize avatar images and attachments
-- **Lazy Loading**: Implement virtual scrolling for large message lists
+1. **Database Connection Failure**: Job retries with exponential backoff
+2. **File System Errors**: Check permissions, ensure _data directory exists
+3. **Out of Memory**: Process channels in batches, implement streaming
+4. **Partial Export Failure**: Log which channels failed, continue with others
 
-### Storage Optimization
+## Build Optimization Notes
 
-- **Compression**: Gzip static assets
-- **Asset Deduplication**: Share common assets between tenant sites
-- **Cleanup**: Remove old generated sites based on retention policy
+- Process data in streaming fashion for large tenants to avoid memory issues
+- Build each tenant's static site independently
+- Use efficient JSON parsing for large data files
+- Implement pagination to handle channels with many messages
+- Ensure proper file permissions (0o777) for all exported files

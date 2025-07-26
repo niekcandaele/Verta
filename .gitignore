@@ -76,3 +76,6 @@ Thumbs.db
 # Yarn Integrity file
 .yarn-integrity
 tsconfig.tsbuildinfo
+
+# Data directories
+_data/
