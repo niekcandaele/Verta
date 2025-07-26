@@ -17,6 +17,7 @@ export interface ExportTenantJobData {
 
 export interface ExportAllTenantsJobData {
   // Empty for now, can add filters later
+  placeholder?: never;
 }
 
 // Create export queue
@@ -58,7 +59,7 @@ export function createExportRouter(_database?: Kysely<Database>): Router {
    * POST /api/export/all-tenants
    * Trigger export for all active tenants
    */
-  router.post<{}, ExportAllJobsResponse>(
+  router.post<unknown, ExportAllJobsResponse>(
     '/all-tenants',
     async (_req, res, next) => {
       try {

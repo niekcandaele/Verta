@@ -79,7 +79,7 @@ async function waitForCompletion(jobId: string, checkInterval = 2000) {
       process.exit(1);
     }
 
-    await new Promise((resolve) => setTimeout(resolve, checkInterval));
+    await new Promise((resolve) => global.setTimeout(resolve, checkInterval));
   }
 }
 
@@ -90,14 +90,15 @@ async function main() {
   const waitFlag = process.argv.includes('--wait');
 
   switch (command) {
-    case 'all':
+    case 'all': {
       const allJobId = await exportAllTenants();
       if (waitFlag && allJobId) {
         await waitForCompletion(allJobId);
       }
       break;
+    }
 
-    case 'tenant':
+    case 'tenant': {
       if (!arg) {
         console.error('❌ Please provide a tenant ID');
         console.log('Usage: npm run export:tenant <tenantId>');
@@ -108,6 +109,7 @@ async function main() {
         await waitForCompletion(tenantJobId);
       }
       break;
+    }
 
     case 'status':
       if (!arg) {

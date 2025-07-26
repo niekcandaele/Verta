@@ -1,0 +1,25 @@
+{
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "build:tenant": "bash -c 'TENANT_SLUG=$1 OUTPUT_DIR=../_data/next-export/$1 npm run build' -- ",
+    "export:tenant": "bash -c 'cd ../backend && npm run export:tenant $1 && cd ../frontend && npm run build:tenant $1' -- "
+  },
+  "dependencies": {
+    "next": "15.4.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "shared-types": "file:../shared-types"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5"
+  }
+}

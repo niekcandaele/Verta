@@ -72,28 +72,28 @@
 
 ## Phase 2: Basic Frontend & Data Verification
 
-- [ ] 10. Create minimal NextJS project
+- [x] 10. Create minimal NextJS project
   - Initialize new NextJS project in frontend/ directory
   - Configure TypeScript and static export in next.config.js
   - Install shared-types package as dependency
   - Set up basic project structure
   - _Requirements: 1.1, 1.2_
 
-- [ ] 11. Create basic data loading
+- [x] 11. Create basic data loading
   - Create data loading utilities in frontend/lib/data.ts
   - Implement functions to read from _data/data-export/
   - Add tenant selection based on build parameter
   - Create basic error handling for missing files
   - _Requirements: 4.7, 5.1_
 
-- [ ] 12. Build minimal pages to verify data
+- [x] 12. Build minimal pages to verify data
   - Create basic index.tsx that lists channels (no styling)
   - Create channel/[id]/[page].tsx that dumps messages as JSON
   - Set up getStaticProps and getStaticPaths
   - Verify data is loading correctly from exported files
   - _Requirements: 2.1, 2.2_
 
-- [ ] 13. Add tenant-specific build scripts
+- [x] 13. Add tenant-specific build scripts
   - Create npm run build:tenant <tenant-slug> script
   - Create npm run export:tenant <tenant-slug> script
   - Configure output to _data/next-export/{tenant-slug}/
