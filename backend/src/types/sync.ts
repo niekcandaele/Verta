@@ -1,78 +1,24 @@
-import type { ChannelType, SyncStatus } from '../database/types.js';
-
 /**
  * Platform-agnostic sync data types
  */
 
 /**
- * Platform-agnostic channel representation
+ * Re-export shared types for convenience
  */
-export interface Channel {
-  id: string;
-  tenantId: string;
-  platformChannelId: string;
-  name: string;
-  type: ChannelType;
-  parentChannelId: string | null;
-  metadata: Record<string, unknown>;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-/**
- * Platform-agnostic message representation
- */
-export interface Message {
-  id: string;
-  channelId: string;
-  platformMessageId: string;
-  anonymizedAuthorId: string;
-  content: string;
-  replyToId: string | null;
-  metadata: Record<string, unknown>;
-  platformCreatedAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-/**
- * Message emoji reaction representation
- */
-export interface MessageEmojiReaction {
-  id: string;
-  messageId: string;
-  emoji: string;
-  anonymizedUserId: string;
-  createdAt: Date;
-}
-
-/**
- * Message attachment representation
- */
-export interface MessageAttachment {
-  id: string;
-  messageId: string;
-  filename: string;
-  fileSize: bigint;
-  contentType: string;
-  url: string;
-  createdAt: Date;
-}
-
-/**
- * Sync progress tracking representation
- */
-export interface SyncProgress {
-  id: string;
-  tenantId: string;
-  channelId: string;
-  lastSyncedMessageId: string;
-  lastSyncedAt: Date;
-  status: SyncStatus;
-  errorDetails: unknown | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
+export type {
+  Channel,
+  Message,
+  MessageEmojiReaction,
+  MessageAttachment,
+  SyncProgress,
+  CreateChannelData,
+  UpdateChannelData,
+  CreateMessageData,
+  CreateMessageEmojiReactionData,
+  CreateMessageAttachmentData,
+  CreateSyncProgressData,
+  UpdateSyncProgressData,
+} from 'shared-types';
 
 /**
  * Platform channel data from external platforms (Discord, Slack, etc.)
@@ -148,62 +94,4 @@ export interface SyncJobResult {
   completedAt: Date;
 }
 
-/**
- * Create/Update DTOs
- */
-
-export interface CreateChannelData {
-  tenantId: string;
-  platformChannelId: string;
-  name: string;
-  type: ChannelType;
-  parentChannelId?: string | null;
-  metadata?: Record<string, unknown>;
-}
-
-export interface UpdateChannelData {
-  name?: string;
-  type?: ChannelType;
-  parentChannelId?: string | null;
-  metadata?: Record<string, unknown>;
-}
-
-export interface CreateMessageData {
-  channelId: string;
-  platformMessageId: string;
-  anonymizedAuthorId: string;
-  content: string;
-  replyToId?: string | null;
-  metadata?: Record<string, unknown>;
-  platformCreatedAt: Date;
-}
-
-export interface CreateMessageEmojiReactionData {
-  messageId: string;
-  emoji: string;
-  anonymizedUserId: string;
-}
-
-export interface CreateMessageAttachmentData {
-  messageId: string;
-  filename: string;
-  fileSize: bigint | number;
-  contentType: string;
-  url: string;
-}
-
-export interface CreateSyncProgressData {
-  tenantId: string;
-  channelId: string;
-  lastSyncedMessageId: string;
-  lastSyncedAt: Date;
-  status: SyncStatus;
-  errorDetails?: unknown;
-}
-
-export interface UpdateSyncProgressData {
-  lastSyncedMessageId?: string;
-  lastSyncedAt?: Date;
-  status?: SyncStatus;
-  errorDetails?: unknown;
-}
+// Create/Update DTOs are now imported from shared-types above

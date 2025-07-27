@@ -7,6 +7,7 @@ import {
   GatewayIntentBits,
   TextChannel,
   ThreadChannel,
+  ForumChannel,
   type GuildBasedChannel,
   type Message,
   ChannelType,
@@ -158,6 +159,11 @@ export class DiscordAdapter implements PlatformAdapter {
 
     try {
       const channel = await this.client.channels.fetch(channelId);
+
+      // Handle forum channels separately
+      if (channel && channel.type === ChannelType.GuildForum) {
+        return this.fetchForumMessages(channel as any, options);
+      }
 
       if (!this.isTextBasedChannel(channel)) {
         return {
@@ -409,6 +415,109 @@ export class DiscordAdapter implements PlatformAdapter {
       reactions: reactions.length > 0 ? reactions : undefined,
       attachments: attachments.length > 0 ? attachments : undefined,
     };
+  }
+
+  /**
+   * Fetch messages from a forum channel by aggregating messages from all threads
+   */
+  private async fetchForumMessages(
+    forumChannel: ForumChannel,
+    options?: FetchMessagesOptions
+  ): Promise<FetchMessagesResult> {
+    try {
+      logger.debug('Fetching messages from forum channel', {
+        channelId: forumChannel.id,
+        channelName: forumChannel.name,
+      });
+
+      // Fetch active threads in the forum
+      const threads = await forumChannel.threads.fetchActive();
+      const allMessages: PlatformMessage[] = [];
+
+      // Also fetch archived threads
+      const archivedThreads = await forumChannel.threads.fetchArchived();
+
+      // Combine all threads
+      const allThreads = [
+        ...threads.threads.values(),
+        ...archivedThreads.threads.values(),
+      ];
+
+      logger.debug('Found threads in forum', {
+        channelId: forumChannel.id,
+        activeThreadCount: threads.threads.size,
+        archivedThreadCount: archivedThreads.threads.size,
+        totalThreadCount: allThreads.length,
+      });
+
+      // Fetch messages from each thread
+      for (const thread of allThreads) {
+        try {
+          const fetchOptions: {
+            limit: number;
+            after?: string;
+            before?: string;
+          } = {
+            limit: Math.min(options?.limit || 100, 100),
+          };
+
+          // Apply message ID filters if provided
+          if (options?.afterMessageId && !options?.afterTimestamp) {
+            fetchOptions.before = options.afterMessageId;
+          } else if (options?.afterMessageId && options?.afterTimestamp) {
+            fetchOptions.after = options.afterMessageId;
+          }
+
+          const messages = await thread.messages.fetch(fetchOptions);
+
+          // Convert Discord messages to platform messages
+          const platformMessages = await Promise.all(
+            messages.map((msg) => this.mapDiscordMessageToPlatform(msg))
+          );
+
+          allMessages.push(...platformMessages);
+        } catch (error) {
+          logger.error('Failed to fetch messages from thread', {
+            threadId: thread.id,
+            threadName: thread.name,
+            error,
+          });
+        }
+      }
+
+      // Sort messages by timestamp (oldest first for historical sync)
+      allMessages.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+      // Apply pagination limit
+      const limit = options?.limit || 100;
+      const paginatedMessages = allMessages.slice(0, limit);
+      const hasMore = allMessages.length > limit;
+
+      // Calculate checkpoint
+      const checkpoint =
+        paginatedMessages.length > 0
+          ? {
+              channelId: forumChannel.id,
+              lastMessageId: paginatedMessages[paginatedMessages.length - 1].id,
+              lastMessageTimestamp:
+                paginatedMessages[paginatedMessages.length - 1].createdAt,
+              messagesProcessed: paginatedMessages.length,
+              hasMoreMessages: hasMore,
+            }
+          : undefined;
+
+      return {
+        messages: paginatedMessages,
+        hasMore,
+        checkpoint,
+      };
+    } catch (error) {
+      logger.error('Failed to fetch forum messages', {
+        channelId: forumChannel.id,
+        error,
+      });
+      throw error;
+    }
   }
 
   /**

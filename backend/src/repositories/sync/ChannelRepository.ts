@@ -5,7 +5,7 @@ import type {
   Channel,
   CreateChannelData,
   UpdateChannelData,
-} from '../../types/sync.js';
+} from 'shared-types';
 import type { Database, ChannelType } from '../../database/types.js';
 
 /**

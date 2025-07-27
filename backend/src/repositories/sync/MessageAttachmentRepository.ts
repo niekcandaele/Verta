@@ -4,7 +4,7 @@ import type { MessageAttachmentRepository } from './types.js';
 import type {
   MessageAttachment,
   CreateMessageAttachmentData,
-} from '../../types/sync.js';
+} from 'shared-types';
 import type { Database } from '../../database/types.js';
 
 /**

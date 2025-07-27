@@ -8,3 +8,7 @@ export const redisConfig: RedisOptions = {
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
 };
+
+export function getRedisConnection(): RedisOptions {
+  return redisConfig;
+}

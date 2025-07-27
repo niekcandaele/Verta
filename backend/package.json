@@ -19,12 +19,18 @@
     "migrate:latest": "tsx scripts/migrate.ts latest",
     "migrate:status": "tsx scripts/migrate.ts status",
     "dev:data": "tsx scripts/dev-data.ts",
-    "dev:reset": "tsx scripts/dev-reset-data.ts"
+    "dev:reset": "tsx scripts/dev-reset-data.ts",
+    "export:all": "tsx scripts/export-cli.ts all",
+    "export:tenant": "tsx scripts/export-cli.ts tenant",
+    "export:status": "tsx scripts/export-cli.ts status",
+    "build:all-tenants": "tsx scripts/build-all-tenants.ts",
+    "worker:export": "tsx src/workers/exportWorker.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "axios": "^1.11.0",
     "bullmq": "^5.56.4",
     "discord.js": "^14.21.0",
     "dotenv": "^17.2.0",
@@ -32,10 +38,12 @@
     "kysely": "^0.28.2",
     "pg": "^8.16.3",
     "redis": "^5.6.0",
+    "shared-types": "file:../shared-types",
     "winston": "^3.17.0",
     "zod": "^4.0.5"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.11",
     "@testcontainers/postgresql": "^11.2.1",
     "@types/express": "^5.0.3",
     "@types/node": "^24.0.0",
