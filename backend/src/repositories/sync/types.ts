@@ -218,6 +218,27 @@ export interface SyncProgressRepository
   upsert(data: CreateSyncProgressData): Promise<SyncProgress>;
 
   /**
+   * Claim a channel for a worker
+   */
+  claimChannel(
+    channelId: string,
+    workerId: string
+  ): Promise<SyncProgress | null>;
+
+  /**
+   * Release a channel from a worker
+   */
+  releaseChannel(
+    channelId: string,
+    workerId: string
+  ): Promise<SyncProgress | null>;
+
+  /**
+   * Find all sync progress assigned to a worker
+   */
+  findByWorkerId(workerId: string): Promise<SyncProgress[]>;
+
+  /**
    * Mark sync as failed with error details
    */
   markFailed(

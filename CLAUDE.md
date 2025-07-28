@@ -9,6 +9,30 @@ npm run discord:sync
 npm run discord:sync -- --tenant=takaro
 ```
 
+## Sync Management Commands (Coming Soon)
+```bash
+# Start sync for all tenants
+npm run sync:start
+
+# Start sync for specific tenant  
+npm run sync:start -- --tenant=takaro
+
+# Reset sync progress (requires confirmation)
+npm run sync:reset -- --tenant=takaro
+
+# Check sync status
+npm run sync:status -- --job-id=<job-id>
+```
+
+## Development Scripts
+```bash
+# Create test tenant
+npm run dev:data
+
+# Reset test data
+npm run dev:reset
+```
+
 ## API Endpoints
 - `POST /api/sync` - Start sync (requires X-API-Key: ikbeneenaap)
 - `GET /api/sync/jobs/{jobId}` - Check job status
@@ -27,4 +51,4 @@ docker logs verta-app --tail 100 2>&1 | grep -i error
 ```
 
 ## Database
-PostgreSQL is available via MCP. Key tables: `tenants`, `channels`, `messages`, `sync_progress`
+PostgreSQL is available via MCP. Key tables: `tenants`, `channels`, `messages`, `sync_progress`, `channel_sync_jobs` (coming soon)

@@ -185,6 +185,104 @@ export class SyncProgressRepositoryImpl
   }
 
   /**
+   * Claim a channel for a worker (atomic operation)
+   */
+  async claimChannel(
+    channelId: string,
+    workerId: string
+  ): Promise<SyncProgress | null> {
+    // First, get the channel's tenant_id
+    const channel = await this.db
+      .selectFrom('channels')
+      .select(['tenant_id'])
+      .where('id', '=', channelId)
+      .executeTakeFirst();
+
+    if (!channel) {
+      return null;
+    }
+
+    // Try to insert or update the sync progress
+    try {
+      // First attempt: try to insert a new record
+      const insertedRow = await this.db
+        .insertInto('sync_progress')
+        .values({
+          id: sql`gen_random_uuid()`,
+          tenant_id: channel.tenant_id,
+          channel_id: channelId,
+          worker_id: workerId,
+          status: 'in_progress' as SyncStatus,
+          started_at: new Date().toISOString(),
+          last_synced_message_id: '',
+          last_synced_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .returningAll()
+        .executeTakeFirst();
+
+      return insertedRow ? this.mapRowToEntity(insertedRow) : null;
+    } catch {
+      // If insert fails due to unique constraint, try to update
+      const row = await this.db
+        .updateTable('sync_progress')
+        .set({
+          worker_id: workerId,
+          status: 'in_progress' as SyncStatus,
+          started_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .where('channel_id', '=', channelId)
+        .where((eb) =>
+          eb.or([
+            eb('worker_id', 'is', null),
+            eb('worker_id', '=', workerId),
+            eb('status', '!=', 'in_progress'),
+          ])
+        )
+        .returningAll()
+        .executeTakeFirst();
+      return row ? this.mapRowToEntity(row) : null;
+    }
+  }
+
+  /**
+   * Release a channel from a worker
+   */
+  async releaseChannel(
+    channelId: string,
+    workerId: string
+  ): Promise<SyncProgress | null> {
+    const row = await this.db
+      .updateTable('sync_progress')
+      .set({
+        worker_id: null,
+        updated_at: new Date().toISOString(),
+      })
+      .where('channel_id', '=', channelId)
+      .where('worker_id', '=', workerId)
+      .returningAll()
+      .executeTakeFirst();
+
+    return row ? this.mapRowToEntity(row) : null;
+  }
+
+  /**
+   * Find all sync progress assigned to a worker
+   */
+  async findByWorkerId(workerId: string): Promise<SyncProgress[]> {
+    const rows = await this.db
+      .selectFrom('sync_progress')
+      .selectAll()
+      .where('worker_id', '=', workerId)
+      .orderBy('started_at', 'desc')
+      .execute();
+
+    return rows.map((row) => this.mapRowToEntity(row));
+  }
+
+  /**
    * Map database row to domain entity
    */
   protected mapRowToEntity(row: any): SyncProgress {
@@ -198,6 +296,16 @@ export class SyncProgressRepositoryImpl
       errorDetails: row.error_details,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
+      // Additional fields for worker tracking
+      workerId: row.worker_id,
+      startedAt: row.started_at ? new Date(row.started_at) : undefined,
+      messagesPerSecond: row.messages_per_second
+        ? Number(row.messages_per_second)
+        : undefined,
+    } as SyncProgress & {
+      workerId?: string;
+      startedAt?: Date;
+      messagesPerSecond?: number;
     };
   }
 

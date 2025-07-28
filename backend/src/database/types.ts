@@ -119,6 +119,27 @@ export interface SyncProgressTable {
   last_synced_at: ColumnType<Date, Date | string, Date | string>;
   status: SyncStatus;
   error_details: ColumnType<unknown, unknown | undefined, unknown>;
+  worker_id: string | null;
+  started_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  messages_per_second: ColumnType<number, number | undefined, number>;
+  created_at: ColumnType<Date, string | undefined, never>;
+  updated_at: ColumnType<Date, string | undefined, string>;
+}
+
+/**
+ * Database table schema for channel sync jobs
+ */
+export interface ChannelSyncJobsTable {
+  id: Generated<string>;
+  tenant_id: string;
+  channel_id: string;
+  parent_job_id: string;
+  worker_id: string | null;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  started_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  completed_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  messages_processed: ColumnType<number, number | undefined, number>;
+  error_details: ColumnType<unknown, unknown | undefined, unknown>;
   created_at: ColumnType<Date, string | undefined, never>;
   updated_at: ColumnType<Date, string | undefined, string>;
 }
@@ -147,6 +168,7 @@ export interface Database {
   message_emoji_reactions: MessageEmojiReactionsTable;
   message_attachments: MessageAttachmentsTable;
   sync_progress: SyncProgressTable;
+  channel_sync_jobs: ChannelSyncJobsTable;
   tenant_branding: TenantBrandingTable;
 }
 

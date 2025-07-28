@@ -19,6 +19,12 @@ export const ConfigSchema = z.object({
   REDIS_PASSWORD: z.string().optional(),
   // Discord configuration
   DISCORD_BOT_TOKEN: z.string().min(1, 'DISCORD_BOT_TOKEN is required'),
+  // Sync configuration
+  SYNC_MAX_CHANNEL_WORKERS: z.coerce.number().int().positive().default(10),
+  SYNC_CHANNEL_BATCH_SIZE: z.coerce.number().int().positive().default(5),
+  SYNC_MESSAGE_FETCH_SIZE: z.coerce.number().int().positive().default(100),
+  // Debug configuration
+  DEBUG_RATE_LIMITS: z.coerce.boolean().default(false),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

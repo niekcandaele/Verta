@@ -28,6 +28,16 @@ export interface FetchMessagesOptions {
   beforeTimestamp?: Date;
 
   /**
+   * Start date for fetching messages (alias for afterTimestamp)
+   */
+  startDate?: Date;
+
+  /**
+   * End date for fetching messages (alias for beforeTimestamp)
+   */
+  endDate?: Date;
+
+  /**
    * Maximum number of messages to fetch (platform may have its own limits)
    */
   limit?: number;

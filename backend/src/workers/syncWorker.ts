@@ -6,6 +6,10 @@ import { Worker, type Job } from 'bullmq';
 import logger from '../utils/logger.js';
 import { redisConfig } from '../config/redis.js';
 import { SYNC_QUEUE_NAME } from '../queues/syncQueue.js';
+import {
+  channelSyncQueue,
+  type ChannelSyncJobData,
+} from '../queues/channelSyncQueue.js';
 import { PlatformAdapterFactory } from '../adapters/index.js';
 import type { PlatformAdapter } from '../adapters/types.js';
 import { db } from '../database/index.js';
@@ -13,19 +17,12 @@ import type { TenantRepository } from '../repositories/tenant/index.js';
 import { TenantRepositoryImpl } from '../repositories/tenant/index.js';
 import {
   ChannelRepository,
-  MessageRepository,
-  MessageEmojiReactionRepository,
-  MessageAttachmentRepository,
-  SyncProgressRepository,
+  ChannelSyncJobRepository,
 } from '../repositories/sync/index.js';
-import { anonymizeUserId } from '../utils/crypto.js';
-import type {
-  SyncJobData,
-  SyncJobResult,
-  PlatformMessage,
-} from '../types/sync.js';
+import type { SyncJobData, SyncJobResult } from '../types/sync.js';
 import type { Platform, ChannelType } from '../database/types.js';
 import { isRateLimitError, classifyError } from '../types/errors.js';
+import { config } from '../config/env.js';
 
 /**
  * Sync worker implementation
@@ -34,19 +31,13 @@ export class SyncWorker {
   private worker: Worker<SyncJobData, SyncJobResult>;
   private tenantRepo: TenantRepository;
   private channelRepo: ChannelRepository;
-  private messageRepo: MessageRepository;
-  private reactionRepo: MessageEmojiReactionRepository;
-  private attachmentRepo: MessageAttachmentRepository;
-  private progressRepo: SyncProgressRepository;
+  private channelSyncJobRepo: ChannelSyncJobRepository;
 
   constructor() {
     // Initialize repositories
     this.tenantRepo = new TenantRepositoryImpl(db);
     this.channelRepo = new ChannelRepository(db);
-    this.messageRepo = new MessageRepository(db);
-    this.reactionRepo = new MessageEmojiReactionRepository(db);
-    this.attachmentRepo = new MessageAttachmentRepository(db);
-    this.progressRepo = new SyncProgressRepository(db);
+    this.channelSyncJobRepo = new ChannelSyncJobRepository(db);
 
     // Create the worker
     this.worker = new Worker<SyncJobData, SyncJobResult>(
@@ -132,47 +123,53 @@ export class SyncWorker {
         // Get channels to sync messages from
         const channelsToSync =
           channelIds ||
-          (await this.channelRepo.findByTenant(tenant.id)).map(
-            (c) => c.platformChannelId
+          (await this.channelRepo.findByTenant(tenant.id)).map((c) => ({
+            id: c.id,
+            platformChannelId: c.platformChannelId,
+          }));
+
+        // Create channel sync jobs
+        const channelJobs: ChannelSyncJobData[] = channelsToSync.map(
+          (channel) => ({
+            tenantId: tenant.id,
+            channelId: typeof channel === 'string' ? channel : channel.id,
+            platformChannelId:
+              typeof channel === 'string' ? channel : channel.platformChannelId,
+            syncType,
+            startDate,
+            endDate,
+            parentJobId: job.id!,
+          })
+        );
+
+        logger.info('Dispatching channel sync jobs', {
+          jobId: job.id,
+          channelCount: channelJobs.length,
+        });
+
+        // Add channel jobs to queue in batches
+        const batchSize = config.SYNC_CHANNEL_BATCH_SIZE || 5;
+        for (let i = 0; i < channelJobs.length; i += batchSize) {
+          const batch = channelJobs.slice(i, i + batchSize);
+          await channelSyncQueue.addBulk(
+            batch.map((data) => ({
+              name: 'sync-channel',
+              data,
+              opts: {
+                priority: 1, // Normal priority
+              },
+            }))
           );
-
-        // Sync messages for each channel
-        for (const channelId of channelsToSync) {
-          await job.updateProgress({
-            channelId,
-            status: 'syncing',
-            channelsProcessed: result.channelsProcessed,
-            messagesProcessed: result.messagesProcessed,
-          });
-
-          try {
-            await this.syncChannelMessages(
-              adapter,
-              tenant.id,
-              channelId,
-              { startDate, endDate, syncType },
-              result
-            );
-          } catch (error) {
-            // Re-throw rate limit errors to stop the entire job
-            if (isRateLimitError(error)) {
-              throw error;
-            }
-
-            const classifiedError = classifyError(error);
-            logger.error('Failed to sync channel messages', {
-              channelId,
-              error: error instanceof Error ? error.message : 'Unknown error',
-              errorType: classifiedError.type,
-              errorClassification: classifiedError.classification,
-            });
-            result.errors.push({
-              channelId,
-              error: error instanceof Error ? error.message : 'Unknown error',
-              timestamp: new Date(),
-            });
-          }
         }
+
+        // Monitor channel progress
+        const finalResult = await this.monitorChannelProgress(
+          job,
+          channelJobs,
+          result
+        );
+
+        return finalResult;
       } finally {
         // Always cleanup adapter
         await adapter.cleanup();
@@ -216,16 +213,6 @@ export class SyncWorker {
 
       throw error; // Re-throw to mark job as failed
     }
-
-    result.completedAt = new Date();
-
-    logger.info('Sync job completed', {
-      jobId: job.id,
-      tenantId,
-      result,
-    });
-
-    return result;
   }
 
   /**
@@ -338,214 +325,155 @@ export class SyncWorker {
   }
 
   /**
-   * Sync messages for a specific channel
+   * Monitor channel sync progress
    */
-  private async syncChannelMessages(
-    adapter: PlatformAdapter,
-    tenantId: string,
-    platformChannelId: string,
-    options: {
-      startDate?: Date;
-      endDate?: Date;
-      syncType: 'full' | 'incremental';
-    },
-    result: SyncJobResult
-  ): Promise<void> {
-    logger.info('Syncing messages for channel', {
-      tenantId,
-      platformChannelId,
-      options,
+  private async monitorChannelProgress(
+    job: Job<SyncJobData>,
+    channelJobs: ChannelSyncJobData[],
+    initialResult: SyncJobResult
+  ): Promise<SyncJobResult> {
+    const result = { ...initialResult };
+    const startTime = Date.now();
+    const pollInterval = 5000; // 5 seconds
+    let completedChannels = 0;
+    let failedChannels = 0;
+
+    logger.info('Starting channel progress monitoring', {
+      parentJobId: job.id,
+      totalChannels: channelJobs.length,
     });
 
-    // Get internal channel ID
-    const channel = await this.channelRepo.findByPlatformId(
-      tenantId,
-      platformChannelId
-    );
-    if (!channel) {
-      throw new Error(`Channel not found: ${platformChannelId}`);
-    }
+    // Continue monitoring until all channels are completed or failed
+    while (completedChannels + failedChannels < channelJobs.length) {
+      // Get status of all channel jobs
+      const channelJobStatuses =
+        await this.channelSyncJobRepo.findByParentJobId(job.id!);
 
-    // Get last sync progress for incremental sync
-    let lastMessageId: string | undefined;
-    if (options.syncType === 'incremental') {
-      const progress = await this.progressRepo.findByTenantAndChannel(
-        tenantId,
-        channel.id
+      // Count completed and failed
+      completedChannels = channelJobStatuses.filter(
+        (j) => j.status === 'completed'
+      ).length;
+      failedChannels = channelJobStatuses.filter(
+        (j) => j.status === 'failed'
+      ).length;
+      const inProgress = channelJobStatuses.filter(
+        (j) => j.status === 'in_progress'
+      ).length;
+
+      // Aggregate statistics
+      result.messagesProcessed = channelJobStatuses.reduce(
+        (sum, j) => sum + j.messagesProcessed,
+        0
       );
-      if (progress) {
-        lastMessageId = progress.lastSyncedMessageId;
-      }
-    }
 
-    // Update sync progress to in_progress
-    await this.progressRepo.upsert({
-      tenantId,
-      channelId: channel.id,
-      lastSyncedMessageId: lastMessageId || '',
-      lastSyncedAt: new Date(),
-      status: 'in_progress',
-    });
-
-    try {
-      let hasMore = true;
-      let afterMessageId = lastMessageId;
-
-      while (hasMore) {
-        logger.debug('Fetching messages batch', {
-          channelId: platformChannelId,
-          afterMessageId,
-          iteration: result.messagesProcessed,
-        });
-
-        const fetchResult = await adapter.fetchMessages(platformChannelId, {
-          afterMessageId,
-          afterTimestamp: options.startDate,
-          beforeTimestamp: options.endDate,
-          limit: 100,
-        });
-
-        logger.debug('Fetch result received', {
-          channelId: platformChannelId,
-          messageCount: fetchResult.messages.length,
-          hasMore: fetchResult.hasMore,
-          checkpointId: fetchResult.checkpoint?.lastMessageId,
-        });
-
-        // Process messages
-        for (const platformMessage of fetchResult.messages) {
-          try {
-            await this.processMessage(channel.id, platformMessage, result);
-          } catch (error) {
-            logger.error('Failed to process message', {
-              messageId: platformMessage.id,
-              error,
-            });
-            result.errors.push({
-              channelId: platformChannelId,
-              error: error instanceof Error ? error.message : 'Unknown error',
-              timestamp: new Date(),
-            });
-          }
-        }
-
-        // Update progress
-        if (fetchResult.checkpoint) {
-          await this.progressRepo.upsert({
-            tenantId,
-            channelId: channel.id,
-            lastSyncedMessageId: fetchResult.checkpoint.lastMessageId,
-            lastSyncedAt: fetchResult.checkpoint.lastMessageTimestamp,
-            status: 'in_progress',
-          });
-          afterMessageId = fetchResult.checkpoint.lastMessageId;
-        }
-
-        hasMore = fetchResult.hasMore;
-
-        logger.debug('Batch complete', {
-          channelId: platformChannelId,
-          hasMore,
-          nextAfterMessageId: afterMessageId,
-          totalMessagesProcessed: result.messagesProcessed,
-        });
-      }
-
-      // Mark sync as completed
-      const finalProgress = await this.progressRepo.findByTenantAndChannel(
-        tenantId,
-        channel.id
-      );
-      if (finalProgress) {
-        await this.progressRepo.update(finalProgress.id, {
-          status: 'completed',
-        });
-      }
-    } catch (error) {
-      // Mark sync as failed
-      const failedProgress = await this.progressRepo.findByTenantAndChannel(
-        tenantId,
-        channel.id
-      );
-      if (failedProgress) {
-        await this.progressRepo.update(failedProgress.id, {
-          status: 'failed',
-          errorDetails:
-            error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Process a single message
-   */
-  private async processMessage(
-    channelId: string,
-    platformMessage: PlatformMessage,
-    result: SyncJobResult
-  ): Promise<void> {
-    // Check if message already exists
-    const existingMessage = await this.messageRepo.findByPlatformId(
-      channelId,
-      platformMessage.id
-    );
-
-    if (!existingMessage) {
-      // Create new message with anonymized author ID
-      const anonymizedAuthorId = anonymizeUserId(platformMessage.authorId);
-
-      const message = await this.messageRepo.create({
-        channelId,
-        platformMessageId: platformMessage.id,
-        anonymizedAuthorId,
-        content: platformMessage.content,
-        replyToId: platformMessage.replyToId || null,
-        metadata: platformMessage.metadata || {},
-        platformCreatedAt: platformMessage.createdAt,
+      // Update job progress
+      await job.updateProgress({
+        channelsTotal: channelJobs.length,
+        channelsCompleted: completedChannels,
+        channelsFailed: failedChannels,
+        channelsInProgress: inProgress,
+        messagesProcessed: result.messagesProcessed,
       });
 
-      result.messagesProcessed++;
-
-      // Process reactions
-      if (platformMessage.reactions) {
-        for (const reaction of platformMessage.reactions) {
-          for (const userId of reaction.users) {
-            try {
-              await this.reactionRepo.create({
-                messageId: message.id,
-                emoji: reaction.emoji,
-                anonymizedUserId: anonymizeUserId(userId),
-              });
-              result.reactionsProcessed++;
-            } catch (error) {
-              // Ignore duplicate reaction errors
-              if (
-                error instanceof Error &&
-                !error.message?.includes('duplicate')
-              ) {
-                throw error;
-              }
-            }
-          }
-        }
+      // Log periodic metrics
+      const elapsed = (Date.now() - startTime) / 1000;
+      if (elapsed > 0) {
+        logger.info('Sync job progress', {
+          context: 'sync-metrics',
+          jobId: job.id,
+          tenantId: job.data.tenantId,
+          metrics: {
+            elapsedSeconds: elapsed,
+            channelsTotal: channelJobs.length,
+            channelsCompleted: completedChannels,
+            channelsFailed: failedChannels,
+            channelsInProgress: inProgress,
+            messagesProcessed: result.messagesProcessed,
+            messagesPerSecond: result.messagesProcessed / elapsed,
+            channelsPerMinute: (completedChannels / elapsed) * 60,
+            concurrentChannels: inProgress,
+            status: 'in_progress',
+          },
+        });
       }
 
-      // Process attachments
-      if (platformMessage.attachments) {
-        for (const attachment of platformMessage.attachments) {
-          await this.attachmentRepo.create({
-            messageId: message.id,
-            filename: attachment.filename,
-            fileSize: BigInt(attachment.fileSize),
-            contentType: attachment.contentType,
-            url: attachment.url,
-          });
-          result.attachmentsProcessed++;
-        }
+      // Check if all channels are done
+      if (completedChannels + failedChannels >= channelJobs.length) {
+        break;
       }
+
+      // Wait before next poll
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
     }
+
+    // Calculate final statistics
+    const endTime = Date.now();
+    const duration = (endTime - startTime) / 1000; // seconds
+    const channelJobStatuses = await this.channelSyncJobRepo.findByParentJobId(
+      job.id!
+    );
+
+    // Aggregate channel results
+    result.channelResults = channelJobStatuses.map((j) => ({
+      channelId: j.channelId,
+      status: j.status,
+      workerId: j.workerId,
+      startedAt: j.startedAt,
+      completedAt: j.completedAt,
+      messagesProcessed: j.messagesProcessed,
+      lastMessageId: undefined, // Would need to get from sync progress
+      error: j.errorDetails ? JSON.stringify(j.errorDetails) : undefined,
+      retryCount: 0,
+    }));
+
+    // Add parallel statistics
+    result.parallelStats = {
+      maxConcurrentChannels: config.SYNC_MAX_CHANNEL_WORKERS || 10,
+      averageChannelTime:
+        completedChannels > 0 ? duration / completedChannels : 0,
+      totalApiCalls: 0, // Would need to track this
+      rateLimitEncounters: 0, // Would need to track this
+    };
+
+    // Add errors from failed channels
+    const failedJobs = channelJobStatuses.filter((j) => j.status === 'failed');
+    for (const failedJob of failedJobs) {
+      result.errors.push({
+        channelId: failedJob.channelId,
+        error: failedJob.errorDetails
+          ? JSON.stringify(failedJob.errorDetails)
+          : 'Channel sync failed',
+        timestamp: failedJob.completedAt || new Date(),
+      });
+    }
+
+    result.channelsProcessed = completedChannels;
+    result.completedAt = new Date();
+
+    // Log final sync metrics
+    logger.info('Sync job completed', {
+      context: 'sync-metrics',
+      jobId: job.id,
+      tenantId: job.data.tenantId,
+      metrics: {
+        duration,
+        channelsTotal: channelJobs.length,
+        channelsProcessed: completedChannels,
+        channelsFailed: failedChannels,
+        messagesProcessed: result.messagesProcessed,
+        messagesPerSecond: result.messagesProcessed / duration,
+        channelsPerMinute: (completedChannels / duration) * 60,
+        maxConcurrentChannels: config.SYNC_MAX_CHANNEL_WORKERS || 10,
+        averageChannelTime:
+          completedChannels > 0 ? duration / completedChannels : 0,
+        status: 'completed',
+      },
+    });
+
+    // Cleanup old channel sync jobs
+    await this.cleanupOldChannelSyncJobs();
+
+    return result;
   }
 
   /**
@@ -586,5 +514,33 @@ export class SyncWorker {
     this.worker.on('error', (error) => {
       logger.error('Worker error', { error });
     });
+  }
+
+  /**
+   * Cleanup old channel sync job records
+   */
+  private async cleanupOldChannelSyncJobs(): Promise<void> {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - 7); // 7 days ago
+
+      const result = await (db as any)
+        .deleteFrom('channel_sync_jobs')
+        .where('status', '=', 'completed')
+        .where('completed_at', '<', cutoffDate.toISOString())
+        .executeTakeFirst();
+
+      const deletedCount = Number(result.numDeletedRows);
+
+      if (deletedCount > 0) {
+        logger.info('Cleaned up old channel sync job records', {
+          deletedCount,
+          cutoffDate,
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to cleanup old channel sync jobs', { error });
+      // Don't throw - cleanup is not critical
+    }
   }
 }

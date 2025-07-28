@@ -30,6 +30,10 @@ import { SyncErrorClassification, classifyError } from '../../types/errors.js';
 export class DiscordAdapter implements PlatformAdapter {
   private client: Client;
   private initialized = false;
+  private rateLimitMetrics = {
+    encounters: 0,
+    totalDelayMs: 0,
+  };
 
   constructor(_config?: PlatformAdapterConfig) {
     // Config can be used for future enhancements
@@ -50,6 +54,33 @@ export class DiscordAdapter implements PlatformAdapter {
     }
 
     try {
+      // Set up rate limit monitoring if DEBUG_RATE_LIMITS is enabled
+      if (config.DEBUG_RATE_LIMITS) {
+        this.client.rest.on('rateLimited', (info) => {
+          this.rateLimitMetrics.encounters++;
+          this.rateLimitMetrics.totalDelayMs += info.timeToReset;
+
+          logger.warn('Discord rate limit encountered', {
+            context: 'rate-limit-debug',
+            timeout: info.timeToReset,
+            limit: info.limit,
+            method: info.method,
+            url: info.url,
+            route: info.route,
+            global: info.global,
+            rateLimitMetrics: {
+              totalEncounters: this.rateLimitMetrics.encounters,
+              totalDelayMs: this.rateLimitMetrics.totalDelayMs,
+              averageDelayMs:
+                this.rateLimitMetrics.totalDelayMs /
+                this.rateLimitMetrics.encounters,
+            },
+          });
+        });
+
+        logger.info('Discord rate limit monitoring enabled');
+      }
+
       await this.client.login(config.DISCORD_BOT_TOKEN);
       this.initialized = true;
       logger.info('Discord adapter initialized successfully');
@@ -65,6 +96,20 @@ export class DiscordAdapter implements PlatformAdapter {
     }
 
     try {
+      // Log final rate limit metrics if monitoring was enabled
+      if (config.DEBUG_RATE_LIMITS && this.rateLimitMetrics.encounters > 0) {
+        logger.info('Discord rate limit summary', {
+          context: 'rate-limit-debug',
+          summary: {
+            totalEncounters: this.rateLimitMetrics.encounters,
+            totalDelayMs: this.rateLimitMetrics.totalDelayMs,
+            averageDelayMs:
+              this.rateLimitMetrics.totalDelayMs /
+              this.rateLimitMetrics.encounters,
+          },
+        });
+      }
+
       this.client.destroy();
       this.initialized = false;
       logger.info('Discord adapter cleaned up successfully');
@@ -72,6 +117,21 @@ export class DiscordAdapter implements PlatformAdapter {
       logger.error('Failed to cleanup Discord adapter', { error });
       throw new Error('Failed to cleanup Discord adapter');
     }
+  }
+
+  /**
+   * Get current rate limit metrics
+   */
+  getRateLimitMetrics() {
+    return {
+      encounters: this.rateLimitMetrics.encounters,
+      totalDelayMs: this.rateLimitMetrics.totalDelayMs,
+      averageDelayMs:
+        this.rateLimitMetrics.encounters > 0
+          ? this.rateLimitMetrics.totalDelayMs /
+            this.rateLimitMetrics.encounters
+          : 0,
+    };
   }
 
   async verifyConnection(platformId: string): Promise<boolean> {
@@ -173,7 +233,7 @@ export class DiscordAdapter implements PlatformAdapter {
       }
 
       const fetchOptions: { limit: number; after?: string; before?: string } = {
-        limit: Math.min(options?.limit || 100, 100), // Discord API limit
+        limit: 100, // Always use Discord's maximum batch size
       };
 
       // For Discord, when doing historical sync (no afterTimestamp),

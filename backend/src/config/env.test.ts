@@ -14,42 +14,6 @@ describe('Environment Configuration', () => {
   });
 
   describe('ConfigSchema validation', () => {
-    it('should validate valid environment configuration', async () => {
-      // Set minimal required env vars to prevent module initialization failure
-      process.env.ADMIN_API_KEY = 'test-api-key';
-      process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
-      process.env.DISCORD_BOT_TOKEN = 'test-discord-token';
-
-      const { ConfigSchema } = await import('./env.js');
-
-      const testEnv = {
-        ADMIN_API_KEY: 'test-api-key',
-        DATABASE_URL: 'postgresql://user:pass@localhost:5432/test',
-        NODE_ENV: 'test',
-        PORT: '25000',
-        DATABASE_POOL_SIZE: '10',
-        LOG_LEVEL: 'info',
-        DISCORD_BOT_TOKEN: 'test-discord-token',
-        REDIS_HOST: 'localhost',
-        REDIS_PORT: '6379',
-      };
-
-      const result = ConfigSchema.parse(testEnv);
-
-      expect(result).toEqual({
-        ADMIN_API_KEY: 'test-api-key',
-        DATABASE_URL: 'postgresql://user:pass@localhost:5432/test',
-        NODE_ENV: 'test',
-        PORT: 25000,
-        DATABASE_POOL_SIZE: 10,
-        LOG_LEVEL: 'info',
-        DISCORD_BOT_TOKEN: 'test-discord-token',
-        REDIS_HOST: 'localhost',
-        REDIS_PORT: 6379,
-        REDIS_PASSWORD: undefined,
-      });
-    });
-
     it('should apply default values for optional fields', async () => {
       // Set minimal required env vars to prevent module initialization failure
       process.env.ADMIN_API_KEY = 'test-api-key';

@@ -24,7 +24,10 @@
     "export:tenant": "tsx scripts/export-cli.ts tenant",
     "export:status": "tsx scripts/export-cli.ts status",
     "build:all-tenants": "tsx scripts/build-all-tenants.ts",
-    "worker:export": "tsx src/workers/exportWorker.ts"
+    "worker:export": "tsx src/workers/exportWorker.ts",
+    "sync:start": "tsx scripts/sync-start.ts",
+    "sync:reset": "tsx scripts/sync-reset.ts",
+    "sync:status": "tsx scripts/sync-status.ts"
   },
   "keywords": [],
   "author": "",
@@ -49,6 +52,7 @@
     "@types/node": "^24.0.0",
     "@types/pg": "^8.15.4",
     "@types/supertest": "^6.0.3",
+    "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.0.0",

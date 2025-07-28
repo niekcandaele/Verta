@@ -92,6 +92,29 @@ export interface SyncJobResult {
   }>;
   startedAt: Date;
   completedAt: Date;
+  // New fields for parallel processing
+  parallelStats?: {
+    maxConcurrentChannels: number;
+    averageChannelTime: number;
+    totalApiCalls: number;
+    rateLimitEncounters: number;
+  };
+  channelResults?: ChannelSyncState[];
+}
+
+/**
+ * Channel sync state for parallel processing
+ */
+export interface ChannelSyncState {
+  channelId: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  workerId?: string;
+  startedAt?: Date;
+  completedAt?: Date;
+  messagesProcessed: number;
+  lastMessageId?: string;
+  error?: string;
+  retryCount: number;
 }
 
 // Create/Update DTOs are now imported from shared-types above
