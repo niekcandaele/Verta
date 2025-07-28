@@ -145,10 +145,15 @@ export class ExportWorker {
     await job.updateProgress(0);
 
     try {
-      // Export tenant data
-      const result = await this.exportService.exportTenant(tenantId);
+      // Export tenant data with progress callback
+      const result = await this.exportService.exportTenant(
+        tenantId,
+        async (progress) => {
+          await job.updateProgress(progress);
+        }
+      );
 
-      // Update progress
+      // Update progress to 100% when complete
       await job.updateProgress(100);
 
       return result;
@@ -170,10 +175,14 @@ export class ExportWorker {
     await job.updateProgress(0);
 
     try {
-      // Export all tenants
-      const results = await this.exportService.exportAllTenants();
+      // Export all tenants with progress callback
+      const results = await this.exportService.exportAllTenants(
+        async (progress) => {
+          await job.updateProgress(progress);
+        }
+      );
 
-      // Update progress
+      // Update progress to 100% when complete
       await job.updateProgress(100);
 
       return results;

@@ -19,8 +19,7 @@ export function getTenantSlug(): string {
 
 // Get the base path for data export files
 export function getDataBasePath(): string {
-  // During build, we read from the backend _data directory (temporary until we fix the backend path)
-  const basePath = process.env.DATA_EXPORT_PATH || '../backend/_data/data-export';
+  const basePath = process.env.DATA_EXPORT_PATH || '../_data/data-export';
   return path.resolve(basePath);
 }
 

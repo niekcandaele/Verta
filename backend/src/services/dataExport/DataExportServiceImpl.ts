@@ -6,7 +6,11 @@ import { mkdir, writeFile, chmod } from 'fs/promises';
 import { join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import type { DataExportService, ExportResult } from './DataExportService.js';
+import type {
+  DataExportService,
+  ExportResult,
+  ExportProgressCallback,
+} from './DataExportService.js';
 import type {
   TenantRepository,
   TenantBrandingRepository,
@@ -47,7 +51,9 @@ export class DataExportServiceImpl implements DataExportService {
     private readonly attachmentRepository: MessageAttachmentRepository
   ) {}
 
-  async exportAllTenants(): Promise<ExportResult[]> {
+  async exportAllTenants(
+    onProgress?: ExportProgressCallback
+  ): Promise<ExportResult[]> {
     const startTime = Date.now();
     const results: ExportResult[] = [];
 
@@ -62,9 +68,23 @@ export class DataExportServiceImpl implements DataExportService {
       logger.info(`Exporting data for ${activeTenants.length} active tenants`);
 
       // Export each tenant
-      for (const tenant of activeTenants) {
+      for (let i = 0; i < activeTenants.length; i++) {
+        const tenant = activeTenants[i];
         try {
-          const result = await this.exportTenant(tenant.id);
+          // Calculate progress for all tenants
+          const tenantProgress = (i / activeTenants.length) * 100;
+          if (onProgress) {
+            await onProgress(tenantProgress);
+          }
+          const result = await this.exportTenant(
+            tenant.id,
+            onProgress
+              ? async (p) =>
+                  await onProgress(
+                    Math.floor(((i + p / 100) / activeTenants.length) * 100)
+                  )
+              : undefined
+          );
           results.push(result);
         } catch (error) {
           logger.error(`Failed to export tenant ${tenant.id}`, error);
@@ -88,7 +108,10 @@ export class DataExportServiceImpl implements DataExportService {
     }
   }
 
-  async exportTenant(tenantId: string): Promise<ExportResult> {
+  async exportTenant(
+    tenantId: string,
+    onProgress?: ExportProgressCallback
+  ): Promise<ExportResult> {
     const startTime = Date.now();
     const errors: string[] = [];
 
@@ -130,6 +153,23 @@ export class DataExportServiceImpl implements DataExportService {
       let totalMessagesExported = 0;
       let totalFilesGenerated = 1; // metadata.json
 
+      // Calculate total pages across all channels for progress tracking
+      let totalPages = 0;
+      let processedPages = 0;
+
+      // First pass: count total pages
+      for (const channel of channels) {
+        const messageCount = await this.messageRepository.countByChannel(
+          channel.id
+        );
+        totalPages += Math.ceil(messageCount / MESSAGES_PER_PAGE);
+      }
+
+      // Report initial progress
+      if (onProgress && totalPages > 0) {
+        await onProgress(0);
+      }
+
       // Process each channel
       for (const channel of channels) {
         try {
@@ -141,7 +181,7 @@ export class DataExportServiceImpl implements DataExportService {
             channel.id
           );
 
-          const totalPages = Math.ceil(messageCount / MESSAGES_PER_PAGE);
+          const channelTotalPages = Math.ceil(messageCount / MESSAGES_PER_PAGE);
 
           // Add channel to metadata
           metadata.channels.push({
@@ -157,7 +197,7 @@ export class DataExportServiceImpl implements DataExportService {
           });
 
           // Export messages in pages
-          for (let page = 1; page <= totalPages; page++) {
+          for (let page = 1; page <= channelTotalPages; page++) {
             const offset = (page - 1) * MESSAGES_PER_PAGE;
             const { data: messages } =
               await this.messageRepository.findByChannel(channel.id, {
@@ -199,7 +239,7 @@ export class DataExportServiceImpl implements DataExportService {
               channelName: channel.name,
               channelType: channel.type,
               page,
-              totalPages,
+              totalPages: channelTotalPages,
               messages: archiveMessages,
             };
 
@@ -210,8 +250,15 @@ export class DataExportServiceImpl implements DataExportService {
             totalMessagesExported += messages.length;
 
             logger.debug(
-              `Exported page ${page}/${totalPages} for channel ${channel.name}`
+              `Exported page ${page}/${channelTotalPages} for channel ${channel.name}`
             );
+
+            // Update progress
+            processedPages++;
+            if (onProgress && totalPages > 0) {
+              const progress = Math.round((processedPages / totalPages) * 100);
+              await onProgress(progress);
+            }
           }
         } catch (error) {
           const errorMsg = `Failed to export channel ${channel.id}: ${

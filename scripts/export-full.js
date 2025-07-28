@@ -9,7 +9,7 @@ const { spawn } = require('child_process');
 const fs = require('fs').promises;
 const path = require('path');
 
-const DATA_EXPORT_PATH = path.join(__dirname, '..', 'backend', '_data', 'data-export');
+const DATA_EXPORT_PATH = path.join(__dirname, '..', '_data', 'data-export');
 
 // Run a command and return a promise
 function runCommand(command, args = [], options = {}) {
