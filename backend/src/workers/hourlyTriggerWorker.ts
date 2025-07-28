@@ -3,7 +3,7 @@
  */
 
 import { Worker, type Job } from 'bullmq';
-import { syncQueue } from '../queues/syncQueue.js';
+import { syncQueue, SYNC_QUEUE_NAME } from '../queues/syncQueue.js';
 import { TenantRepositoryImpl } from '../repositories/tenant/index.js';
 import { db } from '../database/index.js';
 import logger from '../utils/logger.js';
@@ -22,7 +22,7 @@ export class HourlyTriggerWorker {
 
     // Create the worker to process hourly sync triggers
     this.worker = new Worker(
-      'sync',
+      SYNC_QUEUE_NAME,
       async (job: Job) => {
         if (job.name === 'hourly-sync-trigger') {
           await this.runHourlySync();

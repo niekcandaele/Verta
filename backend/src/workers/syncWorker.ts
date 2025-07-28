@@ -43,6 +43,22 @@ export class SyncWorker {
     this.worker = new Worker<SyncJobData, SyncJobResult>(
       SYNC_QUEUE_NAME,
       async (job: Job<SyncJobData>) => {
+        // Skip hourly-sync-trigger jobs - they should be handled by HourlyTriggerWorker
+        if (job.name === 'hourly-sync-trigger') {
+          logger.warn('Skipping hourly-sync-trigger job in SyncWorker', {
+            jobId: job.id,
+          });
+          return {
+            tenantId: '',
+            channelsProcessed: 0,
+            messagesProcessed: 0,
+            reactionsProcessed: 0,
+            attachmentsProcessed: 0,
+            errors: [],
+            startedAt: new Date(),
+            completedAt: new Date(),
+          };
+        }
         return this.processSyncJob(job);
       },
       {
