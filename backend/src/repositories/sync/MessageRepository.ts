@@ -68,7 +68,7 @@ export class MessageRepositoryImpl
     // Get paginated data
     const dataQuery = await query
       .selectAll()
-      .orderBy('platform_created_at', 'asc')
+      .orderBy('platform_created_at', 'desc')
       .limit(limit)
       .offset(offset)
       .execute();
@@ -94,7 +94,7 @@ export class MessageRepositoryImpl
       .selectFrom('messages')
       .selectAll()
       .where('reply_to_id', '=', messageId)
-      .orderBy('platform_created_at', 'asc')
+      .orderBy('platform_created_at', 'desc')
       .execute();
 
     return rows.map((row) => this.mapRowToEntity(row));

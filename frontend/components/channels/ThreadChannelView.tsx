@@ -154,10 +154,10 @@ function buildThreadTree(messages: MessageWithExtras[]): ThreadNode[] {
     }
   });
 
-  // Sort children by timestamp
+  // Sort children by timestamp (newest first)
   const sortNodes = (nodes: ThreadNode[]) => {
     nodes.sort((a, b) => 
-      new Date(a.message.createdAt).getTime() - new Date(b.message.createdAt).getTime()
+      new Date(b.message.platformCreatedAt).getTime() - new Date(a.message.platformCreatedAt).getTime()
     );
     nodes.forEach(node => sortNodes(node.children));
   };

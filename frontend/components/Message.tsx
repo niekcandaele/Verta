@@ -24,7 +24,7 @@ export default function Message({ message }: MessageProps) {
       <div className="chat-header mb-1">
         <span className="font-medium">User {message.anonymizedAuthorId.slice(0, 8)}</span>
         <time className="text-xs opacity-50 ml-2">
-          {formatTimestamp(message.createdAt)}
+          {formatTimestamp(message.platformCreatedAt)}
         </time>
       </div>
       
