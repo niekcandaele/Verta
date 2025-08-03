@@ -4,6 +4,9 @@
  */
 
 import axios from 'axios';
+import { rm, mkdir } from 'fs/promises';
+import { resolve } from 'path';
+import { execSync } from 'child_process';
 import { config } from '../src/config/env.js';
 
 const API_BASE_URL =
@@ -83,6 +86,70 @@ async function waitForCompletion(jobId: string, checkInterval = 2000) {
   }
 }
 
+async function cleanDataDirectory() {
+  try {
+    // Resolve path to root _data directory
+    const dataPath = resolve(process.cwd(), '..', '_data');
+
+    console.log('🧹 Cleaning _data directory...');
+
+    try {
+      // Remove existing _data directory
+      await rm(dataPath, { recursive: true, force: true });
+      console.log('✅ _data directory removed');
+    } catch (error: any) {
+      if (error.code === 'EACCES') {
+        console.warn('⚠️  Permission denied when removing _data directory');
+        console.warn(
+          '   The directory may have been created by Docker running as root'
+        );
+        console.warn(
+          '   You may need to manually remove it with: sudo rm -rf _data'
+        );
+        console.warn('   Continuing without cleanup...');
+        return; // Continue without throwing
+      }
+      throw error; // Re-throw other errors
+    }
+
+    // Recreate empty _data directory with open permissions
+    await mkdir(dataPath, { recursive: true, mode: 0o777 });
+
+    console.log('✅ _data directory cleaned and recreated');
+  } catch (error) {
+    console.error('❌ Failed to clean _data directory:', error);
+    throw error;
+  }
+}
+
+async function syncExportData() {
+  // Only sync if we're not running inside Docker
+  if (process.env.DOCKERIZED === 'true') {
+    return;
+  }
+
+  console.log('\n📦 Syncing exported data from Docker container to host...');
+
+  try {
+    // Remove old data-export directory to ensure clean sync
+    execSync('rm -rf ../_data/data-export', {
+      cwd: process.cwd(),
+      stdio: 'pipe',
+    });
+
+    // Copy from container
+    execSync('docker cp verta-app:/data/data-export ../_data/', {
+      cwd: process.cwd(),
+      stdio: 'inherit',
+    });
+
+    console.log('✅ Data synced successfully!');
+  } catch (error: any) {
+    console.error('❌ Failed to sync data from container:', error.message);
+    // Don't throw - this is a non-critical error
+  }
+}
+
 // Main CLI logic
 async function main() {
   const command = process.argv[2];
@@ -91,9 +158,14 @@ async function main() {
 
   switch (command) {
     case 'all': {
+      // Clean _data directory before export
+      await cleanDataDirectory();
+
       const allJobId = await exportAllTenants();
       if (waitFlag && allJobId) {
         await waitForCompletion(allJobId);
+        // Sync data from Docker volume to host after successful export
+        await syncExportData();
       }
       break;
     }
@@ -107,6 +179,8 @@ async function main() {
       const tenantJobId = await exportTenant(arg);
       if (waitFlag && tenantJobId) {
         await waitForCompletion(tenantJobId);
+        // Sync data from Docker volume to host after successful export
+        await syncExportData();
       }
       break;
     }

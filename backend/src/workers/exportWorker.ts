@@ -75,7 +75,7 @@ export class ExportWorker {
       },
       {
         connection: getRedisConnection(),
-        concurrency: 2, // Process 2 export jobs concurrently
+        concurrency: 1, // Process 1 export job at a time to avoid conflicts
         removeOnComplete: {
           count: 100, // Keep last 100 completed jobs
           age: 24 * 60 * 60, // Keep for 24 hours
@@ -97,6 +97,7 @@ export class ExportWorker {
   async start(): Promise<void> {
     logger.info('Starting export worker');
     // Worker starts automatically when instantiated
+    logger.info('Export worker started');
   }
 
   /**

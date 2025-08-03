@@ -3,9 +3,14 @@
  */
 
 import { mkdir, writeFile, chmod } from 'fs/promises';
+import { existsSync } from 'fs';
 import { join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 import type {
   DataExportService,
   ExportResult,
@@ -126,7 +131,9 @@ export class DataExportServiceImpl implements DataExportService {
 
       // Create export directory
       const exportPath = join(EXPORT_BASE_PATH, tenant.slug);
+      logger.info(`Creating export directory at: ${exportPath}`);
       await this.ensureDirectory(exportPath);
+      logger.info(`Export directory created successfully`);
 
       // Get tenant branding
       const branding =
@@ -310,11 +317,93 @@ export class DataExportServiceImpl implements DataExportService {
 
   private async ensureDirectory(path: string): Promise<void> {
     try {
-      await mkdir(path, { recursive: true });
-      // Set open permissions for container compatibility
-      await chmod(path, 0o777);
+      logger.debug(`Attempting to create directory: ${path}`);
+
+      // Check if directory already exists
+      if (existsSync(path)) {
+        logger.debug(`Directory already exists: ${path}`);
+        return;
+      }
+
+      // Method 1: Try shell command with timeout
+      try {
+        logger.debug(
+          `Creating directory using shell command: mkdir -p "${path}"`
+        );
+        const { stderr } = await execAsync(
+          `mkdir -p "${path}" && chmod 777 "${path}"`,
+          {
+            timeout: 3000, // 3 second timeout
+          }
+        );
+        if (stderr) {
+          logger.warn(`Shell mkdir stderr: ${stderr}`);
+        }
+        logger.debug(
+          `Directory created successfully using shell command: ${path}`
+        );
+        return;
+      } catch (shellError) {
+        logger.warn(`Shell command failed: ${shellError}`);
+      }
+
+      // Method 2: Try creating parent directories first
+      try {
+        const parentDir = dirname(path);
+        if (!existsSync(parentDir)) {
+          logger.debug(`Creating parent directory first: ${parentDir}`);
+          await execAsync(`mkdir -p "${parentDir}"`, { timeout: 2000 });
+        }
+
+        // Now create the target directory
+        logger.debug(`Creating target directory: ${path}`);
+        await execAsync(`mkdir "${path}" && chmod 777 "${path}"`, {
+          timeout: 2000,
+        });
+        logger.debug(`Directory created successfully: ${path}`);
+        return;
+      } catch (parentError) {
+        logger.warn(`Parent directory approach failed: ${parentError}`);
+      }
+
+      // Method 3: Last resort - try Node.js fs methods
+      logger.debug(`Falling back to Node.js fs.mkdir`);
+      await mkdir(path, { recursive: true, mode: 0o777 });
+      logger.debug(`Directory created successfully using fs.mkdir: ${path}`);
     } catch (error) {
+      // Check if error is because directory already exists
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'EEXIST'
+      ) {
+        logger.debug(`Directory already exists: ${path}`);
+        return;
+      }
+
       logger.error(`Failed to create directory ${path}`, error);
+      // Log more details about the error
+      if (error instanceof Error) {
+        logger.error(`Error details: ${error.message}`);
+        logger.error(`Error stack: ${error.stack}`);
+      }
+
+      // Try to diagnose the issue
+      try {
+        const { stdout: lsOutput } = await execAsync(`ls -la /data 2>&1`, {
+          timeout: 1000,
+        });
+        logger.error(`/data directory listing: ${lsOutput}`);
+
+        const { stdout: dfOutput } = await execAsync(`df -h /data 2>&1`, {
+          timeout: 1000,
+        });
+        logger.error(`/data filesystem info: ${dfOutput}`);
+      } catch (diagError) {
+        logger.error(`Failed to diagnose: ${diagError}`);
+      }
+
       throw error;
     }
   }
