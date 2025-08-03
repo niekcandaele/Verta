@@ -1,5 +1,9 @@
 import type { MessageWithExtras } from '@/lib/data';
 import { generateAvatarUrl } from '@/lib/avatars';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
+import rehypeSanitize from 'rehype-sanitize';
 
 interface MessageProps {
   message: MessageWithExtras;
@@ -8,6 +12,13 @@ interface MessageProps {
 export default function Message({ message }: MessageProps) {
   const formatTimestamp = (timestamp: Date | string) => {
     return new Date(timestamp).toLocaleString();
+  };
+
+  // Preprocess Discord-style spoilers (||text||) to markdown spoilers (~~text~~)
+  const preprocessContent = (content: string) => {
+    // Convert Discord spoilers ||text|| to strikethrough ~~text~~ for markdown
+    // We'll handle the spoiler behavior with CSS
+    return content.replace(/\|\|(.+?)\|\|/g, '~~$1~~');
   };
 
   return (
@@ -29,7 +40,54 @@ export default function Message({ message }: MessageProps) {
       </div>
       
       <div className="chat-bubble chat-bubble-primary">
-        {message.content || <em className="opacity-50">No content</em>}
+        {message.content ? (
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkBreaks]}
+            rehypePlugins={[rehypeSanitize]}
+            components={{
+              // Custom renderers for Discord-like styling
+              code: ({ node, inline, className, children, ...props }: any) => {
+                if (inline) {
+                  return (
+                    <code className="px-1 py-0.5 bg-base-300 rounded text-sm" {...props}>
+                      {children}
+                    </code>
+                  );
+                }
+                return (
+                  <pre className="bg-base-300 p-2 rounded-lg overflow-x-auto my-2">
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
+                  </pre>
+                );
+              },
+              blockquote: ({ children }: any) => (
+                <blockquote className="border-l-4 border-base-300 pl-4 my-2 opacity-80">
+                  {children}
+                </blockquote>
+              ),
+              a: ({ href, children }: any) => (
+                <a href={href} className="link link-primary" target="_blank" rel="noopener noreferrer">
+                  {children}
+                </a>
+              ),
+              p: ({ children }: any) => <p className="my-1">{children}</p>,
+              ul: ({ children }: any) => <ul className="list-disc list-inside my-2">{children}</ul>,
+              ol: ({ children }: any) => <ol className="list-decimal list-inside my-2">{children}</ol>,
+              // Handle Discord-style spoilers (||text||)
+              del: ({ children }: any) => (
+                <span className="bg-base-content text-base-content hover:bg-transparent transition-colors cursor-pointer rounded px-1">
+                  {children}
+                </span>
+              ),
+            }}
+          >
+            {preprocessContent(message.content)}
+          </ReactMarkdown>
+        ) : (
+          <em className="opacity-50">No content</em>
+        )}
       </div>
       
       {/* Attachments */}
