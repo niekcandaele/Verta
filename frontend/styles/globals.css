@@ -25,3 +25,39 @@ body {
   padding: 0;
   margin: 0;
 }
+
+/* Discord-style mention styling */
+.mention {
+  @apply inline-flex items-center rounded px-1 font-medium cursor-pointer transition-colors;
+}
+
+.mention-channel {
+  @apply bg-blue-500 bg-opacity-20 text-blue-400;
+}
+
+.mention-channel:hover {
+  @apply bg-opacity-30;
+}
+
+.mention-channel::before {
+  content: '#';
+  @apply mr-0.5;
+}
+
+.mention-user {
+  background-color: rgba(87, 13, 248, 0.2); /* Using primary color with opacity */
+  color: var(--brand-primary);
+}
+
+.mention-user:hover {
+  background-color: rgba(87, 13, 248, 0.3);
+}
+
+.mention-role {
+  background-color: rgba(240, 0, 184, 0.2); /* Using secondary color with opacity */
+  color: var(--brand-secondary);
+}
+
+.mention-role:hover {
+  background-color: rgba(240, 0, 184, 0.3);
+}

@@ -1,24 +1,32 @@
 import type { MessageWithExtras } from '@/lib/data';
 import { generateAvatarUrl } from '@/lib/avatars';
+import { processMentionsForMarkdown } from '@/lib/mentions';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import rehypeSanitize from 'rehype-sanitize';
+import type { Channel } from 'shared-types';
 
 interface MessageProps {
   message: MessageWithExtras;
+  channels: Channel[];
 }
 
-export default function Message({ message }: MessageProps) {
+export default function Message({ message, channels }: MessageProps) {
+
   const formatTimestamp = (timestamp: Date | string) => {
     return new Date(timestamp).toLocaleString();
   };
 
-  // Preprocess Discord-style spoilers (||text||) to markdown spoilers (~~text~~)
+  // Preprocess Discord-style spoilers and mentions
   const preprocessContent = (content: string) => {
     // Convert Discord spoilers ||text|| to strikethrough ~~text~~ for markdown
-    // We'll handle the spoiler behavior with CSS
-    return content.replace(/\|\|(.+?)\|\|/g, '~~$1~~');
+    let processed = content.replace(/\|\|(.+?)\|\|/g, '~~$1~~');
+    
+    // Process mentions to markdown links
+    processed = processMentionsForMarkdown(processed, channels);
+    
+    return processed;
   };
 
   return (
@@ -67,11 +75,42 @@ export default function Message({ message }: MessageProps) {
                   {children}
                 </blockquote>
               ),
-              a: ({ href, children }: any) => (
-                <a href={href} className="link link-primary" target="_blank" rel="noopener noreferrer">
-                  {children}
-                </a>
-              ),
+              a: ({ href, children }: any) => {
+                // Handle mention links
+                if (href?.startsWith('channel:')) {
+                  const channelId = href.substring(8);
+                  const channel = channels.find(c => c.platformChannelId === channelId);
+                  return (
+                    <span className="mention mention-channel">
+                      {children}
+                    </span>
+                  );
+                } else if (href?.startsWith('user:')) {
+                  const userId = href.substring(5);
+                  return (
+                    <span className="mention mention-user">
+                      <img 
+                        src={generateAvatarUrl(userId)} 
+                        alt="" 
+                        className="w-5 h-5 rounded-full inline-block mr-1 align-middle"
+                      />
+                      {children}
+                    </span>
+                  );
+                } else if (href?.startsWith('role:')) {
+                  return (
+                    <span className="mention mention-role">
+                      {children}
+                    </span>
+                  );
+                }
+                // Regular links
+                return (
+                  <a href={href} className="link link-primary" target="_blank" rel="noopener noreferrer">
+                    {children}
+                  </a>
+                );
+              },
               p: ({ children }: any) => <p className="my-1">{children}</p>,
               ul: ({ children }: any) => <ul className="list-disc list-inside my-2">{children}</ul>,
               ol: ({ children }: any) => <ol className="list-decimal list-inside my-2">{children}</ol>,

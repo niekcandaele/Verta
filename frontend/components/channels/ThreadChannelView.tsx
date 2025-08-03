@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import type { MessageWithExtras } from '@/lib/data';
 import Message from '../Message';
+import type { Channel } from 'shared-types';
 
 interface ThreadChannelViewProps {
   messages: MessageWithExtras[];
   channelName: string;
+  channels: Channel[];
 }
 
 interface ThreadNode {
@@ -13,7 +15,7 @@ interface ThreadNode {
   depth: number;
 }
 
-export default function ThreadChannelView({ messages, channelName }: ThreadChannelViewProps) {
+export default function ThreadChannelView({ messages, channelName, channels }: ThreadChannelViewProps) {
   const threadTree = buildThreadTree(messages);
   const [collapsedThreads, setCollapsedThreads] = useState<Set<string>>(new Set());
 
@@ -48,6 +50,7 @@ export default function ThreadChannelView({ messages, channelName }: ThreadChann
             node={node}
             collapsedThreads={collapsedThreads}
             onToggle={toggleThread}
+            channels={channels}
           />
         ))}
       </div>
@@ -59,9 +62,10 @@ interface ThreadNodeComponentProps {
   node: ThreadNode;
   collapsedThreads: Set<string>;
   onToggle: (messageId: string) => void;
+  channels: Channel[];
 }
 
-function ThreadNodeComponent({ node, collapsedThreads, onToggle }: ThreadNodeComponentProps) {
+function ThreadNodeComponent({ node, collapsedThreads, onToggle, channels }: ThreadNodeComponentProps) {
   const hasChildren = node.children.length > 0;
   const isCollapsed = collapsedThreads.has(node.message.id);
 
@@ -97,7 +101,7 @@ function ThreadNodeComponent({ node, collapsedThreads, onToggle }: ThreadNodeCom
           )}
           
           <div className="flex-1">
-            <Message message={node.message} />
+            <Message message={node.message} channels={channels} />
             
             {hasChildren && !isCollapsed && (
               <div className="text-xs text-base-content/50 mt-1">
@@ -117,6 +121,7 @@ function ThreadNodeComponent({ node, collapsedThreads, onToggle }: ThreadNodeCom
               node={child}
               collapsedThreads={collapsedThreads}
               onToggle={onToggle}
+              channels={channels}
             />
           ))}
         </div>

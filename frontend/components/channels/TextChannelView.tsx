@@ -1,12 +1,14 @@
 import type { MessageWithExtras } from '@/lib/data';
 import MessageList from '../MessageList';
+import type { Channel } from 'shared-types';
 
 interface TextChannelViewProps {
   messages: MessageWithExtras[];
   channelName: string;
+  channels: Channel[];
 }
 
-export default function TextChannelView({ messages, channelName }: TextChannelViewProps) {
+export default function TextChannelView({ messages, channelName, channels }: TextChannelViewProps) {
   return (
     <div>
       <div className="mb-4 p-4 bg-base-200 rounded-lg">
@@ -21,7 +23,7 @@ export default function TextChannelView({ messages, channelName }: TextChannelVi
         </p>
       </div>
       
-      <MessageList messages={messages} />
+      <MessageList messages={messages} channels={channels} />
     </div>
   );
 }

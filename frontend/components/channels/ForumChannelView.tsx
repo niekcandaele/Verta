@@ -1,9 +1,11 @@
 import type { MessageWithExtras } from '@/lib/data';
 import Message from '../Message';
+import type { Channel } from 'shared-types';
 
 interface ForumChannelViewProps {
   messages: MessageWithExtras[];
   channelName: string;
+  channels: Channel[];
 }
 
 interface ForumPost {
@@ -11,7 +13,7 @@ interface ForumPost {
   replies: MessageWithExtras[];
 }
 
-export default function ForumChannelView({ messages, channelName }: ForumChannelViewProps) {
+export default function ForumChannelView({ messages, channelName, channels }: ForumChannelViewProps) {
   // Group messages into forum posts (root messages and their replies)
   const forumPosts = groupIntoForumPosts(messages);
 
@@ -38,7 +40,7 @@ export default function ForumChannelView({ messages, channelName }: ForumChannel
                 <h3 className="text-lg font-semibold mb-2">
                   {getPostTitle(post.rootMessage)}
                 </h3>
-                <Message message={post.rootMessage} />
+                <Message message={post.rootMessage} channels={channels} />
               </div>
 
               {/* Replies */}
@@ -50,7 +52,7 @@ export default function ForumChannelView({ messages, channelName }: ForumChannel
                   <div className="ml-4 space-y-2 border-l-2 border-base-300 pl-4">
                     {post.replies.map((reply) => (
                       <div key={reply.id}>
-                        <Message message={reply} />
+                        <Message message={reply} channels={channels} />
                       </div>
                     ))}
                   </div>

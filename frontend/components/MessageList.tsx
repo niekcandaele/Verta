@@ -1,11 +1,13 @@
 import type { MessageWithExtras } from '@/lib/data';
 import Message from './Message';
+import type { Channel } from 'shared-types';
 
 interface MessageListProps {
   messages: MessageWithExtras[];
+  channels: Channel[];
 }
 
-export default function MessageList({ messages }: MessageListProps) {
+export default function MessageList({ messages, channels }: MessageListProps) {
   if (messages.length === 0) {
     return (
       <div className="card bg-base-200">
@@ -21,7 +23,7 @@ export default function MessageList({ messages }: MessageListProps) {
     <div className="space-y-2">
       {messages.map((message) => (
         <div key={message.id} className="border-b border-base-300 pb-4 last:border-0">
-          <Message message={message} />
+          <Message message={message} channels={channels} />
         </div>
       ))}
     </div>

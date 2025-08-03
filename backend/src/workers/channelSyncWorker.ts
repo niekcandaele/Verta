@@ -325,7 +325,21 @@ export class ChannelSyncWorker {
       anonymizedAuthorId: anonymizeUserId(msg.authorId),
       content: msg.content,
       replyToId: msg.replyToId || null,
-      metadata: msg.metadata || {},
+      metadata: msg.metadata
+        ? {
+            ...msg.metadata,
+            mentions: (msg.metadata as any).mentions
+              ? {
+                  ...(msg.metadata as any).mentions,
+                  // Anonymize user IDs in mentions to match anonymizedAuthorId format
+                  users: ((msg.metadata as any).mentions.users || []).map(
+                    (userId: string) => anonymizeUserId(userId)
+                  ),
+                  // Keep channels and roles as-is for proper lookup
+                }
+              : (msg.metadata as any).mentions,
+          }
+        : {},
       platformCreatedAt: msg.createdAt,
     }));
 

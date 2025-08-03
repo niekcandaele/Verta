@@ -85,13 +85,13 @@ export default function ChannelPage({ metadata, channel, pageData, currentPage }
 
         {/* Messages - Render based on channel type */}
         {channel.type === 'text' && (
-          <TextChannelView messages={pageData.messages} channelName={channel.name} />
+          <TextChannelView messages={pageData.messages} channelName={channel.name} channels={metadata.channels} />
         )}
         {channel.type === 'forum' && (
-          <ForumChannelView messages={pageData.messages} channelName={channel.name} />
+          <ForumChannelView messages={pageData.messages} channelName={channel.name} channels={metadata.channels} />
         )}
         {channel.type === 'thread' && (
-          <ThreadChannelView messages={pageData.messages} channelName={channel.name} />
+          <ThreadChannelView messages={pageData.messages} channelName={channel.name} channels={metadata.channels} />
         )}
       </div>
     </Layout>
