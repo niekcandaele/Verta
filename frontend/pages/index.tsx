@@ -9,32 +9,45 @@ interface HomeProps {
 export default function Home({ metadata }: HomeProps) {
   return (
     <Layout metadata={metadata}>
-      <div className="prose max-w-none">
-        <h1 className="text-3xl font-bold mb-6">Welcome to {metadata.tenant.name} Archive</h1>
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-12">
+          <h1 className="text-5xl font-bold mb-4">
+            Welcome to <span className="text-gradient-purple">{metadata.tenant.name}</span> Archive
+          </h1>
+          <p className="text-xl text-muted">Your complete Discord server history, preserved and searchable</p>
+        </div>
         
-        <div className="stats shadow">
-          <div className="stat">
-            <div className="stat-title">Platform</div>
-            <div className="stat-value text-primary">{metadata.tenant.platform}</div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <div className="card glass glass-hover">
+            <div className="card-body flex flex-col justify-between">
+              <h3 className="text-xs text-muted uppercase tracking-wider font-medium">Platform</h3>
+              <p className="text-4xl font-bold text-primary capitalize mt-4">{metadata.tenant.platform}</p>
+            </div>
           </div>
           
-          <div className="stat">
-            <div className="stat-title">Status</div>
-            <div className="stat-value text-secondary">{metadata.tenant.status}</div>
+          <div className="card glass glass-hover">
+            <div className="card-body flex flex-col justify-between">
+              <h3 className="text-xs text-muted uppercase tracking-wider font-medium">Status</h3>
+              <p className="text-4xl font-bold text-success mt-4">{metadata.tenant.status}</p>
+            </div>
           </div>
           
-          <div className="stat">
-            <div className="stat-title">Total Channels</div>
-            <div className="stat-value">{metadata.channels.length}</div>
+          <div className="card glass glass-hover">
+            <div className="card-body flex flex-col justify-between">
+              <h3 className="text-xs text-muted uppercase tracking-wider font-medium">Total Channels</h3>
+              <p className="text-4xl font-bold text-primary mt-4">{metadata.channels.length}</p>
+            </div>
           </div>
         </div>
 
-        <div className="mt-8">
-          <h2 className="text-2xl font-semibold mb-4">Getting Started</h2>
-          <p className="text-base-content/70">
-            Select a channel from the sidebar to view its message history. 
-            This archive was generated on {new Date(metadata.generatedAt).toLocaleString()}.
-          </p>
+        <div className="card glass">
+          <div className="card-body">
+            <h2 className="text-2xl font-semibold text-primary">Getting Started</h2>
+            <p className="text-base-content/80 text-lg leading-relaxed mt-4">
+              Select a channel from the sidebar to view its message history. 
+              This archive was generated on {new Date(metadata.generatedAt).toLocaleString()}.
+            </p>
+          </div>
         </div>
 
         {metadata.branding && (

@@ -1,5 +1,8 @@
 import Link from 'next/link';
 import type { Channel } from 'shared-types';
+import ChannelTypeIcon from './ChannelTypeIcon';
+import { useState, KeyboardEvent } from 'react';
+import clsx from 'clsx';
 
 interface ChannelListProps {
   channels: Channel[];
@@ -7,53 +10,103 @@ interface ChannelListProps {
 }
 
 export default function ChannelList({ channels, currentChannelId }: ChannelListProps) {
-  // Group channels by type
-  const channelsByType = channels.reduce((acc, channel) => {
-    if (!acc[channel.type]) {
-      acc[channel.type] = [];
-    }
-    acc[channel.type].push(channel);
-    return acc;
-  }, {} as Record<string, Channel[]>);
+  const [collapsedCategories, setCollapsedCategories] = useState<string[]>([]);
 
-  // Sort channel types for consistent display
-  const sortedTypes = Object.keys(channelsByType).sort();
+  const handleCategoryToggle = (categoryId: string) => {
+    setCollapsedCategories(prev => 
+      prev.includes(categoryId) ? prev.filter(id => id !== categoryId) : [...prev, categoryId]
+    );
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>, categoryId: string) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      handleCategoryToggle(categoryId);
+    }
+  };
+
+  // Create a mapping from platformChannelId to channel for easy lookup
+  const channelsByPlatformId = new Map(channels.map(c => [c.platformChannelId, c]));
+
+  // Categories are channels with type 'category' or channels that have children
+  const categories = channels.filter(c => 
+    c.type === 'category' || (!c.parentChannelId && channels.some(child => child.parentChannelId === c.id))
+  );
+  
+  // Orphan channels are non-category channels without a parent
+  const orphanChannels = channels.filter(c => 
+    c.type !== 'category' && !c.parentChannelId && !categories.some(cat => cat.id === c.id)
+  );
 
   return (
-    <div className="w-64 min-h-screen bg-base-200 p-4">
-      <h2 className="text-lg font-semibold mb-4">Channels</h2>
-      
-      {sortedTypes.map((type) => (
-        <div key={type} className="mb-6">
-          <h3 className="text-sm font-medium text-base-content/60 uppercase mb-2">
-            {type} Channels ({channelsByType[type].length})
-          </h3>
-          <ul className="menu bg-base-100 rounded-box p-2">
-            {channelsByType[type].map((channel) => (
-              <li key={channel.id}>
-                <Link 
-                  href={`/channel/${channel.id}/1`}
-                  className={`${currentChannelId === channel.id ? 'active' : ''} group`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <span className="truncate flex-1">{channel.name}</span>
-                    <span className="badge badge-xs opacity-60 group-hover:opacity-100">
-                      {type}
-                    </span>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-      
-      <div className="mt-8 p-4 bg-base-100 rounded-box">
-        <div className="stat p-0">
-          <div className="stat-title text-xs">Total Channels</div>
-          <div className="stat-value text-2xl">{channels.length}</div>
-        </div>
-      </div>
-    </div>
+    <nav className="w-full h-full space-y-2" aria-label="Channels">
+      <ul role="tree" className="space-y-1">
+        {categories.map(category => {
+          const isCollapsed = collapsedCategories.includes(category.id);
+          // Match child channels by comparing parentChannelId (platform ID) with category's platformChannelId
+          const childChannels = channels.filter(c => c.parentChannelId === category.platformChannelId);
+          return (
+            <li key={category.id} role="treeitem" aria-expanded={!isCollapsed} aria-level={1}>
+              <div 
+                className="flex items-center justify-between px-2 py-1.5 rounded-lg cursor-pointer hover:bg-primary/5 hover:border-primary/20 border border-transparent transition-all duration-200 focus-ring group" 
+                onClick={() => handleCategoryToggle(category.id)}
+                onKeyDown={(e) => handleKeyDown(e, category.id)}
+                tabIndex={0}
+              >
+                <span className="font-semibold text-xs uppercase tracking-wider text-base-content/70 group-hover:text-primary">{category.name}</span>
+                <span className={`transition-transform transform text-primary/60 group-hover:text-primary ${isCollapsed ? '-rotate-90' : ''}`}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </span>
+              </div>
+              {!isCollapsed && (
+                <ul role="group" className="pl-3 mt-1 space-y-0.5 animate-fade-slide-up">
+                  {childChannels.map(channel => (
+                    <ChannelItem key={channel.id} channel={channel} currentChannelId={currentChannelId} level={2} />
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
+        {orphanChannels.map(channel => (
+          <ChannelItem key={channel.id} channel={channel} currentChannelId={currentChannelId} level={1} />
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+interface ChannelItemProps {
+  channel: Channel;
+  currentChannelId?: string;
+  level?: number;
+}
+
+function ChannelItem({ channel, currentChannelId, level = 1 }: ChannelItemProps) {
+  const isActive = channel.id === currentChannelId;
+  return (
+    <li role="treeitem" aria-level={level}>
+      <Link 
+        href={`/channel/${channel.id}/1`}
+        className={clsx(
+          'group flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-all duration-200 focus-ring',
+          isActive 
+            ? 'bg-primary/25 text-white font-semibold ring-2 ring-primary/50 shadow-lg shadow-primary/40 glow-purple' 
+            : 'text-base-content/80 hover:bg-primary/15 hover:text-primary hover:shadow-md hover:shadow-primary/20 hover:ring-1 hover:ring-primary/30'
+        )}
+      >
+        <ChannelTypeIcon 
+          type={channel.type} 
+          discordType={channel.metadata?.discordType as number | undefined} 
+          size="sm" 
+          className={clsx(
+            'transition-opacity',
+            isActive ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'
+          )} 
+        />
+        <span className="truncate flex-1">{channel.name}</span>
+      </Link>
+    </li>
   );
 }

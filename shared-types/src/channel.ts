@@ -1,4 +1,4 @@
-export type ChannelType = 'text' | 'thread' | 'forum';
+export type ChannelType = 'text' | 'thread' | 'forum' | 'category';
 
 export type Channel = {
   id: string;
@@ -7,6 +7,7 @@ export type Channel = {
   name: string;
   type: ChannelType;
   parentChannelId: string | null;
+  discordChannelType?: number;
   metadata: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;

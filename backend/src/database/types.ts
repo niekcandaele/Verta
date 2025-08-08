@@ -17,7 +17,7 @@ export type TenantStatus = 'ACTIVE' | 'CANCELLED' | 'MAINTENANCE';
 export type Platform = 'slack' | 'discord';
 
 // Channel type enum
-export type ChannelType = 'text' | 'thread' | 'forum';
+export type ChannelType = 'text' | 'thread' | 'forum' | 'category';
 
 // Sync status enum
 export type SyncStatus = 'in_progress' | 'completed' | 'failed';
