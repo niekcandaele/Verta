@@ -175,7 +175,10 @@ export class DiscordAdapter implements PlatformAdapter {
       // Get the @everyone role (it has the same ID as the guild)
       const everyoneRole = guild.roles.everyone;
 
-      return channels
+      const platformChannels: PlatformChannel[] = [];
+
+      // First, get all regular channels
+      const regularChannels = channels
         .filter((channel) => {
           if (!channel) return false;
 
@@ -187,6 +190,55 @@ export class DiscordAdapter implements PlatformAdapter {
         })
         .map((channel) => this.mapDiscordChannelToPlatform(channel!))
         .filter((channel): channel is PlatformChannel => channel !== null);
+
+      platformChannels.push(...regularChannels);
+
+      // Then, fetch threads from forum channels
+      for (const channel of channels.values()) {
+        if (channel && channel.type === ChannelType.GuildForum) {
+          try {
+            // Fetch active threads
+            const activeThreads = await (
+              channel as ForumChannel
+            ).threads.fetchActive();
+            // Fetch archived threads
+            const archivedThreads = await (
+              channel as ForumChannel
+            ).threads.fetchArchived();
+
+            // Combine all threads
+            const allThreads = [
+              ...activeThreads.threads.values(),
+              ...archivedThreads.threads.values(),
+            ];
+
+            // Map threads to platform channels
+            for (const thread of allThreads) {
+              const threadChannel = this.mapDiscordThreadToPlatform(
+                thread,
+                channel.id
+              );
+              if (threadChannel) {
+                platformChannels.push(threadChannel);
+              }
+            }
+
+            logger.debug('Fetched threads from forum channel', {
+              forumId: channel.id,
+              forumName: channel.name,
+              threadCount: allThreads.length,
+            });
+          } catch (error) {
+            logger.error('Failed to fetch threads from forum channel', {
+              channelId: channel.id,
+              channelName: channel.name,
+              error,
+            });
+          }
+        }
+      }
+
+      return platformChannels;
     } catch (error) {
       // Check if it's a rate limit error
       const classifiedError = classifyError(error);
@@ -220,9 +272,19 @@ export class DiscordAdapter implements PlatformAdapter {
     try {
       const channel = await this.client.channels.fetch(channelId);
 
-      // Handle forum channels separately
+      // Forum channels don't have messages directly - their threads do
       if (channel && channel.type === ChannelType.GuildForum) {
-        return this.fetchForumMessages(channel as any, options);
+        logger.debug(
+          'Skipping message fetch for forum channel (messages are in threads)',
+          {
+            channelId,
+            channelType: 'forum',
+          }
+        );
+        return {
+          messages: [],
+          hasMore: false,
+        };
       }
 
       if (!this.isTextBasedChannel(channel)) {
@@ -437,6 +499,29 @@ export class DiscordAdapter implements PlatformAdapter {
   }
 
   /**
+   * Map Discord thread to platform channel
+   */
+  private mapDiscordThreadToPlatform(
+    thread: ThreadChannel,
+    forumChannelId: string
+  ): PlatformChannel | null {
+    return {
+      id: thread.id,
+      name: thread.name,
+      type: 'thread',
+      parentId: forumChannelId,
+      metadata: {
+        discordType: thread.type,
+        archived: thread.archived || false,
+        locked: thread.locked || false,
+        autoArchiveDuration: thread.autoArchiveDuration,
+        archiveTimestamp: thread.archiveTimestamp,
+        createdTimestamp: thread.createdTimestamp,
+      },
+    };
+  }
+
+  /**
    * Map Discord message to platform message
    */
   private async mapDiscordMessageToPlatform(
@@ -475,109 +560,6 @@ export class DiscordAdapter implements PlatformAdapter {
       reactions: reactions.length > 0 ? reactions : undefined,
       attachments: attachments.length > 0 ? attachments : undefined,
     };
-  }
-
-  /**
-   * Fetch messages from a forum channel by aggregating messages from all threads
-   */
-  private async fetchForumMessages(
-    forumChannel: ForumChannel,
-    options?: FetchMessagesOptions
-  ): Promise<FetchMessagesResult> {
-    try {
-      logger.debug('Fetching messages from forum channel', {
-        channelId: forumChannel.id,
-        channelName: forumChannel.name,
-      });
-
-      // Fetch active threads in the forum
-      const threads = await forumChannel.threads.fetchActive();
-      const allMessages: PlatformMessage[] = [];
-
-      // Also fetch archived threads
-      const archivedThreads = await forumChannel.threads.fetchArchived();
-
-      // Combine all threads
-      const allThreads = [
-        ...threads.threads.values(),
-        ...archivedThreads.threads.values(),
-      ];
-
-      logger.debug('Found threads in forum', {
-        channelId: forumChannel.id,
-        activeThreadCount: threads.threads.size,
-        archivedThreadCount: archivedThreads.threads.size,
-        totalThreadCount: allThreads.length,
-      });
-
-      // Fetch messages from each thread
-      for (const thread of allThreads) {
-        try {
-          const fetchOptions: {
-            limit: number;
-            after?: string;
-            before?: string;
-          } = {
-            limit: Math.min(options?.limit || 100, 100),
-          };
-
-          // Apply message ID filters if provided
-          if (options?.afterMessageId && !options?.afterTimestamp) {
-            fetchOptions.before = options.afterMessageId;
-          } else if (options?.afterMessageId && options?.afterTimestamp) {
-            fetchOptions.after = options.afterMessageId;
-          }
-
-          const messages = await thread.messages.fetch(fetchOptions);
-
-          // Convert Discord messages to platform messages
-          const platformMessages = await Promise.all(
-            messages.map((msg) => this.mapDiscordMessageToPlatform(msg))
-          );
-
-          allMessages.push(...platformMessages);
-        } catch (error) {
-          logger.error('Failed to fetch messages from thread', {
-            threadId: thread.id,
-            threadName: thread.name,
-            error,
-          });
-        }
-      }
-
-      // Sort messages by timestamp (oldest first for historical sync)
-      allMessages.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-
-      // Apply pagination limit
-      const limit = options?.limit || 100;
-      const paginatedMessages = allMessages.slice(0, limit);
-      const hasMore = allMessages.length > limit;
-
-      // Calculate checkpoint
-      const checkpoint =
-        paginatedMessages.length > 0
-          ? {
-              channelId: forumChannel.id,
-              lastMessageId: paginatedMessages[paginatedMessages.length - 1].id,
-              lastMessageTimestamp:
-                paginatedMessages[paginatedMessages.length - 1].createdAt,
-              messagesProcessed: paginatedMessages.length,
-              hasMoreMessages: hasMore,
-            }
-          : undefined;
-
-      return {
-        messages: paginatedMessages,
-        hasMore,
-        checkpoint,
-      };
-    } catch (error) {
-      logger.error('Failed to fetch forum messages', {
-        channelId: forumChannel.id,
-        error,
-      });
-      throw error;
-    }
   }
 
   /**

@@ -1,73 +1,98 @@
-import type { MessageWithExtras } from '@/lib/data';
-import Message from '../Message';
-import type { Channel } from 'shared-types';
-import { FiMessageSquare, FiClock, FiUser } from 'react-icons/fi';
-import { generateAvatarUrl } from '@/lib/avatars';
+import type { ForumThreadsPage, ThreadSummary } from '@/lib/data';
+import { FiMessageSquare, FiClock, FiUser, FiLock, FiArchive } from 'react-icons/fi';
+import Link from 'next/link';
 
 interface ForumChannelViewProps {
-  messages: MessageWithExtras[];
-  channelName: string;
-  channels: Channel[];
+  threadData: ForumThreadsPage;
+  currentPage: number;
 }
 
-interface ForumPost {
-  rootMessage: MessageWithExtras;
-  replyCount: number;
-  lastReplyAt?: Date;
-}
-
-export default function ForumChannelView({ messages, channelName, channels }: ForumChannelViewProps) {
-  const forumPosts = groupIntoForumPosts(messages);
-
+export default function ForumChannelView({ threadData, currentPage }: ForumChannelViewProps) {
   return (
     <div className="animate-fade-slide-up">
       <div className="glass p-6 mb-6 rounded-2xl border border-base-content/10 bg-gradient-to-r from-primary/5 to-transparent">
         <h1 className="text-3xl font-bold text-base-content bg-gradient-to-r from-primary to-primary-content bg-clip-text text-transparent">
-          {channelName}
+          {threadData.forumName}
         </h1>
         <p className="text-sm text-muted mt-2 flex items-center gap-2">
           <span className="badge badge-primary badge-outline badge-sm">Forum</span>
-          <span>{forumPosts.length} Posts</span>
+          <span>{threadData.totalThreads} Threads</span>
+          {threadData.totalPages > 1 && (
+            <span>• Page {currentPage} of {threadData.totalPages}</span>
+          )}
         </p>
       </div>
 
+      {/* Pagination for forums with multiple pages */}
+      {threadData.totalPages > 1 && (
+        <div className="flex justify-center mb-6">
+          <div className="btn-group">
+            {currentPage > 1 ? (
+              <Link 
+                href={`/channel/${threadData.forumId}/${currentPage - 1}`}
+                className="btn btn-sm"
+              >
+                « Previous
+              </Link>
+            ) : (
+              <button className="btn btn-sm btn-disabled">« Previous</button>
+            )}
+            
+            <button className="btn btn-sm btn-active">Page {currentPage}</button>
+            
+            {currentPage < threadData.totalPages ? (
+              <Link 
+                href={`/channel/${threadData.forumId}/${currentPage + 1}`}
+                className="btn btn-sm"
+              >
+                Next »
+              </Link>
+            ) : (
+              <button className="btn btn-sm btn-disabled">Next »</button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {forumPosts.map((post) => (
+        {threadData.threads.map((thread) => (
           <div 
-            key={post.rootMessage.id} 
+            key={thread.id} 
             className="card glass glass-hover group focus-ring"
           >
             <div className="card-body">
               <div className="flex items-start gap-3 mb-3">
-                <div className="avatar">
-                  <div className="w-8 h-8 rounded-full ring-2 ring-base-content/10 group-hover:ring-primary/30 transition-all">
-                    <img 
-                      src={generateAvatarUrl(post.rootMessage.anonymizedAuthorId)} 
-                      alt={`Avatar for ${post.rootMessage.anonymizedAuthorId}`}
-                    />
-                  </div>
-                </div>
                 <div className="flex-1 min-w-0">
                   <h2 className="card-title text-lg text-base-content line-clamp-2 group-hover:text-primary transition-colors">
-                    {getPostTitle(post.rootMessage)}
+                    {thread.name}
                   </h2>
                   <div className="flex items-center gap-3 text-xs text-muted mt-1">
-                    <span className="flex items-center gap-1">
-                      <FiUser className="opacity-60" />
-                      User {post.rootMessage.anonymizedAuthorId.slice(0, 6)}
-                    </span>
+                    {thread.archived && (
+                      <span className="flex items-center gap-1">
+                        <FiArchive className="opacity-60" />
+                        Archived
+                      </span>
+                    )}
+                    {thread.locked && (
+                      <span className="flex items-center gap-1">
+                        <FiLock className="opacity-60" />
+                        Locked
+                      </span>
+                    )}
                     <span className="flex items-center gap-1">
                       <FiClock className="opacity-60" />
-                      {formatRelativeTime(post.rootMessage.platformCreatedAt)}
+                      {formatRelativeTime(thread.lastActivity)}
                     </span>
                   </div>
                 </div>
               </div>
               
-              <p className="text-sm text-base-content/70 line-clamp-3 leading-relaxed">
-                {post.rootMessage.content.substring(0, 150)}
-                {post.rootMessage.content.length > 150 && '...'}
-              </p>
+              {thread.firstMessage && (
+                <p className="text-sm text-base-content/70 line-clamp-3 leading-relaxed">
+                  {thread.firstMessage.content}
+                  {thread.firstMessage.content.length >= 200 && '...'}
+                </p>
+              )}
               
               <div className="divider my-3 opacity-10"></div>
               
@@ -75,84 +100,32 @@ export default function ForumChannelView({ messages, channelName, channels }: Fo
                 <div className="flex items-center gap-2">
                   <div className="badge badge-primary badge-outline gap-1.5">
                     <FiMessageSquare className="text-xs" />
-                    <span className="font-medium">{post.replyCount}</span>
+                    <span className="font-medium">{thread.messageCount}</span>
                   </div>
-                  {post.lastReplyAt && (
-                    <span className="text-xs text-muted">
-                      Last: {formatRelativeTime(post.lastReplyAt)}
-                    </span>
-                  )}
                 </div>
-                <button className="btn btn-primary btn-sm btn-ghost hover:btn-primary group-hover:btn-primary focus-ring">
-                  View Post
-                </button>
+                <Link 
+                  href={`/channel/${thread.id}/1`}
+                  className="btn btn-primary btn-sm btn-ghost hover:btn-primary group-hover:btn-primary focus-ring"
+                >
+                  View Thread
+                </Link>
               </div>
             </div>
           </div>
         ))}
       </div>
       
-      {forumPosts.length === 0 && (
+      {threadData.threads.length === 0 && (
         <div className="text-center py-16">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-base-300/50 mb-4">
             <FiMessageSquare className="text-2xl text-muted" />
           </div>
-          <h3 className="text-lg font-medium text-base-content mb-2">No posts yet</h3>
-          <p className="text-sm text-muted">This forum doesn't have any posts.</p>
+          <h3 className="text-lg font-medium text-base-content mb-2">No threads yet</h3>
+          <p className="text-sm text-muted">This forum doesn't have any threads.</p>
         </div>
       )}
     </div>
   );
-}
-
-function groupIntoForumPosts(messages: MessageWithExtras[]): ForumPost[] {
-  const posts: { [key: string]: ForumPost } = {};
-  const messageMap = new Map(messages.map(m => [m.id, m]));
-
-  // First, initialize all root posts
-  for (const message of messages) {
-    if (!message.replyToId) {
-      posts[message.id] = { rootMessage: message, replyCount: 0, lastReplyAt: undefined };
-    }
-  }
-
-  // Then, count replies and track last reply time
-  for (const message of messages) {
-    if (message.replyToId) {
-      const rootMessage = findRootMessage(message, messageMap);
-      if (rootMessage && posts[rootMessage.id]) {
-        posts[rootMessage.id].replyCount++;
-        const replyDate = new Date(message.platformCreatedAt);
-        if (!posts[rootMessage.id].lastReplyAt || replyDate > posts[rootMessage.id].lastReplyAt!) {
-          posts[rootMessage.id].lastReplyAt = replyDate;
-        }
-      }
-    }
-  }
-
-  return Object.values(posts).sort((a, b) => 
-    new Date(b.rootMessage.platformCreatedAt).getTime() - new Date(a.rootMessage.platformCreatedAt).getTime()
-  );
-}
-
-function findRootMessage(message: MessageWithExtras, messageMap: Map<string, MessageWithExtras>): MessageWithExtras | null {
-  let current = message;
-  while (current.replyToId) {
-    const parent = messageMap.get(current.replyToId);
-    if (!parent) {
-      return null; // Orphaned reply chain
-    }
-    current = parent;
-  }
-  return current;
-}
-
-function getPostTitle(message: MessageWithExtras): string {
-  if (message.metadata && typeof message.metadata === 'object' && 'title' in message.metadata) {
-    return String(message.metadata.title);
-  }
-  const firstLine = message.content.split('\n')[0];
-  return firstLine.length > 80 ? firstLine.substring(0, 77) + '...' : firstLine || 'Forum Post';
 }
 
 function formatRelativeTime(date: Date | string): string {

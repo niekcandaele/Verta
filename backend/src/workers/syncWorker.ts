@@ -282,7 +282,11 @@ export class SyncWorker {
       for (const platformChannel of platformChannels) {
         try {
           // Skip channels that don't have a supported type in the database
-          if (!['text', 'thread', 'forum', 'category'].includes(platformChannel.type)) {
+          if (
+            !['text', 'thread', 'forum', 'category'].includes(
+              platformChannel.type
+            )
+          ) {
             logger.debug('Skipping unsupported channel type', {
               channelId: platformChannel.id,
               channelType: platformChannel.type,

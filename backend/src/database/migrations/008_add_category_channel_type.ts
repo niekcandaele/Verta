@@ -20,7 +20,7 @@ export async function down(db: Kysely<any>): Promise<void> {
   // Option 1: Delete them (data loss)
   // Option 2: Convert them to another type
   // For safety, we'll throw an error if category channels exist
-  
+
   const categoryChannels = await db
     .selectFrom('channels')
     .select('id')
@@ -30,7 +30,7 @@ export async function down(db: Kysely<any>): Promise<void> {
   if (categoryChannels.length > 0) {
     throw new Error(
       `Cannot revert migration: ${categoryChannels.length} category channels exist. ` +
-      'Please manually handle these channels before reverting.'
+        'Please manually handle these channels before reverting.'
     );
   }
 

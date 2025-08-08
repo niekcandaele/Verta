@@ -183,6 +183,12 @@ export class DataExportServiceImpl implements DataExportService {
           const channelPath = join(exportPath, 'channels', channel.id);
           await this.ensureDirectory(channelPath);
 
+          // Special handling for forum channels
+          if (channel.type === 'forum') {
+            await this.exportForumChannel(channel, channelPath, metadata);
+            continue;
+          }
+
           // Get message count for this channel
           const messageCount = await this.messageRepository.countByChannel(
             channel.id
@@ -313,6 +319,134 @@ export class DataExportServiceImpl implements DataExportService {
       logger.error(`Failed to export tenant ${tenantId}`, error);
       throw error;
     }
+  }
+
+  /**
+   * Export forum channel with thread summaries
+   */
+  private async exportForumChannel(
+    forumChannel: any,
+    channelPath: string,
+    metadata: ArchiveMetadata
+  ): Promise<void> {
+    const THREADS_PER_PAGE = 30;
+
+    // Add forum channel to metadata
+    metadata.channels.push({
+      id: forumChannel.id,
+      tenantId: forumChannel.tenantId,
+      platformChannelId: forumChannel.platformChannelId,
+      name: forumChannel.name,
+      type: forumChannel.type,
+      parentChannelId: forumChannel.parentChannelId,
+      metadata: forumChannel.metadata,
+      createdAt: forumChannel.createdAt,
+      updatedAt: forumChannel.updatedAt,
+    });
+
+    // Get all threads for this forum
+    const threads = await this.channelRepository.findByParentId(
+      forumChannel.platformChannelId
+    );
+
+    if (threads.length === 0) {
+      // Write empty threads page
+      const emptyPage = {
+        forumId: forumChannel.id,
+        forumName: forumChannel.name,
+        page: 1,
+        totalPages: 1,
+        totalThreads: 0,
+        threadsPerPage: THREADS_PER_PAGE,
+        threads: [],
+      };
+      await this.writeJsonFile(
+        join(channelPath, 'threads-page-1.json'),
+        emptyPage
+      );
+      return;
+    }
+
+    // Get thread summaries with first message
+    const threadSummaries = await Promise.all(
+      threads.map(async (thread) => {
+        const messageCount = await this.messageRepository.countByChannel(
+          thread.id
+        );
+
+        // Get first message (oldest)
+        const { data: allMessages } =
+          await this.messageRepository.findByChannel(thread.id, {
+            limit: 1000,
+            offset: 0,
+          });
+
+        // Sort messages to get first and last
+        const sortedMessages = allMessages.sort(
+          (a, b) =>
+            new Date(a.platformCreatedAt).getTime() -
+            new Date(b.platformCreatedAt).getTime()
+        );
+
+        const firstMessage = sortedMessages[0];
+        const lastMessage = sortedMessages[sortedMessages.length - 1];
+
+        const lastActivity = lastMessage?.platformCreatedAt || thread.createdAt;
+
+        return {
+          id: thread.id,
+          name: thread.name,
+          messageCount,
+          createdAt: thread.createdAt,
+          archived: thread.metadata?.archived || false,
+          locked: thread.metadata?.locked || false,
+          firstMessage: firstMessage
+            ? {
+                id: firstMessage.id,
+                content: firstMessage.content.substring(0, 200),
+                authorId: firstMessage.anonymizedAuthorId,
+                createdAt: firstMessage.platformCreatedAt,
+              }
+            : null,
+          lastActivity,
+        };
+      })
+    );
+
+    // Sort by last activity (newest first)
+    threadSummaries.sort(
+      (a, b) =>
+        new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
+    );
+
+    // Paginate and write thread summary pages
+    const threadPages = Math.ceil(threadSummaries.length / THREADS_PER_PAGE);
+    for (let page = 1; page <= threadPages; page++) {
+      const start = (page - 1) * THREADS_PER_PAGE;
+      const pageThreads = threadSummaries.slice(
+        start,
+        start + THREADS_PER_PAGE
+      );
+
+      const pageData = {
+        forumId: forumChannel.id,
+        forumName: forumChannel.name,
+        page,
+        totalPages: threadPages,
+        totalThreads: threads.length,
+        threadsPerPage: THREADS_PER_PAGE,
+        threads: pageThreads,
+      };
+
+      await this.writeJsonFile(
+        join(channelPath, `threads-page-${page}.json`),
+        pageData
+      );
+    }
+
+    logger.debug(
+      `Exported ${threads.length} thread summaries for forum ${forumChannel.name}`
+    );
   }
 
   private async ensureDirectory(path: string): Promise<void> {
