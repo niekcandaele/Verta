@@ -280,11 +280,27 @@ body[data-theme="dark"] {
   background-color: hsl(var(--elev) / 0.8);
 }
 
+/* Purple radial glow background */
+.radial-glow-purple {
+  background: radial-gradient(circle 800px at 50% 200px, hsl(270 90% 70% / 0.4), transparent);
+  animation: glowPulse 8s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
 /* Respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-slide-up,
   .glass-hover,
-  .card {
+  .card,
+  .radial-glow-purple {
     animation: none;
     transition: none;
   }

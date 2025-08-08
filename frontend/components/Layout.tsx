@@ -32,7 +32,10 @@ export default function Layout({ children, metadata, currentChannelId, syncStatu
   }, [metadata.branding]);
 
   return (
-    <div className="min-h-screen bg-base-100 text-base-content">
+    <div className="min-h-screen bg-base-100 text-base-content relative">
+      {/* Purple Radial Glow Background */}
+      <div className="fixed inset-0 z-0 pointer-events-none radial-glow-purple" />
+      
       <header className={`sticky top-0 z-30 w-full glass glass-hover border-b border-primary/20 ${hasScrolled ? 'shadow-lg shadow-primary/10' : ''} transition-all duration-300`}>
         <div className="navbar px-4 lg:px-6">
           <div className="navbar-start">
@@ -98,7 +101,7 @@ export default function Layout({ children, metadata, currentChannelId, syncStatu
         </div>
       </div>
 
-      <div className="flex flex-1">
+      <div className="flex flex-1 relative z-10">
         <aside className="hidden lg:block w-64 h-[calc(100vh-4rem)] sticky top-16 overflow-y-auto bg-panel border-r border-primary/10">
           <div className="p-4">
             <h2 className="text-sm font-semibold text-primary uppercase tracking-wider mb-4 flex items-center gap-2">
