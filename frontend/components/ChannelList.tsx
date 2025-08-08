@@ -44,6 +44,12 @@ export default function ChannelList({ channels, currentChannelId }: ChannelListP
           const isCollapsed = collapsedCategories.includes(category.id);
           // Match child channels by comparing parentChannelId (platform ID) with category's platformChannelId
           const childChannels = channels.filter(c => c.parentChannelId === category.platformChannelId);
+          
+          // Skip rendering empty categories
+          if (childChannels.length === 0) {
+            return null;
+          }
+          
           return (
             <li key={category.id} role="treeitem" aria-expanded={!isCollapsed} aria-level={1}>
               <div 
