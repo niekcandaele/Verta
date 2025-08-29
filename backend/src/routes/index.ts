@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { createTenantRouter } from './tenant.js';
 import syncRouter from './sync.js';
-import { createExportRouter } from './export.js';
+import v1Router from './api/v1/index.js';
 import type { Kysely } from 'kysely';
 import type { Database } from '../database/types.js';
 
@@ -15,16 +15,15 @@ export function createRouter(database?: Kysely<Database>): Router {
     });
   });
 
+  // Mount v1 API routes for public content
+  router.use('/v1', v1Router);
+
   // Mount tenant routes with the provided database
   const tenantRouter = createTenantRouter(database);
   router.use('/tenants', tenantRouter);
 
   // Mount sync routes
   router.use('/sync', syncRouter);
-
-  // Mount export routes
-  const exportRouter = createExportRouter(database);
-  router.use('/export', exportRouter);
 
   return router;
 }

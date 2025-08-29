@@ -6,7 +6,6 @@ import logger from './utils/logger.js';
 import {
   SyncWorker,
   HourlyTriggerWorker,
-  ExportWorker,
   ChannelSyncWorker,
 } from './workers/index.js';
 import { syncScheduler } from './scheduler/index.js';
@@ -16,7 +15,6 @@ const PORT = config.PORT;
 // Global references to workers
 let syncWorker: SyncWorker | null = null;
 let hourlyTriggerWorker: HourlyTriggerWorker | null = null;
-let exportWorker: ExportWorker | null = null;
 let channelSyncWorker: ChannelSyncWorker | null = null;
 
 /**
@@ -48,12 +46,6 @@ async function startServer() {
       hourlyTriggerWorker = new HourlyTriggerWorker();
       await hourlyTriggerWorker.start();
       logger.info('Hourly trigger worker started');
-
-      // Start export worker
-      logger.info('Starting export worker...');
-      exportWorker = new ExportWorker();
-      await exportWorker.start();
-      logger.info('Export worker started');
 
       // Start channel sync worker
       logger.info('Starting channel sync worker...');
@@ -96,13 +88,6 @@ async function startServer() {
             logger.info('Stopping hourly trigger worker...');
             await hourlyTriggerWorker.stop();
             logger.info('Hourly trigger worker stopped');
-          }
-
-          // Stop export worker
-          if (exportWorker) {
-            logger.info('Stopping export worker...');
-            await exportWorker.stop();
-            logger.info('Export worker stopped');
           }
 
           // Stop sync worker

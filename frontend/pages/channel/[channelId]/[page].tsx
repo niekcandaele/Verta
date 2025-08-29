@@ -1,4 +1,4 @@
-import { GetStaticProps, GetStaticPaths } from 'next';
+import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { 
@@ -110,30 +110,7 @@ export default function ChannelPage({ metadata, channel, pageData, currentPage, 
   );
 }
 
-export const getStaticPaths: GetStaticPaths = async () => {
-  const channels = await getChannels();
-  const paths = [];
-  
-  // Generate paths for all channel/page combinations
-  for (const channel of channels) {
-    const pageNumbers = await getChannelPageNumbers(channel.id);
-    for (const page of pageNumbers) {
-      paths.push({
-        params: {
-          channelId: channel.id,
-          page: page.toString(),
-        },
-      });
-    }
-  }
-  
-  return {
-    paths,
-    fallback: false,
-  };
-};
-
-export const getStaticProps: GetStaticProps<ChannelPageProps> = async ({ params }) => {
+export const getServerSideProps: GetServerSideProps<ChannelPageProps> = async ({ params }) => {
   if (!params || typeof params.channelId !== 'string' || typeof params.page !== 'string') {
     return { notFound: true };
   }

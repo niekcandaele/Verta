@@ -6,14 +6,12 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "build:tenant": "bash -c 'TENANT_SLUG=$1 OUTPUT_DIR=../_data/next-export/$1 npm run build' -- ",
-    "build:all": "cd ../backend && npm run build:all-tenants",
-    "export:tenant": "bash -c 'cd ../backend && npm run export:tenant $1 && cd ../frontend && npm run build:tenant $1' -- "
+    "lint": "next lint"
   },
   "dependencies": {
     "@dicebear/collection": "^9.2.3",
     "@dicebear/core": "^9.2.3",
+    "axios": "^1.11.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.12",
     "next": "15.4.4",

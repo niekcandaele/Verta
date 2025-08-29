@@ -8,6 +8,8 @@ services:
     ports:
       - '25001:4000'  # MySQL protocol port
       - '10080:10080' # Status API port
+    volumes:
+      - tidb_data:/var/lib/tidb
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://127.0.0.1:10080/status']
       interval: 10s
@@ -30,18 +32,35 @@ services:
       retries: 5
     restart: unless-stopped
 
+  db-init:
+    build:
+      context: ./backend
+      target: dev
+    container_name: verta-db-init
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=mysql://root:@tidb:4000/verta
+    depends_on:
+      tidb:
+        condition: service_healthy
+    command: /app/scripts/init-db.sh
+    restart: "no"
+
   app:
     build:
       context: ./backend
       target: dev
     container_name: verta-app
-    user: "${UID:-1000}:${GID:-1000}"
     ports:
       - '25000:25000'
     volumes:
       - ./backend:/app
       - /app/node_modules
-      - ./_data:/data
     env_file:
       - .env
     environment:
@@ -54,6 +73,8 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     depends_on:
+      db-init:
+        condition: service_completed_successfully
       tidb:
         condition: service_healthy
       redis:
@@ -61,5 +82,25 @@ services:
     command: npm run dev
     restart: unless-stopped
 
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    container_name: verta-frontend
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_TENANT_SLUG=${TEST_DISCORD_TENANT_SLUG}
+    depends_on:
+      - app
+    command: npm run dev
+    restart: unless-stopped
+
 volumes:
+  tidb_data:
   redis_data:

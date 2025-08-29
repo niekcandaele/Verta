@@ -4,7 +4,6 @@
   "private": true,
   "description": "Verta - Tenant Static Archive System",
   "scripts": {
-    "export:full": "node scripts/export-full.js",
     "discord:sync": "node scripts/discord-sync.js",
     "backend:dev": "cd backend && npm run dev",
     "frontend:dev": "cd frontend && npm run dev",

@@ -1,5 +1,8 @@
 FROM node:24-alpine AS base
 
+# Install mysql client for init container
+RUN apk add --no-cache mysql-client
+
 WORKDIR /app
 
 FROM base AS deps

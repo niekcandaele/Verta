@@ -1,6 +1,7 @@
 import express, { Application, Request, Response } from 'express';
 import { createRouter } from './routes/index.js';
 import { errorHandler, requestLogger } from './middleware/index.js';
+import corsMiddleware from './middleware/cors.js';
 import type { Kysely } from 'kysely';
 import type { Database } from './database/types.js';
 
@@ -9,6 +10,9 @@ export const createApp = (database?: Kysely<Database>): Application => {
 
   // Request logging middleware
   app.use(requestLogger);
+
+  // CORS middleware for public API
+  app.use(corsMiddleware);
 
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));

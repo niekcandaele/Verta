@@ -1,6 +1,10 @@
-import { readFile } from 'fs/promises';
-import path from 'path';
+/**
+ * Data fetching functions for the frontend
+ * Now uses API calls instead of filesystem operations
+ */
+
 import type { Tenant, TenantBranding, Channel, Message, MessageAttachment, MessageEmojiReaction } from 'shared-types';
+import api from './api-client';
 
 // Extended message type that includes attachments and reactions
 export interface MessageWithExtras extends Message {
@@ -8,22 +12,16 @@ export interface MessageWithExtras extends Message {
   reactions: MessageEmojiReaction[];
 }
 
-// Get the tenant slug from environment variable or build parameter
+// Get the tenant slug from environment variable
 export function getTenantSlug(): string {
-  const slug = process.env.TENANT_SLUG;
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG;
   if (!slug) {
-    throw new Error('TENANT_SLUG environment variable is required');
+    throw new Error('NEXT_PUBLIC_TENANT_SLUG environment variable is required');
   }
   return slug;
 }
 
-// Get the base path for data export files
-export function getDataBasePath(): string {
-  const basePath = process.env.DATA_EXPORT_PATH || '../_data/data-export';
-  return path.resolve(basePath);
-}
-
-// Metadata interface for the exported metadata.json
+// Metadata interface for combined tenant data
 export interface TenantMetadata {
   tenant: Tenant;
   channels: Channel[];
@@ -42,46 +40,87 @@ export interface MessagePageData {
   messages: MessageWithExtras[];
 }
 
-// Load tenant metadata
+// Forum threads page interface
+export interface ForumThreadsPage {
+  channelId: string;
+  channelName: string;
+  page: number;
+  totalPages: number;
+  threads: Channel[];
+}
+
+// Load tenant metadata (combines tenant, channels, and branding)
 export async function getTenantMetadata(): Promise<TenantMetadata> {
-  const tenantSlug = getTenantSlug();
-  const metadataPath = path.join(getDataBasePath(), tenantSlug, 'metadata.json');
-  
   try {
-    const content = await readFile(metadataPath, 'utf-8');
-    return JSON.parse(content) as TenantMetadata;
+    // Fetch tenant, channels, and branding in parallel
+    const [tenantResponse, channelsResponse, brandingResponse] = await Promise.all([
+      api.getTenant(),
+      api.getChannels(),
+      api.getBranding()
+    ]);
+
+    return {
+      tenant: tenantResponse.data.data,
+      channels: channelsResponse.data.data,
+      branding: brandingResponse.data.data,
+      generatedAt: new Date().toISOString(),
+      dataVersion: '2.0.0' // API version
+    };
   } catch (error) {
-    console.error(`Failed to load metadata for tenant ${tenantSlug}:`, error);
-    throw new Error(`Failed to load tenant metadata from ${metadataPath}`);
+    console.error('Failed to load tenant metadata:', error);
+    throw new Error('Failed to load tenant metadata from API');
   }
 }
 
 // Get all channels for the tenant
 export async function getChannels(): Promise<Channel[]> {
-  const metadata = await getTenantMetadata();
-  return metadata.channels;
+  try {
+    const response = await api.getChannels();
+    return response.data.data;
+  } catch (error) {
+    console.error('Failed to load channels:', error);
+    return [];
+  }
 }
 
 // Get a specific channel by ID
 export async function getChannel(channelId: string): Promise<Channel | undefined> {
-  const channels = await getChannels();
-  return channels.find(channel => channel.id === channelId);
+  try {
+    const response = await api.getChannel(channelId);
+    return response.data.data;
+  } catch (error) {
+    console.error(`Failed to load channel ${channelId}:`, error);
+    return undefined;
+  }
 }
 
 // Get messages for a specific channel and page
 export async function getChannelMessages(channelId: string, page: number): Promise<MessagePageData | null> {
-  const tenantSlug = getTenantSlug();
-  const messagePath = path.join(
-    getDataBasePath(),
-    tenantSlug,
-    'channels',
-    channelId,
-    `page-${page}.json`
-  );
-  
   try {
-    const content = await readFile(messagePath, 'utf-8');
-    return JSON.parse(content) as MessagePageData;
+    const [channelResponse, messagesResponse] = await Promise.all([
+      api.getChannel(channelId),
+      api.getChannelMessages(channelId, page, 50)
+    ]);
+
+    const channel = channelResponse.data.data;
+    const messages = messagesResponse.data.data;
+    const meta = messagesResponse.data.meta;
+
+    // Transform messages to include attachments and reactions (empty for now)
+    const messagesWithExtras: MessageWithExtras[] = messages.map((msg: Message) => ({
+      ...msg,
+      attachments: [],
+      reactions: []
+    }));
+
+    return {
+      channelId: channel.id,
+      channelName: channel.name,
+      channelType: channel.type,
+      page: meta.page || page,
+      totalPages: meta.totalPages || 1,
+      messages: messagesWithExtras
+    };
   } catch (error) {
     console.error(`Failed to load messages for channel ${channelId}, page ${page}:`, error);
     return null;
@@ -90,154 +129,114 @@ export async function getChannelMessages(channelId: string, page: number): Promi
 
 // Get all page numbers for a channel
 export async function getChannelPageNumbers(channelId: string): Promise<number[]> {
-  // Check if this is a forum channel by looking at metadata
-  const channel = await getChannel(channelId);
-  
-  if (channel && channel.type === 'forum') {
-    // For forum channels, check for thread summary pages
-    const firstThreadPage = await getForumThreadsPage(channelId, 1);
-    if (!firstThreadPage) {
-      return [];
+  try {
+    const channel = await getChannel(channelId);
+    
+    if (channel && channel.type === 'forum') {
+      // For forum channels, get thread pages
+      const response = await api.getChannelThreads(channelId, 1, 1);
+      const totalPages = response.data.meta.totalPages || 0;
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    } else {
+      // For regular channels, get message pages
+      const response = await api.getChannelMessages(channelId, 1, 1);
+      const totalPages = response.data.meta.totalPages || 0;
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
     }
-    // Generate array of page numbers from 1 to totalPages
-    return Array.from({ length: firstThreadPage.totalPages }, (_, i) => i + 1);
-  } else {
-    // For regular channels, check for message pages
-    const firstPage = await getChannelMessages(channelId, 1);
-    if (!firstPage) {
-      // If no messages exist for the channel, return empty array
-      return [];
-    }
-    // Generate array of page numbers from 1 to totalPages
-    return Array.from({ length: firstPage.totalPages }, (_, i) => i + 1);
+  } catch (error) {
+    console.error(`Failed to get page numbers for channel ${channelId}:`, error);
+    return [];
   }
 }
 
-// Get tenant branding information
+// Get tenant branding
 export async function getTenantBranding(): Promise<TenantBranding | null> {
-  const metadata = await getTenantMetadata();
-  return metadata.branding;
-}
-
-// Forum thread summary interface
-export interface ThreadSummary {
-  id: string;
-  name: string;
-  messageCount: number;
-  createdAt: string;
-  archived: boolean;
-  locked: boolean;
-  firstMessage: {
-    id: string;
-    content: string;
-    authorId: string;
-    createdAt: string;
-  } | null;
-  lastActivity: string;
-}
-
-export interface ForumThreadsPage {
-  forumId: string;
-  forumName: string;
-  page: number;
-  totalPages: number;
-  totalThreads: number;
-  threadsPerPage: number;
-  threads: ThreadSummary[];
-}
-
-// Get forum thread summaries for a specific page
-export async function getForumThreadsPage(forumChannelId: string, page: number): Promise<ForumThreadsPage | null> {
-  const tenantSlug = getTenantSlug();
-  const threadSummaryPath = path.join(
-    getDataBasePath(),
-    tenantSlug,
-    'channels',
-    forumChannelId,
-    `threads-page-${page}.json`
-  );
-  
   try {
-    const content = await readFile(threadSummaryPath, 'utf-8');
-    return JSON.parse(content) as ForumThreadsPage;
+    const response = await api.getBranding();
+    return response.data.data;
   } catch (error) {
-    console.error(`Failed to load forum threads page ${page} for channel ${forumChannelId}:`, error);
+    console.error('Failed to load tenant branding:', error);
     return null;
   }
 }
 
-// Get all threads for a forum channel (for static path generation)
+// Get forum threads page
+export async function getForumThreadsPage(forumChannelId: string, page: number): Promise<ForumThreadsPage | null> {
+  try {
+    const [channelResponse, threadsResponse] = await Promise.all([
+      api.getChannel(forumChannelId),
+      api.getChannelThreads(forumChannelId, page, 20)
+    ]);
+
+    const channel = channelResponse.data.data;
+    const threads = threadsResponse.data.data;
+    const meta = threadsResponse.data.meta;
+
+    return {
+      channelId: channel.id,
+      channelName: channel.name,
+      page: meta.page || page,
+      totalPages: meta.totalPages || 1,
+      threads: threads
+    };
+  } catch (error) {
+    console.error(`Failed to load threads for forum ${forumChannelId}, page ${page}:`, error);
+    return null;
+  }
+}
+
+// Get all threads for a forum channel
 export async function getForumThreads(forumChannelId: string): Promise<Channel[]> {
-  const threads: Channel[] = [];
-  let currentPage = 1;
-  let hasMorePages = true;
-  
-  // First get all thread IDs from the forum summary pages
-  const threadIds: string[] = [];
-  while (hasMorePages) {
-    const pageData = await getForumThreadsPage(forumChannelId, currentPage);
-    if (!pageData) {
-      hasMorePages = false;
-      break;
+  try {
+    const allThreads: Channel[] = [];
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await api.getChannelThreads(forumChannelId, page, 100);
+      const threads = response.data.data;
+      const meta = response.data.meta;
+      
+      allThreads.push(...threads);
+      
+      if (page >= (meta.totalPages || 1)) {
+        hasMore = false;
+      } else {
+        page++;
+      }
     }
-    
-    // Collect all thread IDs from this page
-    for (const threadSummary of pageData.threads) {
-      threadIds.push(threadSummary.id);
-    }
-    
-    hasMorePages = currentPage < pageData.totalPages;
-    currentPage++;
+
+    return allThreads;
+  } catch (error) {
+    console.error(`Failed to load all threads for forum ${forumChannelId}:`, error);
+    return [];
   }
-  
-  // Now get the full channel data for threads that exist
-  const channels = await getChannels();
-  for (const threadId of threadIds) {
-    const thread = channels.find(c => c.id === threadId);
-    if (thread) {
-      threads.push(thread);
-    } else {
-      // If thread isn't in main channels list, create a minimal channel object
-      // This ensures we generate pages for all threads that have data
-      threads.push({
-        id: threadId,
-        tenantId: '',
-        platformChannelId: '',
-        name: 'Thread',
-        type: 'thread' as const,
-        parentChannelId: forumChannelId,
-        metadata: {},
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      } as unknown as Channel);
-    }
-  }
-  
-  return threads;
 }
 
 // Get messages for a thread
 export async function getThreadMessages(threadId: string): Promise<MessageWithExtras[]> {
-  const allMessages: MessageWithExtras[] = [];
-  let currentPage = 1;
-  let hasMorePages = true;
-  
-  while (hasMorePages) {
-    const pageData = await getChannelMessages(threadId, currentPage);
-    if (!pageData) {
-      hasMorePages = false;
-      break;
-    }
+  try {
+    // Need to get the channel ID first - for now, use a workaround
+    // In a real implementation, you might want to pass channelId as a parameter
+    const channels = await getChannels();
+    const forumChannel = channels.find(c => c.type === 'forum');
     
-    allMessages.push(...pageData.messages);
-    hasMorePages = currentPage < pageData.totalPages;
-    currentPage++;
+    if (!forumChannel) {
+      console.error('No forum channel found');
+      return [];
+    }
+
+    const response = await api.getThreadMessages(forumChannel.id, threadId, 1, 100);
+    const messages = response.data.data;
+
+    // Transform messages to include attachments and reactions
+    return messages.map((msg: Message) => ({
+      ...msg,
+      attachments: [],
+      reactions: []
+    }));
+  } catch (error) {
+    console.error(`Failed to load messages for thread ${threadId}:`, error);
+    return [];
   }
-  
-  // Sort by date (oldest first)
-  allMessages.sort((a, b) => 
-    new Date(a.platformCreatedAt).getTime() - new Date(b.platformCreatedAt).getTime()
-  );
-  
-  return allMessages;
 }

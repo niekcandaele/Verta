@@ -19,6 +19,17 @@ interface ErrorResponse {
 }
 
 /**
+ * RFC 7807 Problem Details format
+ */
+interface ProblemDetails {
+  type?: string;      // URI reference for the problem type
+  title: string;      // Short human-readable summary
+  status: number;     // HTTP status code
+  detail?: string;    // Human-readable explanation
+  instance?: string;  // URI reference for this occurrence
+}
+
+/**
  * Map service error types to HTTP status codes
  */
 function getStatusCodeForServiceError(errorType: ServiceErrorType): number {
@@ -79,6 +90,35 @@ export class ApiError extends Error {
 }
 
 /**
+ * Check if the request is for the v1 API
+ */
+function isV1ApiRequest(req: Request): boolean {
+  return req.path.startsWith('/api/v1/');
+}
+
+/**
+ * Create RFC 7807 Problem Details response
+ */
+function createProblemDetails(
+  status: number,
+  title: string,
+  detail?: string,
+  type?: string,
+  instance?: string
+): ProblemDetails {
+  const problem: ProblemDetails = {
+    title,
+    status
+  };
+  
+  if (type) problem.type = type;
+  if (detail) problem.detail = detail;
+  if (instance) problem.instance = instance;
+  
+  return problem;
+}
+
+/**
  * Express error handling middleware
  * Handles different error types and returns consistent error responses
  */
@@ -123,6 +163,20 @@ export function errorHandler(
 
   // Handle custom API errors
   if (err instanceof ApiError) {
+    // Use RFC 7807 format for v1 API
+    if (isV1ApiRequest(req)) {
+      const problem = createProblemDetails(
+        err.statusCode,
+        err.error,
+        err.message,
+        `/errors/${err.error.toLowerCase().replace(/\s+/g, '-')}`,
+        req.path
+      );
+      res.status(err.statusCode).json(problem);
+      return;
+    }
+    
+    // Use legacy format for other endpoints
     const response: ErrorResponse = {
       error: err.error,
       message: err.message,
