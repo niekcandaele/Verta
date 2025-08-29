@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { Kysely, sql } from 'kysely';
+import { randomUUID } from 'crypto';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { Pool } from 'pg';
 import { PostgresDialect } from 'kysely';
@@ -67,7 +68,7 @@ class TestRepository extends BaseCrudRepositoryImpl<
 
   protected mapCreateDataToRow(data: CreateTestEntity): any {
     return {
-      id: sql`gen_random_uuid()`,
+      id: randomUUID(),
       name: data.name,
       description: data.description ?? null,
       active: data.active ?? true,
@@ -115,8 +116,8 @@ describe('BaseCrudRepository', () => {
     await db.schema
       .createTable('test_entities')
       .ifNotExists()
-      .addColumn('id', 'uuid', (col) =>
-        col.primaryKey().defaultTo(sql`gen_random_uuid()`)
+      .addColumn('id', 'varchar(36)', (col) =>
+        col.primaryKey()
       )
       .addColumn('name', 'varchar(255)', (col) => col.notNull())
       .addColumn('description', 'text')

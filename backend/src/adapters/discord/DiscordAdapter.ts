@@ -477,8 +477,8 @@ export class DiscordAdapter implements PlatformAdapter {
         break;
       case ChannelType.GuildVoice:
       case ChannelType.GuildStageVoice:
-        type = 'voice';
-        break;
+        // Skip voice channels - they don't contain text messages
+        return null;
       case ChannelType.GuildCategory:
         type = 'category';
         break;

@@ -1,18 +1,18 @@
 {
   "mcpServers": {
-    "postgres": {
-      "command": "docker",
+    "tidb": {
+      "command": "uvx",
       "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-e",
-        "DATABASE_URI",
-        "crystaldba/postgres-mcp",
-        "--access-mode=unrestricted"
+        "--from",
+        "pytidb[mcp]",
+        "tidb-mcp-server"
       ],
       "env": {
-        "DATABASE_URI": "postgresql://verta_user:verta_password@172.17.0.1:25001/verta"
+        "TIDB_HOST": "localhost",
+        "TIDB_PORT": "25001",
+        "TIDB_USERNAME": "root",
+        "TIDB_PASSWORD": "",
+        "TIDB_DATABASE": "verta"
       }
     }
   }

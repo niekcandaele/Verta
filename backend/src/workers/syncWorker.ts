@@ -302,20 +302,30 @@ export class SyncWorker {
 
           if (existingChannel) {
             // Update existing channel
+            // Look up parent channel's internal ID if it has a parent
+            const parentChannelId = platformChannel.parentId
+              ? (await this.channelRepo.findByPlatformId(tenantId, platformChannel.parentId))?.id || null
+              : null;
+            
             await this.channelRepo.update(existingChannel.id, {
               name: platformChannel.name,
               type: platformChannel.type as ChannelType,
-              parentChannelId: platformChannel.parentId || null,
+              parentChannelId,
               metadata: platformChannel.metadata || {},
             });
           } else {
             // Create new channel
+            // Look up parent channel's internal ID if it has a parent
+            const parentChannelId = platformChannel.parentId
+              ? (await this.channelRepo.findByPlatformId(tenantId, platformChannel.parentId))?.id || null
+              : null;
+            
             await this.channelRepo.create({
               tenantId,
               platformChannelId: platformChannel.id,
               name: platformChannel.name,
               type: platformChannel.type as ChannelType,
-              parentChannelId: platformChannel.parentId || null,
+              parentChannelId,
               metadata: platformChannel.metadata || {},
             });
             logger.info('Added new channel visible to @everyone', {

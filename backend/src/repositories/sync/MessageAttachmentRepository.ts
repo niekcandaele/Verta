@@ -1,4 +1,5 @@
-import { Kysely, sql } from 'kysely';
+import { Kysely } from 'kysely';
+import { randomUUID } from 'crypto';
 import { BaseCrudRepositoryImpl } from '../BaseCrudRepository.js';
 import type { MessageAttachmentRepository } from './types.js';
 import type {
@@ -48,10 +49,17 @@ export class MessageAttachmentRepositoryImpl
       this.mapCreateDataToRow(attachment)
     );
 
-    const rows = await this.db
+    await this.db
       .insertInto('message_attachments')
       .values(insertData)
-      .returningAll()
+      .execute();
+
+    // Fetch the inserted rows
+    const ids = insertData.map(data => data.id);
+    const rows = await this.db
+      .selectFrom('message_attachments')
+      .selectAll()
+      .where('id', 'in', ids)
       .execute();
 
     return rows.map((row) => this.mapRowToEntity(row));
@@ -103,7 +111,7 @@ export class MessageAttachmentRepositoryImpl
    */
   protected mapCreateDataToRow(data: CreateMessageAttachmentData): any {
     return {
-      id: sql`gen_random_uuid()`,
+      id: randomUUID(),
       message_id: data.messageId,
       filename: data.filename,
       file_size: data.fileSize.toString(),

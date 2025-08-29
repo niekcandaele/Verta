@@ -1,4 +1,5 @@
-import { Kysely, sql } from 'kysely';
+import { Kysely } from 'kysely';
+import { randomUUID } from 'crypto';
 import { BaseCrudRepositoryImpl } from '../BaseCrudRepository.js';
 import type { MessageEmojiReactionRepository } from './types.js';
 import type {
@@ -81,17 +82,36 @@ export class MessageEmojiReactionRepositoryImpl
       this.mapCreateDataToRow(reaction)
     );
 
-    // Use ON CONFLICT DO NOTHING to skip existing reactions
-    const rows = await this.db
-      .insertInto('message_emoji_reactions')
-      .values(insertData)
-      .onConflict((oc) =>
-        oc.columns(['message_id', 'anonymized_user_id', 'emoji']).doNothing()
-      )
-      .returningAll()
-      .execute();
+    // MySQL doesn't support RETURNING with ON DUPLICATE KEY
+    // Insert one by one and collect successful inserts
+    const created: MessageEmojiReaction[] = [];
+    
+    for (const data of insertData) {
+      try {
+        await this.db
+          .insertInto('message_emoji_reactions')
+          .values(data)
+          .execute();
+        
+        // If insert succeeded, fetch the created row
+        const row = await this.db
+          .selectFrom('message_emoji_reactions')
+          .selectAll()
+          .where('id', '=', data.id)
+          .executeTakeFirst();
+        
+        if (row) {
+          created.push(this.mapRowToEntity(row));
+        }
+      } catch (error: any) {
+        // Skip duplicates silently
+        if (error?.code !== 'ER_DUP_ENTRY') {
+          throw error;
+        }
+      }
+    }
 
-    return rows.map((row) => this.mapRowToEntity(row));
+    return created;
   }
 
   /**
@@ -142,7 +162,7 @@ export class MessageEmojiReactionRepositoryImpl
    */
   protected mapCreateDataToRow(data: CreateMessageEmojiReactionData): any {
     return {
-      id: sql`gen_random_uuid()`,
+      id: randomUUID(),
       message_id: data.messageId,
       emoji: data.emoji,
       anonymized_user_id: data.anonymizedUserId,

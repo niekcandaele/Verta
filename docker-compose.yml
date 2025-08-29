@@ -1,20 +1,19 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: verta-postgres
+  tidb:
+    image: pingcap/tidb:v7.5.0
+    container_name: verta-tidb
     environment:
-      POSTGRES_DB: verta
-      POSTGRES_USER: verta_user
-      POSTGRES_PASSWORD: verta_password
+      TIDB_USER: verta_user
+      TIDB_PASSWORD: verta_password
     ports:
-      - '25001:5432'
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - '25001:4000'  # MySQL protocol port
+      - '10080:10080' # Status API port
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U verta_user -d verta']
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:10080/status']
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
 
   redis:
@@ -31,20 +30,6 @@ services:
       retries: 5
     restart: unless-stopped
 
-  init-volumes:
-    image: alpine:latest
-    container_name: verta-init-volumes
-    user: root
-    volumes:
-      - export_data:/data
-    command: >
-      sh -c "
-        echo 'Fixing volume permissions...' &&
-        chown -R 1000:1000 /data &&
-        chmod -R 755 /data &&
-        echo 'Volume permissions fixed!'
-      "
-
   app:
     build:
       context: ./backend
@@ -56,29 +41,25 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
-      - export_data:/data
+      - ./_data:/data
     env_file:
       - .env
     environment:
       - NODE_ENV=development
       - DOCKERIZED=true
       - PORT=25000
-      - DATABASE_URL=postgresql://verta_user:verta_password@postgres:5432/verta
+      - DATABASE_URL=mysql://root:@tidb:4000/verta
       - DATABASE_POOL_SIZE=10
       - LOG_LEVEL=debug
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     depends_on:
-      postgres:
+      tidb:
         condition: service_healthy
       redis:
         condition: service_healthy
-      init-volumes:
-        condition: service_completed_successfully
     command: npm run dev
     restart: unless-stopped
 
 volumes:
-  postgres_data:
   redis_data:
-  export_data:

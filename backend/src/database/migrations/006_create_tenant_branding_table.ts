@@ -3,10 +3,10 @@ import { Kysely, sql } from 'kysely';
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema
     .createTable('tenant_branding')
-    .addColumn('id', 'uuid', (col) =>
-      col.primaryKey().defaultTo(sql`gen_random_uuid()`)
+    .addColumn('id', 'varchar(36)', (col) =>
+      col.primaryKey()
     )
-    .addColumn('tenant_id', 'uuid', (col) => col.notNull())
+    .addColumn('tenant_id', 'varchar(36)', (col) => col.notNull())
     .addColumn('logo', 'text', (col) => col)
     .addColumn('primary_color', 'varchar(7)', (col) =>
       col.notNull().defaultTo('#3b82f6')
@@ -18,10 +18,10 @@ export async function up(db: Kysely<any>): Promise<void> {
       col.notNull().defaultTo('#10b981')
     )
     .addColumn('created_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`)
     )
     .addColumn('updated_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
     )
     .execute();
 
@@ -40,50 +40,32 @@ export async function up(db: Kysely<any>): Promise<void> {
     .unique()
     .execute();
 
-  // Add CHECK constraints to validate hex color format
+  // Add CHECK constraints to validate hex color format (MySQL REGEXP syntax)
   await sql`
     ALTER TABLE tenant_branding 
     ADD CONSTRAINT check_primary_color_format 
-    CHECK (primary_color ~ '^#[0-9A-Fa-f]{6}$')
+    CHECK (primary_color REGEXP '^#[0-9A-Fa-f]{6}$')
   `.execute(db);
 
   await sql`
     ALTER TABLE tenant_branding 
     ADD CONSTRAINT check_secondary_color_format 
-    CHECK (secondary_color ~ '^#[0-9A-Fa-f]{6}$')
+    CHECK (secondary_color REGEXP '^#[0-9A-Fa-f]{6}$')
   `.execute(db);
 
   await sql`
     ALTER TABLE tenant_branding 
     ADD CONSTRAINT check_accent_color_format 
-    CHECK (accent_color ~ '^#[0-9A-Fa-f]{6}$')
+    CHECK (accent_color REGEXP '^#[0-9A-Fa-f]{6}$')
   `.execute(db);
 
-  // Create trigger to automatically update updated_at
-  await sql`
-    CREATE TRIGGER update_tenant_branding_updated_at 
-    BEFORE UPDATE ON tenant_branding 
-    FOR EACH ROW 
-    EXECUTE FUNCTION update_updated_at_column();
-  `.execute(db);
+  // Note: MySQL handles updated_at automatically with ON UPDATE CURRENT_TIMESTAMP
+  // No need for a separate trigger
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
-  // Drop trigger
-  await sql`DROP TRIGGER IF EXISTS update_tenant_branding_updated_at ON tenant_branding`.execute(
-    db
-  );
-
   // Drop constraints
-  await sql`ALTER TABLE tenant_branding DROP CONSTRAINT IF EXISTS check_accent_color_format`.execute(
-    db
-  );
-  await sql`ALTER TABLE tenant_branding DROP CONSTRAINT IF EXISTS check_secondary_color_format`.execute(
-    db
-  );
-  await sql`ALTER TABLE tenant_branding DROP CONSTRAINT IF EXISTS check_primary_color_format`.execute(
-    db
-  );
+  // Note: MySQL doesn't support DROP CONSTRAINT syntax, constraints are dropped with table
 
   // Drop indexes
   await db.schema.dropIndex('idx_tenant_branding_tenant_id').execute();

@@ -190,8 +190,38 @@ export class TenantServiceImpl
   protected handleRepositoryError(error: unknown): ServiceResult<any> {
     if (error instanceof Error) {
       const message = error.message.toLowerCase();
+      
+      // MySQL/TiDB duplicate key error
+      const mysqlError = error as any;
+      if (mysqlError.code === 'ER_DUP_ENTRY') {
+        // Parse the duplicate key message to determine which constraint failed
+        if (message.includes('idx_tenants_slug') || message.includes("'slug'")) {
+          return createErrorResult(
+            createServiceError(
+              ServiceErrorType.DUPLICATE_ENTRY,
+              'A tenant with this slug already exists'
+            )
+          );
+        }
+        if (message.includes('idx_tenants_platform_platform_id') || 
+            (message.includes("'platform'") && message.includes("'platform_id'"))) {
+          return createErrorResult(
+            createServiceError(
+              ServiceErrorType.DUPLICATE_ENTRY,
+              'A tenant for this platform already exists'
+            )
+          );
+        }
+        // Generic duplicate entry error
+        return createErrorResult(
+          createServiceError(
+            ServiceErrorType.DUPLICATE_ENTRY,
+            'A duplicate entry already exists'
+          )
+        );
+      }
 
-      // PostgreSQL unique constraint violations with specific messages
+      // PostgreSQL unique constraint violations (keeping for compatibility)
       if (
         message.includes('duplicate key') ||
         message.includes('unique constraint')

@@ -318,30 +318,44 @@ export class ChannelSyncWorker {
   ): Promise<number> {
     if (messages.length === 0) return 0;
 
-    // Prepare message data
-    const messageData = messages.map((msg) => ({
-      channelId,
-      platformMessageId: msg.id,
-      anonymizedAuthorId: anonymizeUserId(msg.authorId),
-      content: msg.content,
-      replyToId: msg.replyToId || null,
-      metadata: msg.metadata
-        ? {
-            ...msg.metadata,
-            mentions: (msg.metadata as any).mentions
-              ? {
-                  ...(msg.metadata as any).mentions,
-                  // Anonymize user IDs in mentions to match anonymizedAuthorId format
-                  users: ((msg.metadata as any).mentions.users || []).map(
-                    (userId: string) => anonymizeUserId(userId)
-                  ),
-                  // Keep channels and roles as-is for proper lookup
-                }
-              : (msg.metadata as any).mentions,
-          }
-        : {},
-      platformCreatedAt: msg.createdAt,
-    }));
+    // Prepare message data, looking up internal IDs for replies
+    const messageDataPromises = messages.map(async (msg) => {
+      // Look up internal message ID if this is a reply
+      let replyToId: string | null = null;
+      if (msg.replyToId) {
+        const replyToMessage = await this.messageRepo.findByPlatformId(
+          channelId,
+          msg.replyToId
+        );
+        replyToId = replyToMessage?.id || null;
+      }
+
+      return {
+        channelId,
+        platformMessageId: msg.id,
+        anonymizedAuthorId: anonymizeUserId(msg.authorId),
+        content: msg.content,
+        replyToId,
+        metadata: msg.metadata
+          ? {
+              ...msg.metadata,
+              mentions: (msg.metadata as any).mentions
+                ? {
+                    ...(msg.metadata as any).mentions,
+                    // Anonymize user IDs in mentions to match anonymizedAuthorId format
+                    users: ((msg.metadata as any).mentions.users || []).map(
+                      (userId: string) => anonymizeUserId(userId)
+                    ),
+                    // Keep channels and roles as-is for proper lookup
+                  }
+                : (msg.metadata as any).mentions,
+            }
+          : {},
+        platformCreatedAt: msg.createdAt,
+      };
+    });
+
+    const messageData = await Promise.all(messageDataPromises);
 
     // Bulk upsert messages
     const { created, skipped } = await this.messageRepo.bulkUpsert(messageData);

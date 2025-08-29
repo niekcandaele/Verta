@@ -1,4 +1,5 @@
-import { Kysely, sql } from 'kysely';
+import { Kysely } from 'kysely';
+import { randomUUID } from 'crypto';
 import { BaseCrudRepositoryImpl } from '../BaseCrudRepository.js';
 import type { MessageRepository } from './types.js';
 import type { PaginatedResult } from '../types.js';
@@ -108,10 +109,20 @@ export class MessageRepositoryImpl
 
     const insertData = messages.map((msg) => this.mapCreateDataToRow(msg));
 
-    const rows = await this.db
+    await this.db
       .insertInto('messages')
       .values(insertData)
-      .returningAll()
+      .execute();
+
+    // Fetch the inserted rows
+    const platformMessageIds = messages.map(msg => msg.platformMessageId);
+    const channelIds = [...new Set(messages.map(msg => msg.channelId))];
+    
+    const rows = await this.db
+      .selectFrom('messages')
+      .selectAll()
+      .where('platform_message_id', 'in', platformMessageIds)
+      .where('channel_id', 'in', channelIds)
       .execute();
 
     return rows.map((row) => this.mapRowToEntity(row));
@@ -127,19 +138,37 @@ export class MessageRepositoryImpl
     if (messages.length === 0) return { created: [], skipped: 0 };
 
     const insertData = messages.map((msg) => this.mapCreateDataToRow(msg));
+    const created: Message[] = [];
+    let skipped = 0;
 
-    // Use ON CONFLICT DO NOTHING to skip existing messages
-    const rows = await this.db
-      .insertInto('messages')
-      .values(insertData)
-      .onConflict((oc) =>
-        oc.columns(['channel_id', 'platform_message_id']).doNothing()
-      )
-      .returningAll()
-      .execute();
-
-    const created = rows.map((row) => this.mapRowToEntity(row));
-    const skipped = messages.length - created.length;
+    // MySQL doesn't support RETURNING with ON DUPLICATE KEY UPDATE
+    // So we need to insert one by one and track what was created
+    for (const data of insertData) {
+      try {
+        await this.db
+          .insertInto('messages')
+          .values(data)
+          .execute();
+        
+        // If insert succeeded, fetch the created row
+        const row = await this.db
+          .selectFrom('messages')
+          .selectAll()
+          .where('id', '=', data.id)
+          .executeTakeFirst();
+        
+        if (row) {
+          created.push(this.mapRowToEntity(row));
+        }
+      } catch (error: any) {
+        // If duplicate key error, count as skipped
+        if (error?.code === 'ER_DUP_ENTRY') {
+          skipped++;
+        } else {
+          throw error;
+        }
+      }
+    }
 
     return { created, skipped };
   }
@@ -195,7 +224,7 @@ export class MessageRepositoryImpl
    */
   protected mapCreateDataToRow(data: CreateMessageData): any {
     return {
-      id: sql`gen_random_uuid()`,
+      id: randomUUID(),
       channel_id: data.channelId,
       platform_message_id: data.platformMessageId,
       anonymized_author_id: data.anonymizedAuthorId,

@@ -4,24 +4,24 @@ export async function up(db: Kysely<any>): Promise<void> {
   // Create channels table
   await db.schema
     .createTable('channels')
-    .addColumn('id', 'uuid', (col) =>
-      col.primaryKey().defaultTo(sql`gen_random_uuid()`)
+    .addColumn('id', 'varchar(36)', (col) =>
+      col.primaryKey()
     )
-    .addColumn('tenant_id', 'uuid', (col) =>
+    .addColumn('tenant_id', 'varchar(36)', (col) =>
       col.notNull().references('tenants.id').onDelete('cascade')
     )
     .addColumn('platform_channel_id', 'varchar(255)', (col) => col.notNull())
     .addColumn('name', 'varchar(255)', (col) => col.notNull())
     .addColumn('type', 'varchar(50)', (col) => col.notNull())
-    .addColumn('parent_channel_id', 'uuid', (col) =>
+    .addColumn('parent_channel_id', 'varchar(36)', (col) =>
       col.references('channels.id').onDelete('cascade')
     )
-    .addColumn('metadata', 'jsonb', (col) => col.defaultTo(sql`'{}'::jsonb`))
+    .addColumn('metadata', 'json')
     .addColumn('created_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`)
     )
     .addColumn('updated_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
     )
     .execute();
 
@@ -35,51 +35,51 @@ export async function up(db: Kysely<any>): Promise<void> {
   // Create messages table
   await db.schema
     .createTable('messages')
-    .addColumn('id', 'uuid', (col) =>
-      col.primaryKey().defaultTo(sql`gen_random_uuid()`)
+    .addColumn('id', 'varchar(36)', (col) =>
+      col.primaryKey()
     )
-    .addColumn('channel_id', 'uuid', (col) =>
+    .addColumn('channel_id', 'varchar(36)', (col) =>
       col.notNull().references('channels.id').onDelete('cascade')
     )
     .addColumn('platform_message_id', 'varchar(255)', (col) => col.notNull())
     .addColumn('anonymized_author_id', 'varchar(64)', (col) => col.notNull())
     .addColumn('content', 'text', (col) => col.notNull())
-    .addColumn('reply_to_id', 'uuid', (col) =>
+    .addColumn('reply_to_id', 'varchar(36)', (col) =>
       col.references('messages.id').onDelete('set null')
     )
-    .addColumn('metadata', 'jsonb', (col) => col.defaultTo(sql`'{}'::jsonb`))
+    .addColumn('metadata', 'json')
     .addColumn('platform_created_at', 'timestamp', (col) => col.notNull())
     .addColumn('created_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`)
     )
     .addColumn('updated_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
     )
     .execute();
 
   // Create message_emoji_reactions table
   await db.schema
     .createTable('message_emoji_reactions')
-    .addColumn('id', 'uuid', (col) =>
-      col.primaryKey().defaultTo(sql`gen_random_uuid()`)
+    .addColumn('id', 'varchar(36)', (col) =>
+      col.primaryKey()
     )
-    .addColumn('message_id', 'uuid', (col) =>
+    .addColumn('message_id', 'varchar(36)', (col) =>
       col.notNull().references('messages.id').onDelete('cascade')
     )
     .addColumn('emoji', 'varchar(255)', (col) => col.notNull())
     .addColumn('anonymized_user_id', 'varchar(64)', (col) => col.notNull())
     .addColumn('created_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`)
     )
     .execute();
 
   // Create message_attachments table
   await db.schema
     .createTable('message_attachments')
-    .addColumn('id', 'uuid', (col) =>
-      col.primaryKey().defaultTo(sql`gen_random_uuid()`)
+    .addColumn('id', 'varchar(36)', (col) =>
+      col.primaryKey()
     )
-    .addColumn('message_id', 'uuid', (col) =>
+    .addColumn('message_id', 'varchar(36)', (col) =>
       col.notNull().references('messages.id').onDelete('cascade')
     )
     .addColumn('filename', 'varchar(500)', (col) => col.notNull())
@@ -87,31 +87,31 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('content_type', 'varchar(255)', (col) => col.notNull())
     .addColumn('url', 'text', (col) => col.notNull())
     .addColumn('created_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`)
     )
     .execute();
 
   // Create sync_progress table
   await db.schema
     .createTable('sync_progress')
-    .addColumn('id', 'uuid', (col) =>
-      col.primaryKey().defaultTo(sql`gen_random_uuid()`)
+    .addColumn('id', 'varchar(36)', (col) =>
+      col.primaryKey()
     )
-    .addColumn('tenant_id', 'uuid', (col) =>
+    .addColumn('tenant_id', 'varchar(36)', (col) =>
       col.notNull().references('tenants.id').onDelete('cascade')
     )
-    .addColumn('channel_id', 'uuid', (col) =>
+    .addColumn('channel_id', 'varchar(36)', (col) =>
       col.notNull().references('channels.id').onDelete('cascade')
     )
     .addColumn('last_synced_message_id', 'varchar(255)', (col) => col.notNull())
     .addColumn('last_synced_at', 'timestamp', (col) => col.notNull())
     .addColumn('status', 'varchar(50)', (col) => col.notNull())
-    .addColumn('error_details', 'jsonb')
+    .addColumn('error_details', 'json')
     .addColumn('created_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`)
     )
     .addColumn('updated_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
     )
     .execute();
 
@@ -206,40 +206,11 @@ export async function up(db: Kysely<any>): Promise<void> {
     .column('status')
     .execute();
 
-  // Create triggers for updated_at columns
-  await sql`
-    CREATE TRIGGER update_channels_updated_at 
-    BEFORE UPDATE ON channels 
-    FOR EACH ROW 
-    EXECUTE FUNCTION update_updated_at_column();
-  `.execute(db);
-
-  await sql`
-    CREATE TRIGGER update_messages_updated_at 
-    BEFORE UPDATE ON messages 
-    FOR EACH ROW 
-    EXECUTE FUNCTION update_updated_at_column();
-  `.execute(db);
-
-  await sql`
-    CREATE TRIGGER update_sync_progress_updated_at 
-    BEFORE UPDATE ON sync_progress 
-    FOR EACH ROW 
-    EXECUTE FUNCTION update_updated_at_column();
-  `.execute(db);
+  // Note: MySQL handles updated_at automatically with ON UPDATE CURRENT_TIMESTAMP
+  // No need for separate triggers
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
-  // Drop triggers
-  await sql`DROP TRIGGER IF EXISTS update_sync_progress_updated_at ON sync_progress`.execute(
-    db
-  );
-  await sql`DROP TRIGGER IF EXISTS update_messages_updated_at ON messages`.execute(
-    db
-  );
-  await sql`DROP TRIGGER IF EXISTS update_channels_updated_at ON channels`.execute(
-    db
-  );
 
   // Drop indexes
   await db.schema.dropIndex('idx_sync_progress_status').execute();

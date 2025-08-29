@@ -2,7 +2,8 @@
  * Tenant repository implementation
  */
 
-import { Kysely, sql } from 'kysely';
+import { Kysely } from 'kysely';
+import { randomUUID } from 'crypto';
 import { BaseCrudRepositoryImpl } from '../BaseCrudRepository.js';
 import type { TenantRepository } from './TenantRepository.js';
 import type { Tenant, CreateTenantData, UpdateTenantData } from 'shared-types';
@@ -72,7 +73,7 @@ export class TenantRepositoryImpl
    */
   protected mapCreateDataToRow(data: CreateTenantData): any {
     return {
-      id: sql`gen_random_uuid()`,
+      id: randomUUID(),
       name: data.name,
       slug: data.slug,
       status: data.status || 'ACTIVE',

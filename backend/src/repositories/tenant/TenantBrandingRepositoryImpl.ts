@@ -2,7 +2,8 @@
  * Tenant branding repository implementation
  */
 
-import { Kysely, sql } from 'kysely';
+import { Kysely } from 'kysely';
+import { randomUUID } from 'crypto';
 import { BaseCrudRepositoryImpl } from '../BaseCrudRepository.js';
 import type { TenantBrandingRepository } from './TenantBrandingRepository.js';
 import type {
@@ -44,13 +45,32 @@ export class TenantBrandingRepositoryImpl
    * Create or update tenant branding (upsert)
    */
   async upsert(data: CreateTenantBrandingData): Promise<TenantBranding> {
+    const insertData = this.mapCreateDataToRow(data);
+    
+    // MySQL UPSERT - First try to insert
+    try {
+      await this.db
+        .insertInto('tenant_branding')
+        .values(insertData)
+        .execute();
+    } catch (error: any) {
+      // If duplicate key error, update the existing record
+      if (error?.code === 'ER_DUP_ENTRY') {
+        await this.db
+          .updateTable('tenant_branding')
+          .set(this.mapUpdateDataToRow(data))
+          .where('tenant_id', '=', data.tenantId)
+          .execute();
+      } else {
+        throw error;
+      }
+    }
+
+    // Fetch the row to return it
     const row = await this.db
-      .insertInto('tenant_branding')
-      .values(this.mapCreateDataToRow(data))
-      .onConflict((oc) =>
-        oc.column('tenant_id').doUpdateSet(this.mapUpdateDataToRow(data))
-      )
-      .returningAll()
+      .selectFrom('tenant_branding')
+      .selectAll()
+      .where('tenant_id', '=', data.tenantId)
       .executeTakeFirstOrThrow();
 
     return this.mapRowToEntity(row);
@@ -79,7 +99,7 @@ export class TenantBrandingRepositoryImpl
    */
   protected mapCreateDataToRow(data: CreateTenantBrandingData): any {
     return {
-      id: sql`gen_random_uuid()`,
+      id: randomUUID(),
       tenant_id: data.tenantId,
       logo: data.logo || null,
       primary_color: data.primaryColor || '#3b82f6',

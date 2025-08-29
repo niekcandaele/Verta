@@ -51,4 +51,13 @@ docker logs verta-app --tail 100 2>&1 | grep -i error
 ```
 
 ## Database
-PostgreSQL is available via MCP. Key tables: `tenants`, `channels`, `messages`, `sync_progress`, `channel_sync_jobs` (coming soon)
+TiDB is available via MCP. Key tables: `tenants`, `channels`, `messages`, `sync_progress`, `channel_sync_jobs`
+
+### TiDB MCP Commands
+- `show_databases` - List all databases
+- `switch_database` - Switch to a different database
+- `show_tables` - List all tables in current database
+- `db_query` - Execute read-only SQL queries
+- `db_execute` - Execute data modification SQL (INSERT, UPDATE, DELETE)
+- `db_create_user` - Create database user
+- `db_remove_user` - Remove database user

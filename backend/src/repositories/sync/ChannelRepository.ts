@@ -1,4 +1,5 @@
-import { Kysely, sql } from 'kysely';
+import { Kysely } from 'kysely';
+import { randomUUID } from 'crypto';
 import { BaseCrudRepositoryImpl } from '../BaseCrudRepository.js';
 import type { ChannelRepository } from './types.js';
 import type {
@@ -77,20 +78,38 @@ export class ChannelRepositoryImpl
   async upsert(data: CreateChannelData): Promise<Channel> {
     const insertData = this.mapCreateDataToRow(data);
 
-    // PostgreSQL UPSERT using ON CONFLICT
+    // MySQL UPSERT - First try to insert
+    try {
+      await this.db
+        .insertInto('channels')
+        .values(insertData)
+        .execute();
+    } catch (error: any) {
+      // If duplicate key error, update the existing record
+      if (error?.code === 'ER_DUP_ENTRY') {
+        await this.db
+          .updateTable('channels')
+          .set({
+            name: insertData.name,
+            type: insertData.type,
+            parent_channel_id: insertData.parent_channel_id,
+            metadata: insertData.metadata,
+            updated_at: new Date().toISOString(),
+          })
+          .where('tenant_id', '=', insertData.tenant_id)
+          .where('platform_channel_id', '=', insertData.platform_channel_id)
+          .execute();
+      } else {
+        throw error;
+      }
+    }
+
+    // Fetch the row to return it
     const row = await this.db
-      .insertInto('channels')
-      .values(insertData)
-      .onConflict((oc) =>
-        oc.columns(['tenant_id', 'platform_channel_id']).doUpdateSet({
-          name: insertData.name,
-          type: insertData.type,
-          parent_channel_id: insertData.parent_channel_id,
-          metadata: insertData.metadata,
-          updated_at: new Date().toISOString(),
-        })
-      )
-      .returningAll()
+      .selectFrom('channels')
+      .selectAll()
+      .where('tenant_id', '=', insertData.tenant_id)
+      .where('platform_channel_id', '=', insertData.platform_channel_id)
       .executeTakeFirstOrThrow();
 
     return this.mapRowToEntity(row);
@@ -118,7 +137,7 @@ export class ChannelRepositoryImpl
    */
   protected mapCreateDataToRow(data: CreateChannelData): any {
     return {
-      id: sql`gen_random_uuid()`,
+      id: randomUUID(),
       tenant_id: data.tenantId,
       platform_channel_id: data.platformChannelId,
       name: data.name,

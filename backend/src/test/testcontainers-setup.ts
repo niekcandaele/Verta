@@ -2,10 +2,10 @@
  * Testcontainers setup utilities for integration tests
  */
 
-import { PostgreSqlContainer } from '@testcontainers/postgresql';
+import { GenericContainer } from 'testcontainers';
 import { Kysely } from 'kysely';
-import { PostgresDialect } from 'kysely';
-import { Pool } from 'pg';
+import { MysqlDialect } from 'kysely';
+import mysql from 'mysql2';
 import { setupTestDatabase, cleanupTestDatabase } from './database-setup.js';
 import type { Database } from '../database/types.js';
 
@@ -15,36 +15,44 @@ import type { Database } from '../database/types.js';
 export interface TestDatabaseContext {
   /** Kysely database instance */
   db: Kysely<Database>;
-  /** PostgreSQL container instance */
+  /** TiDB container instance */
   container: any;
   /** Cleanup function to truncate all tables */
   cleanup: () => Promise<void>;
 }
 
 /**
- * Create a test database with PostgreSQL container and run migrations
+ * Create a test database with TiDB container and run migrations
  * @returns Test database context with db, container, and cleanup function
  */
 export async function createTestDatabase(): Promise<TestDatabaseContext> {
-  // Start PostgreSQL container
-  const container = await new PostgreSqlContainer('postgres:16-alpine')
-    .withDatabase('test_db')
-    .withUsername('test_user')
-    .withPassword('test_password')
+  // Start TiDB container
+  const container = await new GenericContainer('pingcap/tidb:v7.5.0')
+    .withExposedPorts(4000, 10080) // 4000 for MySQL protocol, 10080 for status
+    .withEnvironment({
+      MYSQL_ALLOW_EMPTY_PASSWORD: '1',
+    })
     .start();
 
+  // Wait for TiDB to be ready
+  await new Promise(resolve => setTimeout(resolve, 3000));
+
   // Create database connection
-  const pool = new Pool({
+  // Using non-promise mysql2 to fix Kysely/TiDB compatibility issue
+  const pool = mysql.createPool({
     host: container.getHost(),
-    port: container.getPort(),
-    database: container.getDatabase(),
-    user: container.getUsername(),
-    password: container.getPassword(),
+    port: container.getMappedPort(4000),
+    user: 'root',
+    password: '',
+    database: 'test',
+    connectionLimit: 10,
+    waitForConnections: true,
+    queueLimit: 0,
   });
 
   // Create Kysely instance
   const db = new Kysely<Database>({
-    dialect: new PostgresDialect({ pool }),
+    dialect: new MysqlDialect({ pool }),
   });
 
   // Run migrations

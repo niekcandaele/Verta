@@ -1,26 +1,21 @@
 import { Kysely, sql } from 'kysely';
 
 export async function up(db: Kysely<any>): Promise<void> {
-  // Drop the existing CHECK constraint on channel type
+  // MySQL/TiDB doesn't support CHECK constraints in the same way as PostgreSQL
+  // The channel type validation will be enforced at the application level
+  // This migration just documents the addition of the 'category' type
+  
+  // Optionally, we could modify the column to be an ENUM, but that's more restrictive
+  // For now, we'll just add a comment to document the allowed values
   await sql`
     ALTER TABLE channels 
-    DROP CONSTRAINT IF EXISTS check_channel_type
-  `.execute(db);
-
-  // Add a new CHECK constraint that includes 'category'
-  await sql`
-    ALTER TABLE channels 
-    ADD CONSTRAINT check_channel_type 
-    CHECK (type IN ('text', 'thread', 'forum', 'category'))
+    MODIFY COLUMN type VARCHAR(20) 
+    COMMENT 'Channel type: text, thread, forum, or category'
   `.execute(db);
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
   // First, we need to handle any existing category channels
-  // Option 1: Delete them (data loss)
-  // Option 2: Convert them to another type
-  // For safety, we'll throw an error if category channels exist
-
   const categoryChannels = await db
     .selectFrom('channels')
     .select('id')
@@ -34,16 +29,10 @@ export async function down(db: Kysely<any>): Promise<void> {
     );
   }
 
-  // Drop the current constraint
+  // Just update the comment to reflect the removal of category type
   await sql`
     ALTER TABLE channels 
-    DROP CONSTRAINT IF EXISTS check_channel_type
-  `.execute(db);
-
-  // Add back the original constraint without 'category'
-  await sql`
-    ALTER TABLE channels 
-    ADD CONSTRAINT check_channel_type 
-    CHECK (type IN ('text', 'thread', 'forum'))
+    MODIFY COLUMN type VARCHAR(20) 
+    COMMENT 'Channel type: text, thread, or forum'
   `.execute(db);
 }

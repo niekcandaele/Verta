@@ -3,8 +3,8 @@ import { Kysely, sql } from 'kysely';
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema
     .createTable('tenants')
-    .addColumn('id', 'uuid', (col) =>
-      col.primaryKey().defaultTo(sql`gen_random_uuid()`)
+    .addColumn('id', 'varchar(36)', (col) =>
+      col.primaryKey()
     )
     .addColumn('name', 'varchar(255)', (col) => col.notNull())
     .addColumn('slug', 'varchar(255)', (col) => col.notNull())
@@ -14,14 +14,14 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('platform', 'varchar(20)', (col) => col.notNull())
     .addColumn('platform_id', 'varchar(255)', (col) => col.notNull())
     .addColumn('created_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`)
     )
     .addColumn('updated_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
     )
     .execute();
 
-  // Add CHECK constraints for enums
+  // Add CHECK constraints for enums (MySQL 8.0.16+ supports CHECK constraints)
   await sql`
     ALTER TABLE tenants 
     ADD CONSTRAINT check_tenant_status 
@@ -61,32 +61,11 @@ export async function up(db: Kysely<any>): Promise<void> {
     .column('created_at')
     .execute();
 
-  // Create trigger to automatically update updated_at
-  await sql`
-    CREATE OR REPLACE FUNCTION update_updated_at_column()
-    RETURNS TRIGGER AS $$
-    BEGIN
-      NEW.updated_at = now();
-      RETURN NEW;
-    END;
-    $$ language 'plpgsql';
-  `.execute(db);
-
-  await sql`
-    CREATE TRIGGER update_tenants_updated_at 
-    BEFORE UPDATE ON tenants 
-    FOR EACH ROW 
-    EXECUTE FUNCTION update_updated_at_column();
-  `.execute(db);
+  // Note: MySQL handles updated_at automatically with ON UPDATE CURRENT_TIMESTAMP
+  // No need for a separate trigger
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
-  // Drop trigger and function
-  await sql`DROP TRIGGER IF EXISTS update_tenants_updated_at ON tenants`.execute(
-    db
-  );
-  await sql`DROP FUNCTION IF EXISTS update_updated_at_column`.execute(db);
-
   // Drop indexes
   await db.schema.dropIndex('idx_tenants_created_at').execute();
   await db.schema.dropIndex('idx_tenants_status').execute();

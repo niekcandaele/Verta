@@ -85,10 +85,16 @@ export abstract class BaseCrudRepositoryImpl<T, CreateData, UpdateData>
   async create(data: CreateData): Promise<T> {
     const insertData = this.mapCreateDataToRow(data);
 
-    const row = await this.db
+    await this.db
       .insertInto(this.tableName)
       .values(insertData)
-      .returningAll()
+      .execute();
+
+    // MySQL doesn't support RETURNING, so fetch the created row
+    const row = await this.db
+      .selectFrom(this.tableName)
+      .selectAll()
+      .where('id' as any, '=', insertData.id)
       .executeTakeFirstOrThrow();
 
     return this.mapRowToEntity(row);
@@ -106,11 +112,17 @@ export abstract class BaseCrudRepositoryImpl<T, CreateData, UpdateData>
       updated_at: new Date().toISOString(),
     };
 
-    const row = await this.db
+    await this.db
       .updateTable(this.tableName)
       .set(dataWithTimestamp as any)
       .where('id' as any, '=', id)
-      .returningAll()
+      .execute();
+
+    // MySQL doesn't support RETURNING, so fetch the updated row
+    const row = await this.db
+      .selectFrom(this.tableName)
+      .selectAll()
+      .where('id' as any, '=', id)
       .executeTakeFirst();
 
     return row ? this.mapRowToEntity(row) : null;

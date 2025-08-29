@@ -1,4 +1,5 @@
-import { Kysely, sql } from 'kysely';
+import { Kysely } from 'kysely';
+import { randomUUID } from 'crypto';
 import { BaseCrudRepositoryImpl } from '../BaseCrudRepository.js';
 import type { Database } from '../../database/types.js';
 
@@ -112,7 +113,7 @@ export class ChannelSyncJobRepositoryImpl
     jobId: string,
     workerId: string
   ): Promise<ChannelSyncJob | null> {
-    const result = await this.db
+    await this.db
       .updateTable('channel_sync_jobs')
       .set({
         worker_id: workerId,
@@ -123,7 +124,13 @@ export class ChannelSyncJobRepositoryImpl
       .where('id', '=', jobId)
       .where('status', '=', 'pending')
       .where('worker_id', 'is', null)
-      .returningAll()
+      .execute();
+
+    const result = await this.db
+      .selectFrom('channel_sync_jobs')
+      .selectAll()
+      .where('id', '=', jobId)
+      .where('worker_id', '=', workerId)
       .executeTakeFirst();
 
     return result ? this.mapRowToEntity(result) : null;
@@ -171,7 +178,7 @@ export class ChannelSyncJobRepositoryImpl
    */
   protected mapCreateDataToRow(data: CreateChannelSyncJobData): any {
     return {
-      id: sql`gen_random_uuid()`,
+      id: randomUUID(),
       tenant_id: data.tenantId,
       channel_id: data.channelId,
       parent_job_id: data.parentJobId,

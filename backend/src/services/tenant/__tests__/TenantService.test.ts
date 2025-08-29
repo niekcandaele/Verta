@@ -2,7 +2,7 @@
  * Tests for TenantService
  */
 
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { TenantServiceImpl } from '../TenantServiceImpl.js';
 import { TenantRepositoryImpl } from '../../../repositories/tenant/TenantRepositoryImpl.js';
 import {
@@ -21,14 +21,18 @@ describe('TenantService', () => {
   let service: TenantServiceImpl;
   let repository: TenantRepositoryImpl;
 
-  beforeEach(async () => {
-    // Create fresh test database
+  beforeAll(async () => {
+    // Create test database once for all tests
     context = await createTestDatabase();
     repository = new TenantRepositoryImpl(context.db);
     service = new TenantServiceImpl(repository);
+  });
 
-    // Clean up any existing data
-    await context.cleanup();
+  beforeEach(async () => {
+    // Clean up any existing data before each test
+    if (context) {
+      await context.cleanup();
+    }
   });
 
   afterAll(async () => {

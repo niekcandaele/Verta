@@ -1,28 +1,38 @@
-import { Kysely, PostgresDialect } from 'kysely';
-import { Pool } from 'pg';
+import { Kysely, MysqlDialect } from 'kysely';
+import mysql from 'mysql2';
 import { config } from '../config/env.js';
 import type { Database } from './types.js';
 
 /**
  * Create and configure the database connection pool
  */
-const createPool = () => {
-  return new Pool({
-    connectionString: config.DATABASE_URL,
-    max: config.DATABASE_POOL_SIZE,
+const createConnectionPool = () => {
+  // Parse the DATABASE_URL to extract connection details
+  const url = new URL(config.DATABASE_URL);
+  
+  // Using non-promise mysql2 to fix Kysely/TiDB compatibility issue
+  return mysql.createPool({
+    host: url.hostname,
+    port: parseInt(url.port || '3306'),
+    user: url.username,
+    password: url.password,
+    database: url.pathname.substring(1), // Remove leading '/'
+    connectionLimit: config.DATABASE_POOL_SIZE,
     // Additional pool configuration
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    waitForConnections: true,
+    queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0,
   });
 };
 
 /**
- * Initialize Kysely database instance with PostgreSQL dialect
+ * Initialize Kysely database instance with MySQL dialect for TiDB
  */
 const createDatabase = (): Kysely<Database> => {
   return new Kysely<Database>({
-    dialect: new PostgresDialect({
-      pool: createPool(),
+    dialect: new MysqlDialect({
+      pool: createConnectionPool(),
     }),
     log(event) {
       if (config.LOG_LEVEL === 'verbose') {

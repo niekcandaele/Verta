@@ -4,13 +4,13 @@ export async function up(db: Kysely<any>): Promise<void> {
   // Create channel_sync_jobs table
   await db.schema
     .createTable('channel_sync_jobs')
-    .addColumn('id', 'uuid', (col) =>
-      col.primaryKey().defaultTo(sql`gen_random_uuid()`)
+    .addColumn('id', 'varchar(36)', (col) =>
+      col.primaryKey()
     )
-    .addColumn('tenant_id', 'uuid', (col) =>
+    .addColumn('tenant_id', 'varchar(36)', (col) =>
       col.notNull().references('tenants.id').onDelete('cascade')
     )
-    .addColumn('channel_id', 'uuid', (col) =>
+    .addColumn('channel_id', 'varchar(36)', (col) =>
       col.notNull().references('channels.id').onDelete('cascade')
     )
     .addColumn('parent_job_id', 'varchar(255)', (col) => col.notNull())
@@ -19,12 +19,12 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('started_at', 'timestamp')
     .addColumn('completed_at', 'timestamp')
     .addColumn('messages_processed', 'integer', (col) => col.defaultTo(0))
-    .addColumn('error_details', 'jsonb')
+    .addColumn('error_details', 'json')
     .addColumn('created_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`)
     )
     .addColumn('updated_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
     )
     .execute();
 
@@ -59,7 +59,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .alterTable('sync_progress')
     .addColumn('worker_id', 'varchar(50)')
     .addColumn('started_at', 'timestamp')
-    .addColumn('messages_per_second', 'numeric')
+    .addColumn('messages_per_second', 'decimal')
     .execute();
 
   // Add index for worker queries on sync_progress
@@ -69,21 +69,11 @@ export async function up(db: Kysely<any>): Promise<void> {
     .columns(['worker_id', 'status'])
     .execute();
 
-  // Create trigger for channel_sync_jobs updated_at
-  await sql`
-    CREATE TRIGGER update_channel_sync_jobs_updated_at 
-    BEFORE UPDATE ON channel_sync_jobs 
-    FOR EACH ROW 
-    EXECUTE FUNCTION update_updated_at_column();
-  `.execute(db);
+  // Note: MySQL handles updated_at automatically with ON UPDATE CURRENT_TIMESTAMP
+  // No need for a separate trigger
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
-  // Drop trigger
-  await sql`DROP TRIGGER IF EXISTS update_channel_sync_jobs_updated_at ON channel_sync_jobs`.execute(
-    db
-  );
-
   // Drop indexes from sync_progress
   await db.schema.dropIndex('idx_sync_progress_worker').execute();
 

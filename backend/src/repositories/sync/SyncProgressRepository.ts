@@ -1,4 +1,5 @@
-import { Kysely, sql } from 'kysely';
+import { Kysely } from 'kysely';
+import { randomUUID } from 'crypto';
 import { BaseCrudRepositoryImpl } from '../BaseCrudRepository.js';
 import type { SyncProgressRepository } from './types.js';
 import type {
@@ -73,20 +74,38 @@ export class SyncProgressRepositoryImpl
   async upsert(data: CreateSyncProgressData): Promise<SyncProgress> {
     const insertData = this.mapCreateDataToRow(data);
 
-    // PostgreSQL UPSERT using ON CONFLICT
+    // MySQL UPSERT - First try to insert
+    try {
+      await this.db
+        .insertInto('sync_progress')
+        .values(insertData)
+        .execute();
+    } catch (error: any) {
+      // If duplicate key error, update the existing record
+      if (error?.code === 'ER_DUP_ENTRY') {
+        await this.db
+          .updateTable('sync_progress')
+          .set({
+            last_synced_message_id: insertData.last_synced_message_id,
+            last_synced_at: insertData.last_synced_at,
+            status: insertData.status,
+            error_details: insertData.error_details,
+            updated_at: new Date().toISOString(),
+          })
+          .where('tenant_id', '=', insertData.tenant_id)
+          .where('channel_id', '=', insertData.channel_id)
+          .execute();
+      } else {
+        throw error;
+      }
+    }
+
+    // Fetch the row to return it
     const row = await this.db
-      .insertInto('sync_progress')
-      .values(insertData)
-      .onConflict((oc) =>
-        oc.columns(['tenant_id', 'channel_id']).doUpdateSet({
-          last_synced_message_id: insertData.last_synced_message_id,
-          last_synced_at: insertData.last_synced_at,
-          status: insertData.status,
-          error_details: insertData.error_details,
-          updated_at: new Date().toISOString(),
-        })
-      )
-      .returningAll()
+      .selectFrom('sync_progress')
+      .selectAll()
+      .where('tenant_id', '=', insertData.tenant_id)
+      .where('channel_id', '=', insertData.channel_id)
       .executeTakeFirstOrThrow();
 
     return this.mapRowToEntity(row);
@@ -99,7 +118,7 @@ export class SyncProgressRepositoryImpl
     channelId: string,
     errorDetails: unknown
   ): Promise<SyncProgress | null> {
-    const row = await this.db
+    await this.db
       .updateTable('sync_progress')
       .set({
         status: 'failed' as SyncStatus,
@@ -107,7 +126,12 @@ export class SyncProgressRepositoryImpl
         updated_at: new Date().toISOString(),
       })
       .where('channel_id', '=', channelId)
-      .returningAll()
+      .execute();
+
+    const row = await this.db
+      .selectFrom('sync_progress')
+      .selectAll()
+      .where('channel_id', '=', channelId)
       .executeTakeFirst();
 
     return row ? this.mapRowToEntity(row) : null;
@@ -121,7 +145,7 @@ export class SyncProgressRepositoryImpl
     lastSyncedMessageId: string,
     lastSyncedAt: Date
   ): Promise<SyncProgress | null> {
-    const row = await this.db
+    await this.db
       .updateTable('sync_progress')
       .set({
         last_synced_message_id: lastSyncedMessageId,
@@ -131,7 +155,12 @@ export class SyncProgressRepositoryImpl
         updated_at: new Date().toISOString(),
       })
       .where('channel_id', '=', channelId)
-      .returningAll()
+      .execute();
+
+    const row = await this.db
+      .selectFrom('sync_progress')
+      .selectAll()
+      .where('channel_id', '=', channelId)
       .executeTakeFirst();
 
     return row ? this.mapRowToEntity(row) : null;
@@ -203,12 +232,13 @@ export class SyncProgressRepositoryImpl
     }
 
     // Try to insert or update the sync progress
+    const newId = randomUUID();
     try {
       // First attempt: try to insert a new record
-      const insertedRow = await this.db
+      await this.db
         .insertInto('sync_progress')
         .values({
-          id: sql`gen_random_uuid()`,
+          id: newId,
           tenant_id: channel.tenant_id,
           channel_id: channelId,
           worker_id: workerId,
@@ -219,13 +249,18 @@ export class SyncProgressRepositoryImpl
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
-        .returningAll()
+        .execute();
+
+      const insertedRow = await this.db
+        .selectFrom('sync_progress')
+        .selectAll()
+        .where('id', '=', newId)
         .executeTakeFirst();
 
       return insertedRow ? this.mapRowToEntity(insertedRow) : null;
     } catch {
       // If insert fails due to unique constraint, try to update
-      const row = await this.db
+      await this.db
         .updateTable('sync_progress')
         .set({
           worker_id: workerId,
@@ -241,8 +276,14 @@ export class SyncProgressRepositoryImpl
             eb('status', '!=', 'in_progress'),
           ])
         )
-        .returningAll()
+        .execute();
+
+      const row = await this.db
+        .selectFrom('sync_progress')
+        .selectAll()
+        .where('channel_id', '=', channelId)
         .executeTakeFirst();
+
       return row ? this.mapRowToEntity(row) : null;
     }
   }
@@ -254,7 +295,7 @@ export class SyncProgressRepositoryImpl
     channelId: string,
     workerId: string
   ): Promise<SyncProgress | null> {
-    const row = await this.db
+    await this.db
       .updateTable('sync_progress')
       .set({
         worker_id: null,
@@ -262,7 +303,12 @@ export class SyncProgressRepositoryImpl
       })
       .where('channel_id', '=', channelId)
       .where('worker_id', '=', workerId)
-      .returningAll()
+      .execute();
+
+    const row = await this.db
+      .selectFrom('sync_progress')
+      .selectAll()
+      .where('channel_id', '=', channelId)
       .executeTakeFirst();
 
     return row ? this.mapRowToEntity(row) : null;
@@ -314,7 +360,7 @@ export class SyncProgressRepositoryImpl
    */
   protected mapCreateDataToRow(data: CreateSyncProgressData): any {
     return {
-      id: sql`gen_random_uuid()`,
+      id: randomUUID(),
       tenant_id: data.tenantId,
       channel_id: data.channelId,
       last_synced_message_id: data.lastSyncedMessageId,
