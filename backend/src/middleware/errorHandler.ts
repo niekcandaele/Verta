@@ -22,11 +22,11 @@ interface ErrorResponse {
  * RFC 7807 Problem Details format
  */
 interface ProblemDetails {
-  type?: string;      // URI reference for the problem type
-  title: string;      // Short human-readable summary
-  status: number;     // HTTP status code
-  detail?: string;    // Human-readable explanation
-  instance?: string;  // URI reference for this occurrence
+  type?: string; // URI reference for the problem type
+  title: string; // Short human-readable summary
+  status: number; // HTTP status code
+  detail?: string; // Human-readable explanation
+  instance?: string; // URI reference for this occurrence
 }
 
 /**
@@ -108,13 +108,13 @@ function createProblemDetails(
 ): ProblemDetails {
   const problem: ProblemDetails = {
     title,
-    status
+    status,
   };
-  
+
   if (type) problem.type = type;
   if (detail) problem.detail = detail;
   if (instance) problem.instance = instance;
-  
+
   return problem;
 }
 
@@ -175,7 +175,7 @@ export function errorHandler(
       res.status(err.statusCode).json(problem);
       return;
     }
-    
+
     // Use legacy format for other endpoints
     const response: ErrorResponse = {
       error: err.error,

@@ -55,7 +55,7 @@ export class MessageAttachmentRepositoryImpl
       .execute();
 
     // Fetch the inserted rows
-    const ids = insertData.map(data => data.id);
+    const ids = insertData.map((data) => data.id);
     const rows = await this.db
       .selectFrom('message_attachments')
       .selectAll()

@@ -75,6 +75,19 @@ export interface MessageRepository
   ): Promise<PaginatedResult<Message>>;
 
   /**
+   * Find all messages in a channel with pagination, including attachments and reactions
+   */
+  findByChannelWithExtras(
+    channelId: string,
+    options?: {
+      limit?: number;
+      offset?: number;
+      startDate?: Date;
+      endDate?: Date;
+    }
+  ): Promise<PaginatedResult<any>>;
+
+  /**
    * Find all replies to a specific message
    */
   findReplies(messageId: string): Promise<Message[]>;

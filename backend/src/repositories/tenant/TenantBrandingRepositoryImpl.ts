@@ -46,13 +46,10 @@ export class TenantBrandingRepositoryImpl
    */
   async upsert(data: CreateTenantBrandingData): Promise<TenantBranding> {
     const insertData = this.mapCreateDataToRow(data);
-    
+
     // MySQL UPSERT - First try to insert
     try {
-      await this.db
-        .insertInto('tenant_branding')
-        .values(insertData)
-        .execute();
+      await this.db.insertInto('tenant_branding').values(insertData).execute();
     } catch (error: any) {
       // If duplicate key error, update the existing record
       if (error?.code === 'ER_DUP_ENTRY') {

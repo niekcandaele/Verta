@@ -106,11 +106,11 @@ export async function getChannelMessages(channelId: string, page: number): Promi
     const messages = messagesResponse.data.data;
     const meta = messagesResponse.data.meta;
 
-    // Transform messages to include attachments and reactions (empty for now)
-    const messagesWithExtras: MessageWithExtras[] = messages.map((msg: Message) => ({
+    // Transform messages - API now includes attachments and reactions
+    const messagesWithExtras: MessageWithExtras[] = messages.map((msg: any) => ({
       ...msg,
-      attachments: [],
-      reactions: []
+      attachments: msg.attachments || [],
+      reactions: msg.reactions || []
     }));
 
     return {
@@ -229,11 +229,11 @@ export async function getThreadMessages(threadId: string): Promise<MessageWithEx
     const response = await api.getThreadMessages(forumChannel.id, threadId, 1, 100);
     const messages = response.data.data;
 
-    // Transform messages to include attachments and reactions
-    return messages.map((msg: Message) => ({
+    // Transform messages - API now includes attachments and reactions
+    return messages.map((msg: any) => ({
       ...msg,
-      attachments: [],
-      reactions: []
+      attachments: msg.attachments || [],
+      reactions: msg.reactions || []
     }));
   } catch (error) {
     console.error(`Failed to load messages for thread ${threadId}:`, error);

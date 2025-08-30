@@ -4,9 +4,7 @@ export async function up(db: Kysely<any>): Promise<void> {
   // Create channel_sync_jobs table
   await db.schema
     .createTable('channel_sync_jobs')
-    .addColumn('id', 'varchar(36)', (col) =>
-      col.primaryKey()
-    )
+    .addColumn('id', 'varchar(36)', (col) => col.primaryKey())
     .addColumn('tenant_id', 'varchar(36)', (col) =>
       col.notNull().references('tenants.id').onDelete('cascade')
     )
@@ -24,7 +22,9 @@ export async function up(db: Kysely<any>): Promise<void> {
       col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`)
     )
     .addColumn('updated_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
+      col
+        .notNull()
+        .defaultTo(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
     )
     .execute();
 

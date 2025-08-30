@@ -116,9 +116,7 @@ describe('BaseCrudRepository', () => {
     await db.schema
       .createTable('test_entities')
       .ifNotExists()
-      .addColumn('id', 'varchar(36)', (col) =>
-        col.primaryKey()
-      )
+      .addColumn('id', 'varchar(36)', (col) => col.primaryKey())
       .addColumn('name', 'varchar(255)', (col) => col.notNull())
       .addColumn('description', 'text')
       .addColumn('active', 'boolean', (col) => col.notNull().defaultTo(true))

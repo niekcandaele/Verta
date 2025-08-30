@@ -32,6 +32,7 @@ export class SyncWorker {
   private tenantRepo: TenantRepository;
   private channelRepo: ChannelRepository;
   private channelSyncJobRepo: ChannelSyncJobRepository;
+  private platformAdapters: Map<Platform, PlatformAdapter> = new Map();
 
   constructor() {
     // Initialize repositories
@@ -43,23 +44,40 @@ export class SyncWorker {
     this.worker = new Worker<SyncJobData, SyncJobResult>(
       SYNC_QUEUE_NAME,
       async (job: Job<SyncJobData>) => {
-        // Skip hourly-sync-trigger jobs - they should be handled by HourlyTriggerWorker
-        if (job.name === 'hourly-sync-trigger') {
-          logger.warn('Skipping hourly-sync-trigger job in SyncWorker', {
+        try {
+          // Skip hourly-sync-trigger jobs - they should be handled by HourlyTriggerWorker
+          if (job.name === 'hourly-sync-trigger') {
+            logger.warn('Skipping hourly-sync-trigger job in SyncWorker', {
+              jobId: job.id,
+            });
+            return {
+              tenantId: '',
+              channelsProcessed: 0,
+              messagesProcessed: 0,
+              reactionsProcessed: 0,
+              attachmentsProcessed: 0,
+              errors: [],
+              startedAt: new Date(),
+              completedAt: new Date(),
+            };
+          }
+
+          logger.info('SyncWorker processing job', {
             jobId: job.id,
+            jobName: job.name,
+            data: job.data,
           });
-          return {
-            tenantId: '',
-            channelsProcessed: 0,
-            messagesProcessed: 0,
-            reactionsProcessed: 0,
-            attachmentsProcessed: 0,
-            errors: [],
-            startedAt: new Date(),
-            completedAt: new Date(),
-          };
+
+          return await this.processSyncJob(job);
+        } catch (error) {
+          logger.error('Fatal error in sync worker job processing', {
+            jobId: job.id,
+            jobName: job.name,
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+          });
+          throw error; // Re-throw to mark job as failed
         }
-        return this.processSyncJob(job);
       },
       {
         connection: redisConfig,
@@ -76,6 +94,8 @@ export class SyncWorker {
    */
   async start(): Promise<void> {
     logger.info('Starting sync worker');
+    // Initialize platform adapters
+    await this.initializePlatformAdapters();
     // Worker starts automatically when instantiated
   }
 
@@ -85,6 +105,13 @@ export class SyncWorker {
   async stop(): Promise<void> {
     logger.info('Stopping sync worker');
     await this.worker.close();
+
+    // Cleanup adapters (they won't destroy the shared Discord client)
+    for (const [platform, adapter] of this.platformAdapters.entries()) {
+      logger.debug(`Cleaning up ${platform} adapter in sync worker`);
+      await adapter.cleanup();
+    }
+    this.platformAdapters.clear();
   }
 
   /**
@@ -118,11 +145,10 @@ export class SyncWorker {
         throw new Error(`Tenant not found: ${tenantId}`);
       }
 
-      // Create platform adapter
-      const adapter = PlatformAdapterFactory.create(
+      // Get or create platform adapter (reuse existing instance)
+      const adapter = await this.getOrCreateAdapter(
         tenant.platform as Platform
       );
-      await adapter.initialize();
 
       try {
         // Verify connection
@@ -187,8 +213,8 @@ export class SyncWorker {
 
         return finalResult;
       } finally {
-        // Always cleanup adapter
-        await adapter.cleanup();
+        // Don't cleanup adapter - it's shared across jobs
+        // Cleanup only happens when worker stops
       }
     } catch (error) {
       // Check if it's a rate limit error
@@ -304,9 +330,14 @@ export class SyncWorker {
             // Update existing channel
             // Look up parent channel's internal ID if it has a parent
             const parentChannelId = platformChannel.parentId
-              ? (await this.channelRepo.findByPlatformId(tenantId, platformChannel.parentId))?.id || null
+              ? (
+                  await this.channelRepo.findByPlatformId(
+                    tenantId,
+                    platformChannel.parentId
+                  )
+                )?.id || null
               : null;
-            
+
             await this.channelRepo.update(existingChannel.id, {
               name: platformChannel.name,
               type: platformChannel.type as ChannelType,
@@ -317,9 +348,14 @@ export class SyncWorker {
             // Create new channel
             // Look up parent channel's internal ID if it has a parent
             const parentChannelId = platformChannel.parentId
-              ? (await this.channelRepo.findByPlatformId(tenantId, platformChannel.parentId))?.id || null
+              ? (
+                  await this.channelRepo.findByPlatformId(
+                    tenantId,
+                    platformChannel.parentId
+                  )
+                )?.id || null
               : null;
-            
+
             await this.channelRepo.create({
               tenantId,
               platformChannelId: platformChannel.id,
@@ -544,6 +580,56 @@ export class SyncWorker {
     this.worker.on('error', (error) => {
       logger.error('Worker error', { error });
     });
+  }
+
+  /**
+   * Initialize platform adapters for reuse across jobs
+   */
+  private async initializePlatformAdapters(): Promise<void> {
+    // Pre-create and initialize adapters for known platforms
+    const platforms: Platform[] = ['discord']; // Add more platforms as needed
+
+    for (const platform of platforms) {
+      try {
+        const adapter = PlatformAdapterFactory.create(platform);
+        await adapter.initialize();
+        this.platformAdapters.set(platform, adapter);
+        logger.info(`Initialized ${platform} adapter for sync worker`, {
+          platform,
+        });
+      } catch (error) {
+        logger.error(
+          `Failed to initialize ${platform} adapter in sync worker`,
+          {
+            platform,
+            error,
+          }
+        );
+      }
+    }
+  }
+
+  /**
+   * Get or create a platform adapter
+   */
+  private async getOrCreateAdapter(
+    platform: Platform
+  ): Promise<PlatformAdapter> {
+    // Check if we already have an adapter for this platform
+    let adapter = this.platformAdapters.get(platform);
+
+    if (!adapter) {
+      // Create and initialize a new adapter if we don't have one
+      logger.info(`Creating new ${platform} adapter in sync worker`, {
+        platform,
+      });
+
+      adapter = PlatformAdapterFactory.create(platform);
+      await adapter.initialize();
+      this.platformAdapters.set(platform, adapter);
+    }
+
+    return adapter;
   }
 
   /**

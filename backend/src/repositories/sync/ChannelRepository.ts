@@ -80,10 +80,7 @@ export class ChannelRepositoryImpl
 
     // MySQL UPSERT - First try to insert
     try {
-      await this.db
-        .insertInto('channels')
-        .values(insertData)
-        .execute();
+      await this.db.insertInto('channels').values(insertData).execute();
     } catch (error: any) {
       // If duplicate key error, update the existing record
       if (error?.code === 'ER_DUP_ENTRY') {

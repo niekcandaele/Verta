@@ -4,9 +4,7 @@ export async function up(db: Kysely<any>): Promise<void> {
   // Create channels table
   await db.schema
     .createTable('channels')
-    .addColumn('id', 'varchar(36)', (col) =>
-      col.primaryKey()
-    )
+    .addColumn('id', 'varchar(36)', (col) => col.primaryKey())
     .addColumn('tenant_id', 'varchar(36)', (col) =>
       col.notNull().references('tenants.id').onDelete('cascade')
     )
@@ -21,7 +19,9 @@ export async function up(db: Kysely<any>): Promise<void> {
       col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`)
     )
     .addColumn('updated_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
+      col
+        .notNull()
+        .defaultTo(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
     )
     .execute();
 
@@ -35,9 +35,7 @@ export async function up(db: Kysely<any>): Promise<void> {
   // Create messages table
   await db.schema
     .createTable('messages')
-    .addColumn('id', 'varchar(36)', (col) =>
-      col.primaryKey()
-    )
+    .addColumn('id', 'varchar(36)', (col) => col.primaryKey())
     .addColumn('channel_id', 'varchar(36)', (col) =>
       col.notNull().references('channels.id').onDelete('cascade')
     )
@@ -53,16 +51,16 @@ export async function up(db: Kysely<any>): Promise<void> {
       col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`)
     )
     .addColumn('updated_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
+      col
+        .notNull()
+        .defaultTo(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
     )
     .execute();
 
   // Create message_emoji_reactions table
   await db.schema
     .createTable('message_emoji_reactions')
-    .addColumn('id', 'varchar(36)', (col) =>
-      col.primaryKey()
-    )
+    .addColumn('id', 'varchar(36)', (col) => col.primaryKey())
     .addColumn('message_id', 'varchar(36)', (col) =>
       col.notNull().references('messages.id').onDelete('cascade')
     )
@@ -76,9 +74,7 @@ export async function up(db: Kysely<any>): Promise<void> {
   // Create message_attachments table
   await db.schema
     .createTable('message_attachments')
-    .addColumn('id', 'varchar(36)', (col) =>
-      col.primaryKey()
-    )
+    .addColumn('id', 'varchar(36)', (col) => col.primaryKey())
     .addColumn('message_id', 'varchar(36)', (col) =>
       col.notNull().references('messages.id').onDelete('cascade')
     )
@@ -94,9 +90,7 @@ export async function up(db: Kysely<any>): Promise<void> {
   // Create sync_progress table
   await db.schema
     .createTable('sync_progress')
-    .addColumn('id', 'varchar(36)', (col) =>
-      col.primaryKey()
-    )
+    .addColumn('id', 'varchar(36)', (col) => col.primaryKey())
     .addColumn('tenant_id', 'varchar(36)', (col) =>
       col.notNull().references('tenants.id').onDelete('cascade')
     )
@@ -111,7 +105,9 @@ export async function up(db: Kysely<any>): Promise<void> {
       col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`)
     )
     .addColumn('updated_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
+      col
+        .notNull()
+        .defaultTo(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
     )
     .execute();
 
@@ -211,7 +207,6 @@ export async function up(db: Kysely<any>): Promise<void> {
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
-
   // Drop indexes
   await db.schema.dropIndex('idx_sync_progress_status').execute();
   await db.schema.dropIndex('idx_sync_progress_tenant_id').execute();

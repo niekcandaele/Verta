@@ -190,12 +190,15 @@ export class TenantServiceImpl
   protected handleRepositoryError(error: unknown): ServiceResult<any> {
     if (error instanceof Error) {
       const message = error.message.toLowerCase();
-      
+
       // MySQL/TiDB duplicate key error
       const mysqlError = error as any;
       if (mysqlError.code === 'ER_DUP_ENTRY') {
         // Parse the duplicate key message to determine which constraint failed
-        if (message.includes('idx_tenants_slug') || message.includes("'slug'")) {
+        if (
+          message.includes('idx_tenants_slug') ||
+          message.includes("'slug'")
+        ) {
           return createErrorResult(
             createServiceError(
               ServiceErrorType.DUPLICATE_ENTRY,
@@ -203,8 +206,10 @@ export class TenantServiceImpl
             )
           );
         }
-        if (message.includes('idx_tenants_platform_platform_id') || 
-            (message.includes("'platform'") && message.includes("'platform_id'"))) {
+        if (
+          message.includes('idx_tenants_platform_platform_id') ||
+          (message.includes("'platform'") && message.includes("'platform_id'"))
+        ) {
           return createErrorResult(
             createServiceError(
               ServiceErrorType.DUPLICATE_ENTRY,

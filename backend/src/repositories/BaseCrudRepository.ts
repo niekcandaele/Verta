@@ -85,10 +85,7 @@ export abstract class BaseCrudRepositoryImpl<T, CreateData, UpdateData>
   async create(data: CreateData): Promise<T> {
     const insertData = this.mapCreateDataToRow(data);
 
-    await this.db
-      .insertInto(this.tableName)
-      .values(insertData)
-      .execute();
+    await this.db.insertInto(this.tableName).values(insertData).execute();
 
     // MySQL doesn't support RETURNING, so fetch the created row
     const row = await this.db

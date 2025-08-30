@@ -12,6 +12,7 @@ import {
   type ChannelSyncJobData,
 } from '../queues/channelSyncQueue.js';
 import { PlatformAdapterFactory } from '../adapters/index.js';
+import type { PlatformAdapter } from '../adapters/types.js';
 import { db } from '../database/index.js';
 import type { TenantRepository } from '../repositories/tenant/index.js';
 import { TenantRepositoryImpl } from '../repositories/tenant/index.js';
@@ -36,6 +37,7 @@ export class ChannelSyncWorker {
   private reactionRepo: MessageEmojiReactionRepository;
   private attachmentRepo: MessageAttachmentRepository;
   private progressRepo: SyncProgressRepository;
+  private platformAdapters: Map<Platform, PlatformAdapter> = new Map();
 
   constructor() {
     // Generate unique worker ID
@@ -72,6 +74,9 @@ export class ChannelSyncWorker {
       workerId: this.workerId,
       concurrency: config.SYNC_MAX_CHANNEL_WORKERS,
     });
+
+    // Initialize platform adapters
+    await this.initializePlatformAdapters();
   }
 
   /**
@@ -80,6 +85,13 @@ export class ChannelSyncWorker {
   async stop(): Promise<void> {
     logger.info('Stopping channel sync worker', { workerId: this.workerId });
     await this.worker.close();
+
+    // Cleanup adapters (they won't destroy the shared Discord client)
+    for (const [platform, adapter] of this.platformAdapters.entries()) {
+      logger.debug(`Cleaning up ${platform} adapter`);
+      await adapter.cleanup();
+    }
+    this.platformAdapters.clear();
   }
 
   /**
@@ -141,13 +153,10 @@ export class ChannelSyncWorker {
         throw new Error(`Tenant not found: ${tenantId}`);
       }
 
-      // Get platform adapter
-      const adapter = PlatformAdapterFactory.create(
+      // Get or create platform adapter (reuse existing instance)
+      const adapter = await this.getOrCreateAdapter(
         tenant.platform as Platform
       );
-
-      // Initialize the adapter
-      await adapter.initialize();
 
       try {
         // 3. Get last checkpoint for incremental sync
@@ -277,8 +286,8 @@ export class ChannelSyncWorker {
           retryCount: 0,
         };
       } finally {
-        // Always cleanup adapter
-        await adapter.cleanup();
+        // Don't cleanup adapter - it's shared across jobs
+        // Cleanup only happens when worker stops
       }
     } catch (error) {
       logger.error('Channel sync failed', {
@@ -409,6 +418,56 @@ export class ChannelSyncWorker {
     });
 
     return messages.length;
+  }
+
+  /**
+   * Initialize platform adapters for reuse across jobs
+   */
+  private async initializePlatformAdapters(): Promise<void> {
+    // Pre-create and initialize adapters for known platforms
+    const platforms: Platform[] = ['discord']; // Add more platforms as needed
+
+    for (const platform of platforms) {
+      try {
+        const adapter = PlatformAdapterFactory.create(platform);
+        await adapter.initialize();
+        this.platformAdapters.set(platform, adapter);
+        logger.info(`Initialized ${platform} adapter for worker`, {
+          workerId: this.workerId,
+          platform,
+        });
+      } catch (error) {
+        logger.error(`Failed to initialize ${platform} adapter`, {
+          workerId: this.workerId,
+          platform,
+          error,
+        });
+      }
+    }
+  }
+
+  /**
+   * Get or create a platform adapter
+   */
+  private async getOrCreateAdapter(
+    platform: Platform
+  ): Promise<PlatformAdapter> {
+    // Check if we already have an adapter for this platform
+    let adapter = this.platformAdapters.get(platform);
+
+    if (!adapter) {
+      // Create and initialize a new adapter if we don't have one
+      logger.info(`Creating new ${platform} adapter`, {
+        workerId: this.workerId,
+        platform,
+      });
+
+      adapter = PlatformAdapterFactory.create(platform);
+      await adapter.initialize();
+      this.platformAdapters.set(platform, adapter);
+    }
+
+    return adapter;
   }
 
   /**

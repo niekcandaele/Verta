@@ -85,21 +85,21 @@ export class MessageEmojiReactionRepositoryImpl
     // MySQL doesn't support RETURNING with ON DUPLICATE KEY
     // Insert one by one and collect successful inserts
     const created: MessageEmojiReaction[] = [];
-    
+
     for (const data of insertData) {
       try {
         await this.db
           .insertInto('message_emoji_reactions')
           .values(data)
           .execute();
-        
+
         // If insert succeeded, fetch the created row
         const row = await this.db
           .selectFrom('message_emoji_reactions')
           .selectAll()
           .where('id', '=', data.id)
           .executeTakeFirst();
-        
+
         if (row) {
           created.push(this.mapRowToEntity(row));
         }

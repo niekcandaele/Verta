@@ -35,7 +35,7 @@ export async function createTestDatabase(): Promise<TestDatabaseContext> {
     .start();
 
   // Wait for TiDB to be ready
-  await new Promise(resolve => setTimeout(resolve, 3000));
+  await new Promise((resolve) => setTimeout(resolve, 3000));
 
   // Create database connection
   // Using non-promise mysql2 to fix Kysely/TiDB compatibility issue

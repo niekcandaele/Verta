@@ -4,7 +4,6 @@
 
 import {
   Client,
-  GatewayIntentBits,
   TextChannel,
   ThreadChannel,
   ForumChannel,
@@ -21,121 +20,55 @@ import type {
   PlatformAdapterConfig,
 } from '../types.js';
 import type { PlatformChannel, PlatformMessage } from '../../types/sync.js';
-import { config } from '../../config/env.js';
 import { SyncErrorClassification, classifyError } from '../../types/errors.js';
+import { discordClientManager } from './DiscordClientManager.js';
 
 /**
  * Discord adapter implementation for syncing Discord data
  */
 export class DiscordAdapter implements PlatformAdapter {
-  private client: Client;
-  private initialized = false;
-  private rateLimitMetrics = {
-    encounters: 0,
-    totalDelayMs: 0,
-  };
+  private client: Client | null = null;
 
   constructor(_config?: PlatformAdapterConfig) {
     // Config can be used for future enhancements
-
-    this.client = new Client({
-      intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMessageReactions,
-      ],
-    });
+    // Client is now managed by DiscordClientManager
   }
 
   async initialize(): Promise<void> {
-    if (this.initialized) {
-      return;
+    // Get the shared Discord client from the manager
+    // The manager handles all initialization, login, and rate limit monitoring
+    if (this.client) {
+      return; // Already have a client reference
     }
 
     try {
-      // Set up rate limit monitoring if DEBUG_RATE_LIMITS is enabled
-      if (config.DEBUG_RATE_LIMITS) {
-        this.client.rest.on('rateLimited', (info) => {
-          this.rateLimitMetrics.encounters++;
-          this.rateLimitMetrics.totalDelayMs += info.timeToReset;
-
-          logger.warn('Discord rate limit encountered', {
-            context: 'rate-limit-debug',
-            timeout: info.timeToReset,
-            limit: info.limit,
-            method: info.method,
-            url: info.url,
-            route: info.route,
-            global: info.global,
-            rateLimitMetrics: {
-              totalEncounters: this.rateLimitMetrics.encounters,
-              totalDelayMs: this.rateLimitMetrics.totalDelayMs,
-              averageDelayMs:
-                this.rateLimitMetrics.totalDelayMs /
-                this.rateLimitMetrics.encounters,
-            },
-          });
-        });
-
-        logger.info('Discord rate limit monitoring enabled');
-      }
-
-      await this.client.login(config.DISCORD_BOT_TOKEN);
-      this.initialized = true;
-      logger.info('Discord adapter initialized successfully');
+      // Ensure the global client is initialized
+      await discordClientManager.initialize();
+      this.client = discordClientManager.getClient();
+      logger.debug('Discord adapter using shared client');
     } catch (error) {
-      logger.error('Failed to initialize Discord adapter', { error });
+      logger.error('Failed to get Discord client from manager', { error });
       throw new Error('Failed to initialize Discord adapter');
     }
   }
 
   async cleanup(): Promise<void> {
-    if (!this.initialized) {
-      return;
-    }
-
-    try {
-      // Log final rate limit metrics if monitoring was enabled
-      if (config.DEBUG_RATE_LIMITS && this.rateLimitMetrics.encounters > 0) {
-        logger.info('Discord rate limit summary', {
-          context: 'rate-limit-debug',
-          summary: {
-            totalEncounters: this.rateLimitMetrics.encounters,
-            totalDelayMs: this.rateLimitMetrics.totalDelayMs,
-            averageDelayMs:
-              this.rateLimitMetrics.totalDelayMs /
-              this.rateLimitMetrics.encounters,
-          },
-        });
-      }
-
-      this.client.destroy();
-      this.initialized = false;
-      logger.info('Discord adapter cleaned up successfully');
-    } catch (error) {
-      logger.error('Failed to cleanup Discord adapter', { error });
-      throw new Error('Failed to cleanup Discord adapter');
-    }
+    // Don't destroy the shared client - it's managed globally
+    // Just clear our reference to it
+    this.client = null;
+    logger.debug('Discord adapter cleanup (shared client remains active)');
   }
 
   /**
    * Get current rate limit metrics
    */
   getRateLimitMetrics() {
-    return {
-      encounters: this.rateLimitMetrics.encounters,
-      totalDelayMs: this.rateLimitMetrics.totalDelayMs,
-      averageDelayMs:
-        this.rateLimitMetrics.encounters > 0
-          ? this.rateLimitMetrics.totalDelayMs /
-            this.rateLimitMetrics.encounters
-          : 0,
-    };
+    // Delegate to the client manager for rate limit metrics
+    return discordClientManager.getRateLimitMetrics();
   }
 
   async verifyConnection(platformId: string): Promise<boolean> {
-    if (!this.initialized) {
+    if (!this.client) {
       throw new Error('Discord adapter not initialized');
     }
 
@@ -164,7 +97,7 @@ export class DiscordAdapter implements PlatformAdapter {
   }
 
   async fetchChannels(platformId: string): Promise<PlatformChannel[]> {
-    if (!this.initialized) {
+    if (!this.client) {
       throw new Error('Discord adapter not initialized');
     }
 
@@ -265,7 +198,7 @@ export class DiscordAdapter implements PlatformAdapter {
     channelId: string,
     options?: FetchMessagesOptions
   ): Promise<FetchMessagesResult> {
-    if (!this.initialized) {
+    if (!this.client) {
       throw new Error('Discord adapter not initialized');
     }
 
@@ -395,7 +328,7 @@ export class DiscordAdapter implements PlatformAdapter {
   async getChannelMetadata(
     channelId: string
   ): Promise<Record<string, unknown>> {
-    if (!this.initialized) {
+    if (!this.client) {
       throw new Error('Discord adapter not initialized');
     }
 
@@ -430,7 +363,7 @@ export class DiscordAdapter implements PlatformAdapter {
   async getPlatformMetadata(
     platformId: string
   ): Promise<Record<string, unknown>> {
-    if (!this.initialized) {
+    if (!this.client) {
       throw new Error('Discord adapter not initialized');
     }
 

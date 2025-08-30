@@ -76,10 +76,7 @@ export class SyncProgressRepositoryImpl
 
     // MySQL UPSERT - First try to insert
     try {
-      await this.db
-        .insertInto('sync_progress')
-        .values(insertData)
-        .execute();
+      await this.db.insertInto('sync_progress').values(insertData).execute();
     } catch (error: any) {
       // If duplicate key error, update the existing record
       if (error?.code === 'ER_DUP_ENTRY') {

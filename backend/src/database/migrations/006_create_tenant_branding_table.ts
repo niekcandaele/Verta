@@ -3,9 +3,7 @@ import { Kysely, sql } from 'kysely';
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema
     .createTable('tenant_branding')
-    .addColumn('id', 'varchar(36)', (col) =>
-      col.primaryKey()
-    )
+    .addColumn('id', 'varchar(36)', (col) => col.primaryKey())
     .addColumn('tenant_id', 'varchar(36)', (col) => col.notNull())
     .addColumn('logo', 'text', (col) => col)
     .addColumn('primary_color', 'varchar(7)', (col) =>
@@ -21,7 +19,9 @@ export async function up(db: Kysely<any>): Promise<void> {
       col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`)
     )
     .addColumn('updated_at', 'timestamp', (col) =>
-      col.notNull().defaultTo(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
+      col
+        .notNull()
+        .defaultTo(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
     )
     .execute();
 

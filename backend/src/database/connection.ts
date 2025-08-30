@@ -8,7 +8,9 @@ import logger from '../utils/logger.js';
  */
 export async function testConnection(): Promise<boolean> {
   try {
-    const result = await sql<{ result: number }>`SELECT 1 as result`.execute(db);
+    const result = await sql<{ result: number }>`SELECT 1 as result`.execute(
+      db
+    );
     logger.info('Database connection established', {
       result: result.rows[0].result,
     });

@@ -3,9 +3,15 @@
  */
 
 import type { ServiceResult } from '../types.js';
-import type { Tenant, TenantBranding } from '../../repositories/tenant/types.js';
+import type {
+  Tenant,
+  TenantBranding,
+} from '../../repositories/tenant/types.js';
 import type { Channel, Message } from 'shared-types';
-import type { PaginatedResult, PaginationOptions } from '../../repositories/types.js';
+import type {
+  PaginatedResult,
+  PaginationOptions,
+} from '../../repositories/types.js';
 
 /**
  * Service interface for content delivery via REST API
@@ -38,7 +44,10 @@ export interface ContentService {
    * @param channelId - The channel ID
    * @returns Service result with channel data
    */
-  getChannel(tenantSlug: string, channelId: string): Promise<ServiceResult<Channel>>;
+  getChannel(
+    tenantSlug: string,
+    channelId: string
+  ): Promise<ServiceResult<Channel>>;
 
   /**
    * Get messages for a channel with pagination

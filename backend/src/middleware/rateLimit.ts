@@ -21,9 +21,9 @@ export const apiRateLimiter = rateLimit({
       status: 429,
       type: '/errors/rate-limit-exceeded',
       detail: 'Too many requests from this IP. Please try again later.',
-      instance: req.path
+      instance: req.path,
     });
-  }
+  },
 });
 
 /**
@@ -42,9 +42,9 @@ export const strictRateLimiter = rateLimit({
       status: 429,
       type: '/errors/rate-limit-exceeded',
       detail: 'Too many requests from this IP. Please try again later.',
-      instance: req.path
+      instance: req.path,
     });
-  }
+  },
 });
 
 export default apiRateLimiter;

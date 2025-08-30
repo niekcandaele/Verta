@@ -4,7 +4,7 @@ export async function up(db: Kysely<any>): Promise<void> {
   // MySQL/TiDB doesn't support CHECK constraints in the same way as PostgreSQL
   // The channel type validation will be enforced at the application level
   // This migration just documents the addition of the 'category' type
-  
+
   // Optionally, we could modify the column to be an ENUM, but that's more restrictive
   // For now, we'll just add a comment to document the allowed values
   await sql`

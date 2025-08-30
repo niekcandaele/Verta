@@ -37,9 +37,13 @@ initializeService().catch(console.error);
 /**
  * Middleware to validate and extract tenant slug from header
  */
-function validateTenantHeader(req: Request, _res: Response, next: (err?: any) => void) {
+function validateTenantHeader(
+  req: Request,
+  _res: Response,
+  next: (err?: any) => void
+) {
   const tenantSlug = req.headers['x-tenant-slug'] as string;
-  
+
   if (!tenantSlug) {
     throw new ApiError(
       400,
@@ -47,7 +51,7 @@ function validateTenantHeader(req: Request, _res: Response, next: (err?: any) =>
       'The X-Tenant-Slug header is required for all API requests'
     );
   }
-  
+
   // Attach to request for use in handlers
   (req as any).tenantSlug = tenantSlug;
   next();
@@ -67,19 +71,19 @@ router.get(
   validateTenantHeader,
   asyncHandler(async (req: Request, res: Response) => {
     const tenantSlug = (req as any).tenantSlug;
-    
+
     const result = await contentService.getTenant(tenantSlug);
-    
+
     if (!result.success) {
       if (result.error.type === 'NOT_FOUND') {
         throw new ApiError(404, 'Tenant Not Found', result.error.message);
       }
       throw new ApiError(500, 'Internal Server Error', result.error.message);
     }
-    
+
     res.json({
       data: result.data,
-      meta: {}
+      meta: {},
     });
   })
 );
@@ -93,19 +97,19 @@ router.get(
   validateTenantHeader,
   asyncHandler(async (req: Request, res: Response) => {
     const tenantSlug = (req as any).tenantSlug;
-    
+
     const result = await contentService.getBranding(tenantSlug);
-    
+
     if (!result.success) {
       if (result.error.type === 'NOT_FOUND') {
         throw new ApiError(404, 'Tenant Not Found', result.error.message);
       }
       throw new ApiError(500, 'Internal Server Error', result.error.message);
     }
-    
+
     res.json({
       data: result.data,
-      meta: {}
+      meta: {},
     });
   })
 );
@@ -119,19 +123,19 @@ router.get(
   validateTenantHeader,
   asyncHandler(async (req: Request, res: Response) => {
     const tenantSlug = (req as any).tenantSlug;
-    
+
     const result = await contentService.getChannels(tenantSlug);
-    
+
     if (!result.success) {
       if (result.error.type === 'NOT_FOUND') {
         throw new ApiError(404, 'Tenant Not Found', result.error.message);
       }
       throw new ApiError(500, 'Internal Server Error', result.error.message);
     }
-    
+
     res.json({
       data: result.data,
-      meta: {}
+      meta: {},
     });
   })
 );
@@ -146,19 +150,19 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const tenantSlug = (req as any).tenantSlug;
     const { channelId } = req.params;
-    
+
     const result = await contentService.getChannel(tenantSlug, channelId);
-    
+
     if (!result.success) {
       if (result.error.type === 'NOT_FOUND') {
         throw new ApiError(404, 'Channel Not Found', result.error.message);
       }
       throw new ApiError(500, 'Internal Server Error', result.error.message);
     }
-    
+
     res.json({
       data: result.data,
-      meta: {}
+      meta: {},
     });
   })
 );
@@ -175,25 +179,25 @@ router.get(
     const { channelId } = req.params;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
-    
+
     const result = await contentService.getChannelMessages(
       tenantSlug,
       channelId,
       { page, limit }
     );
-    
+
     if (!result.success) {
       if (result.error.type === 'NOT_FOUND') {
         throw new ApiError(404, 'Channel Not Found', result.error.message);
       }
       throw new ApiError(500, 'Internal Server Error', result.error.message);
     }
-    
+
     const { data: items, pagination: paginationMeta } = result.data;
-    
+
     res.json({
       data: items,
-      meta: paginationMeta
+      meta: paginationMeta,
     });
   })
 );
@@ -210,25 +214,25 @@ router.get(
     const { channelId } = req.params;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
-    
+
     const result = await contentService.getChannelThreads(
       tenantSlug,
       channelId,
       { page, limit }
     );
-    
+
     if (!result.success) {
       if (result.error.type === 'NOT_FOUND') {
         throw new ApiError(404, 'Channel Not Found', result.error.message);
       }
       throw new ApiError(500, 'Internal Server Error', result.error.message);
     }
-    
+
     const { data: items, pagination: paginationMeta } = result.data;
-    
+
     res.json({
       data: items,
-      meta: paginationMeta
+      meta: paginationMeta,
     });
   })
 );
@@ -245,26 +249,26 @@ router.get(
     const { channelId, threadId } = req.params;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
-    
+
     const result = await contentService.getThreadMessages(
       tenantSlug,
       channelId,
       threadId,
       { page, limit }
     );
-    
+
     if (!result.success) {
       if (result.error.type === 'NOT_FOUND') {
         throw new ApiError(404, 'Thread Not Found', result.error.message);
       }
       throw new ApiError(500, 'Internal Server Error', result.error.message);
     }
-    
+
     const { data: items, pagination: paginationMeta } = result.data;
-    
+
     res.json({
       data: items,
-      meta: paginationMeta
+      meta: paginationMeta,
     });
   })
 );

@@ -9,6 +9,7 @@ import {
   ChannelSyncWorker,
 } from './workers/index.js';
 import { syncScheduler } from './scheduler/index.js';
+import { discordClientManager } from './adapters/discord/DiscordClientManager.js';
 
 const PORT = config.PORT;
 
@@ -31,6 +32,13 @@ async function startServer() {
       logger.info('Running database migrations...');
       await migrateToLatest();
       logger.info('Database migrations completed');
+    }
+
+    // Initialize Discord client ONCE for the entire application
+    if (config.NODE_ENV !== 'test') {
+      logger.info('Initializing global Discord client...');
+      await discordClientManager.initialize();
+      logger.info('Global Discord client initialized');
     }
 
     // Start workers and scheduler
@@ -103,6 +111,11 @@ async function startServer() {
             await channelSyncWorker.stop();
             logger.info('Channel sync worker stopped');
           }
+
+          // Cleanup Discord client
+          logger.info('Cleaning up Discord client...');
+          await discordClientManager.cleanup();
+          logger.info('Discord client cleaned up');
 
           // Close database connections
           await closeDatabase();

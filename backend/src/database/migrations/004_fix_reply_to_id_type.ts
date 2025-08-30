@@ -10,7 +10,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     `.execute(db);
   } catch (error: any) {
     // Ignore error if foreign key doesn't exist
-    if (!error.message?.includes("check that column/key exists")) {
+    if (!error.message?.includes('check that column/key exists')) {
       throw error;
     }
   }

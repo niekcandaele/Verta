@@ -4,9 +4,15 @@
 
 import type { ContentService } from './ContentService.js';
 import type { ServiceResult } from '../types.js';
-import type { Tenant, TenantBranding } from '../../repositories/tenant/types.js';
+import type {
+  Tenant,
+  TenantBranding,
+} from '../../repositories/tenant/types.js';
 import type { Channel, Message } from 'shared-types';
-import type { PaginatedResult, PaginationOptions } from '../../repositories/types.js';
+import type {
+  PaginatedResult,
+  PaginationOptions,
+} from '../../repositories/types.js';
 import type { TenantRepository } from '../../repositories/tenant/TenantRepository.js';
 import type { TenantBrandingRepository } from '../../repositories/tenant/TenantBrandingRepository.js';
 import type { ChannelRepositoryImpl } from '../../repositories/sync/ChannelRepository.js';
@@ -60,7 +66,9 @@ export class ContentServiceImpl implements ContentService {
   /**
    * Get tenant branding by slug
    */
-  async getBranding(slug: string): Promise<ServiceResult<TenantBranding | null>> {
+  async getBranding(
+    slug: string
+  ): Promise<ServiceResult<TenantBranding | null>> {
     try {
       // First get the tenant to get its ID
       const tenant = await this.tenantRepository.findBySlug(slug);
@@ -118,7 +126,10 @@ export class ContentServiceImpl implements ContentService {
   /**
    * Get a specific channel
    */
-  async getChannel(tenantSlug: string, channelId: string): Promise<ServiceResult<Channel>> {
+  async getChannel(
+    tenantSlug: string,
+    channelId: string
+  ): Promise<ServiceResult<Channel>> {
     try {
       // First get the tenant to verify access
       const tenant = await this.tenantRepository.findBySlug(tenantSlug);
@@ -196,13 +207,20 @@ export class ContentServiceImpl implements ContentService {
 
       // Convert pagination options to repository format
       const offset = ((pagination.page || 1) - 1) * (pagination.limit || 50);
-      const messages = await this.messageRepository.findByChannel(channelId, {
-        limit: pagination.limit,
-        offset
-      });
+      const messages = await this.messageRepository.findByChannelWithExtras(
+        channelId,
+        {
+          limit: pagination.limit,
+          offset,
+        }
+      );
       return createSuccessResult(messages);
     } catch (error) {
-      logger.error('Failed to get channel messages', { tenantSlug, channelId, error });
+      logger.error('Failed to get channel messages', {
+        tenantSlug,
+        channelId,
+        error,
+      });
       return createErrorResult(
         createServiceError(
           ServiceErrorType.DATABASE_ERROR,
@@ -245,69 +263,88 @@ export class ContentServiceImpl implements ContentService {
 
       // Get thread channels that belong to this forum
       const allThreads = await this.channelRepository.findByParentId(channelId);
-      
+
       // Filter to only thread type channels
-      const threadChannels = allThreads.filter(c => c.type === 'thread');
-      
+      const threadChannels = allThreads.filter((c) => c.type === 'thread');
+
       // Apply pagination
       const offset = ((pagination.page || 1) - 1) * (pagination.limit || 20);
-      const paginatedThreads = threadChannels.slice(offset, offset + (pagination.limit || 20));
-      
+      const paginatedThreads = threadChannels.slice(
+        offset,
+        offset + (pagination.limit || 20)
+      );
+
       // Enrich threads with message data
       const enrichedThreads = await Promise.all(
         paginatedThreads.map(async (thread) => {
           // Get message stats for this thread
-          const messages = await this.messageRepository.findByChannel(thread.id, { limit: 1000 });
-          
+          const messages = await this.messageRepository.findByChannel(
+            thread.id,
+            { limit: 1000 }
+          );
+
           // Parse metadata if it exists
           let metadata: any = {};
           if (thread.metadata) {
             try {
-              metadata = typeof thread.metadata === 'string' 
-                ? JSON.parse(thread.metadata) 
-                : thread.metadata;
+              metadata =
+                typeof thread.metadata === 'string'
+                  ? JSON.parse(thread.metadata)
+                  : thread.metadata;
             } catch (e) {
-              logger.warn('Failed to parse thread metadata', { threadId: thread.id, error: e });
+              logger.warn('Failed to parse thread metadata', {
+                threadId: thread.id,
+                error: e,
+              });
             }
           }
-          
+
           // Find first and last message
           const firstMessage = messages.data[0];
           const lastMessage = messages.data[messages.data.length - 1];
-          
+
           // Create enriched thread object
           const enrichedThread: any = {
             ...thread,
             messageCount: messages.pagination.total,
-            lastActivity: lastMessage?.platformCreatedAt || metadata.createdTimestamp || thread.createdAt,
+            lastActivity:
+              lastMessage?.platformCreatedAt ||
+              metadata.createdTimestamp ||
+              thread.createdAt,
             archived: metadata.archived || false,
-            locked: metadata.locked || false
+            locked: metadata.locked || false,
           };
-          
+
           // Add first message if it exists
           if (firstMessage && firstMessage.content) {
             enrichedThread.firstMessage = {
-              content: firstMessage.content
+              content: firstMessage.content,
             };
           }
-          
+
           return enrichedThread;
         })
       );
-      
+
       const result: PaginatedResult<any> = {
         data: enrichedThreads,
         pagination: {
           page: pagination.page || 1,
           limit: pagination.limit || 20,
           total: threadChannels.length,
-          totalPages: Math.ceil(threadChannels.length / (pagination.limit || 20))
-        }
+          totalPages: Math.ceil(
+            threadChannels.length / (pagination.limit || 20)
+          ),
+        },
       };
-      
+
       return createSuccessResult(result);
     } catch (error) {
-      logger.error('Failed to get channel threads', { tenantSlug, channelId, error });
+      logger.error('Failed to get channel threads', {
+        tenantSlug,
+        channelId,
+        error,
+      });
       return createErrorResult(
         createServiceError(
           ServiceErrorType.DATABASE_ERROR,
@@ -352,13 +389,21 @@ export class ContentServiceImpl implements ContentService {
       // For now, return messages from the channel filtered by thread
       // TODO: Implement proper thread message filtering when repository supports it
       const offset = ((pagination.page || 1) - 1) * (pagination.limit || 50);
-      const messages = await this.messageRepository.findByChannel(channelId, {
-        limit: pagination.limit,
-        offset
-      });
+      const messages = await this.messageRepository.findByChannelWithExtras(
+        channelId,
+        {
+          limit: pagination.limit,
+          offset,
+        }
+      );
       return createSuccessResult(messages);
     } catch (error) {
-      logger.error('Failed to get thread messages', { tenantSlug, channelId, threadId, error });
+      logger.error('Failed to get thread messages', {
+        tenantSlug,
+        channelId,
+        threadId,
+        error,
+      });
       return createErrorResult(
         createServiceError(
           ServiceErrorType.DATABASE_ERROR,

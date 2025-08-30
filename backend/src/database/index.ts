@@ -9,7 +9,7 @@ import type { Database } from './types.js';
 const createConnectionPool = () => {
   // Parse the DATABASE_URL to extract connection details
   const url = new URL(config.DATABASE_URL);
-  
+
   // Using non-promise mysql2 to fix Kysely/TiDB compatibility issue
   return mysql.createPool({
     host: url.hostname,
