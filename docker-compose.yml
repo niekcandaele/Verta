@@ -101,6 +101,29 @@ services:
     command: npm run dev
     restart: unless-stopped
 
+  ml-service:
+    build:
+      context: ./python-ml-service
+    container_name: verta-ml-service
+    ports:
+      - '8000:8000'
+    volumes:
+      - ./python-ml-service:/app
+    environment:
+      - ML_SERVICE_DEBUG=${ML_SERVICE_DEBUG:-false}
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+      - ML_SERVICE_LLM_API_KEY=${LLM_API_KEY}
+      - ML_SERVICE_WORKERS=1
+      - ML_SERVICE_MODEL_CACHE_DIR=/models
+    mem_limit: 4g
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    restart: unless-stopped
+
 volumes:
   tidb_data:
   redis_data:
