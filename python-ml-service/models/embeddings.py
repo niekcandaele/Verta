@@ -22,7 +22,7 @@ class EmbeddingModel:
         self.model = None
         self.device = "cpu"  # CPU-only as specified
         self.loaded = False
-        self.embedding_dimension = 768  # BGE-M3 default dimension
+        self.embedding_dimension = 1024  # BGE-M3 default dimension
         
     def load(self) -> None:
         """
