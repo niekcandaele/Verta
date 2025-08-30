@@ -112,7 +112,7 @@ services:
     environment:
       - ML_SERVICE_DEBUG=${ML_SERVICE_DEBUG:-false}
       - ADMIN_API_KEY=${ADMIN_API_KEY}
-      - ML_SERVICE_LLM_API_KEY=${LLM_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - ML_SERVICE_WORKERS=1
       - ML_SERVICE_MODEL_CACHE_DIR=/models
     mem_limit: 4g

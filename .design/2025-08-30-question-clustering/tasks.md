@@ -121,38 +121,38 @@ Building an ML-powered question clustering system that identifies, rephrases, an
 **Demo**: "At standup, I can show: Node.js calling Python service and rephrasing multi-part questions via LLM"
 
 ### Tasks
-- [ ] Task 4.1: Create ML client service
+- [x] Task 4.1: Create ML client service
   - **Output**: TypeScript service for ML communication
   - **Files**: `backend/src/services/MlClientService.ts`
   - **Verify**: Service methods have proper types
 
-- [ ] Task 4.2: Implement retry logic and circuit breaker
+- [x] Task 4.2: Implement retry logic and circuit breaker
   - **Depends on**: 4.1
   - **Output**: Resilient HTTP client with exponential backoff
   - **Files**: Update `backend/src/services/MlClientService.ts`
   - **Verify**: Handles service downtime gracefully
 
-- [ ] Task 4.3: Add LLM rephrase endpoint to Python service
+- [x] Task 4.3: Add LLM rephrase endpoint to Python service
   - **Output**: `/api/ml/rephrase` endpoint calling Gemini Flash
   - **Files**: `python-ml-service/endpoints/rephrase.py`, `python-ml-service/services/llm.py`
   - **Verify**: Multi-message arrays get coherent rephrasing
 
-- [ ] Task 4.4: Create question processing service
+- [x] Task 4.4: Create question processing service
   - **Depends on**: 4.1, 4.3
   - **Output**: Service orchestrating the ML pipeline
   - **Files**: `backend/src/services/QuestionProcessingService.ts`
   - **Verify**: Can process a message through full pipeline
 
-- [ ] Task 4.5: Add environment configuration
+- [x] Task 4.5: Add environment configuration
   - **Output**: All ML-related env vars configured
   - **Files**: `.env.example`, `backend/src/config/ml.ts`
   - **Verify**: Config loads from environment
 
 ### Phase 4 Checkpoint
-- [ ] Test ML client: Successfully calls all Python endpoints
-- [ ] Test LLM integration: Rephrases multi-part questions
-- [ ] Run lint: `npm run lint`
-- [ ] **Demo ready**: Show end-to-end question processing pipeline
+- [x] Test ML client: Successfully calls all Python endpoints
+- [x] Test LLM integration: Rephrases multi-part questions
+- [x] Run lint: `npm run lint`
+- [x] **Demo ready**: Show end-to-end question processing pipeline
 
 ## Phase 5: Analysis Worker & Queue Integration
 **Goal**: Create background worker for processing messages through ML pipeline

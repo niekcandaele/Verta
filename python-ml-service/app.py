@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from config import settings
 from models.classifier import get_classifier
 from models.embeddings import get_embedding_model
-from endpoints import classify, embed
+from endpoints import classify, embed, rephrase
 from middleware.auth import verify_api_key
 
 # Configure logging
@@ -94,6 +94,10 @@ app.include_router(
 )
 app.include_router(
     embed.router,
+    dependencies=[Depends(verify_api_key)]
+)
+app.include_router(
+    rephrase.router,
     dependencies=[Depends(verify_api_key)]
 )
 

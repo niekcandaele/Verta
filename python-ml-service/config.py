@@ -22,10 +22,9 @@ class Settings(BaseSettings):
     question_classifier_model: str = "shahrukhx01/question-vs-statement-classifier"
     embedding_model: str = "BAAI/bge-m3"
     
-    # LLM configuration
-    llm_api_url: str = "https://openrouter.ai/api/v1"
-    llm_model: str = "google/gemini-2.0-flash-001"
-    llm_api_key: Optional[str] = None
+    # OpenRouter configuration for LLM
+    openrouter_api_key: Optional[str] = os.getenv("OPENROUTER_API_KEY")
+    openrouter_model: str = "google/gemini-2.0-flash-thinking-exp-1219"
     
     # Clustering configuration
     similarity_threshold: float = 0.85
