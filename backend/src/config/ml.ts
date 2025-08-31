@@ -4,9 +4,10 @@ const mlConfigSchema = z.object({
   // ML Service Configuration
   mlServiceUrl: z.string().url().default('http://ml-service:8000'),
   mlServiceApiKey: z.string().min(1),
-  mlServiceTimeout: z.number().positive().default(30000),
+  mlServiceTimeout: z.number().positive().default(120000), // Increased from 30s to 2 minutes
+  mlServiceOcrTimeout: z.number().positive().default(300000), // 5 minutes for OCR
   mlServiceMaxRetries: z.number().positive().default(3),
-  mlServiceRetryDelay: z.number().positive().default(1000),
+  mlServiceRetryDelay: z.number().positive().default(5000), // Increased from 1s to 5s
 
   // Gemini API Configuration
   geminiApiKey: z.string().optional(),
@@ -43,13 +44,14 @@ export function loadMlConfig(): MlConfig {
     // ML Service
     mlServiceUrl: process.env.ML_SERVICE_URL || 'http://ml-service:8000',
     mlServiceApiKey: process.env.ADMIN_API_KEY,
-    mlServiceTimeout: parseInt(process.env.ML_SERVICE_TIMEOUT || '30000', 10),
+    mlServiceTimeout: parseInt(process.env.ML_SERVICE_TIMEOUT || '120000', 10),
+    mlServiceOcrTimeout: parseInt(process.env.ML_SERVICE_OCR_TIMEOUT || '300000', 10),
     mlServiceMaxRetries: parseInt(
       process.env.ML_SERVICE_MAX_RETRIES || '3',
       10
     ),
     mlServiceRetryDelay: parseInt(
-      process.env.ML_SERVICE_RETRY_DELAY || '1000',
+      process.env.ML_SERVICE_RETRY_DELAY || '5000',
       10
     ),
 

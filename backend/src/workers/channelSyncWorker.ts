@@ -25,6 +25,7 @@ import {
 import { anonymizeUserId } from '../utils/crypto.js';
 import type { PlatformMessage, ChannelSyncState } from '../types/sync.js';
 import type { Platform } from '../database/types.js';
+import { addOcrJobsBatch } from '../queues/ocrQueue.js';
 
 /**
  * Channel sync worker implementation
@@ -323,7 +324,7 @@ export class ChannelSyncWorker {
   private async processMessageBatch(
     messages: PlatformMessage[],
     channelId: string,
-    _tenantId: string
+    tenantId: string
   ): Promise<number> {
     if (messages.length === 0) return 0;
 
@@ -405,7 +406,41 @@ export class ChannelSyncWorker {
             })
           );
 
-          await this.attachmentRepo.bulkCreate(attachmentData);
+          const createdAttachments = await this.attachmentRepo.bulkCreate(attachmentData);
+
+          // Queue OCR jobs for image attachments
+          const imageAttachments = createdAttachments.filter((_attachment, index) => {
+            const contentType = platformMessage.attachments![index].contentType;
+            return this.isImageContentType(contentType);
+          });
+
+          if (imageAttachments.length > 0) {
+            const ocrJobs = imageAttachments.map((attachment) => ({
+              data: {
+                tenantId: tenantId,
+                messageId: createdMessage.id,
+                attachmentId: attachment.id,
+                attachmentUrl: platformMessage.attachments![
+                  attachmentData.findIndex(a => a.messageId === attachment.messageId && a.filename === attachment.filename)
+                ].url,
+                attachmentFilename: attachment.filename,
+              },
+            }));
+
+            try {
+              const jobIds = await addOcrJobsBatch(ocrJobs);
+              logger.debug('Queued OCR jobs for image attachments', {
+                messageId: createdMessage.id,
+                attachmentCount: imageAttachments.length,
+                jobIds,
+              });
+            } catch (error) {
+              logger.error('Failed to queue OCR jobs', {
+                messageId: createdMessage.id,
+                error,
+              });
+            }
+          }
         }
       }
     }
@@ -468,6 +503,26 @@ export class ChannelSyncWorker {
     }
 
     return adapter;
+  }
+
+  /**
+   * Check if content type is an image that should be processed with OCR
+   */
+  private isImageContentType(contentType: string): boolean {
+    const imageTypes = [
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/gif',
+      'image/webp',
+      'image/bmp',
+      'image/tiff',
+      'image/svg+xml',
+    ];
+    
+    // Check exact match or starts with image/
+    return imageTypes.includes(contentType.toLowerCase()) || 
+           contentType.toLowerCase().startsWith('image/');
   }
 
   /**

@@ -16,6 +16,7 @@ export interface ProcessingOptions {
 export interface ProcessingResult {
   messagesProcessed: number;
   questionsIdentified: number;
+  questionsFromOcr: number;
   clustersCreated: number;
   clustersUpdated: number;
   errors: Array<{ messageId: string; error: string }>;
@@ -61,6 +62,7 @@ export class QuestionProcessingService {
     const result: ProcessingResult = {
       messagesProcessed: 0,
       questionsIdentified: 0,
+      questionsFromOcr: 0,
       clustersCreated: 0,
       clustersUpdated: 0,
       errors: [],
@@ -96,6 +98,72 @@ export class QuestionProcessingService {
   }
 
   /**
+   * Fetch OCR results for messages with attachments
+   */
+  private async fetchOcrResultsForMessages(
+    messages: Message[]
+  ): Promise<Map<string, string>> {
+    const ocrTextMap = new Map<string, string>();
+    
+    try {
+      // Get all message IDs
+      const messageIds = messages.map(m => m.id);
+      
+      // Fetch OCR results for these messages
+      const ocrResults = await this.db
+        .selectFrom('ocr_results')
+        .innerJoin('message_attachments', 'message_attachments.id', 'ocr_results.attachment_id')
+        .select([
+          'message_attachments.message_id',
+          'ocr_results.extracted_text',
+          'ocr_results.status'
+        ])
+        .where('message_attachments.message_id', 'in', messageIds)
+        .where('ocr_results.status', '=', 'completed')
+        .execute();
+      
+      // Aggregate OCR text by message ID
+      for (const result of ocrResults) {
+        if (result.extracted_text) {
+          const existing = ocrTextMap.get(result.message_id) || '';
+          // Append OCR text with a separator if there are multiple attachments
+          ocrTextMap.set(
+            result.message_id,
+            existing ? `${existing}\n\n[Image Description]:\n${result.extracted_text}` : result.extracted_text
+          );
+        }
+      }
+      
+      logger.debug(`Fetched OCR results for ${ocrTextMap.size} messages`);
+    } catch (error) {
+      logger.error('Failed to fetch OCR results', error);
+    }
+    
+    return ocrTextMap;
+  }
+
+  /**
+   * Combine message content with OCR text
+   */
+  private combineMessageWithOcr(
+    message: Message,
+    ocrText: string | undefined
+  ): string {
+    if (!ocrText) {
+      return message.content;
+    }
+    
+    // Combine message text with OCR text
+    // If message has no text content (just an image), use only OCR text
+    if (!message.content || message.content.trim() === '') {
+      return ocrText;
+    }
+    
+    // Otherwise combine both
+    return `${message.content}\n\n[Image Content]:\n${ocrText}`;
+  }
+
+  /**
    * Process a single chunk of messages
    */
   private async processChunk(
@@ -108,18 +176,49 @@ export class QuestionProcessingService {
     },
     result: ProcessingResult
   ): Promise<void> {
-    // Step 1: Classify messages in batch
-    const texts = messages.map((m) => m.content);
+    // Step 1: Fetch OCR results for messages with attachments
+    const ocrTextMap = await this.fetchOcrResultsForMessages(messages);
+    
+    // Step 2: Combine message content with OCR text
+    const texts = messages.map((m) => {
+      const ocrText = ocrTextMap.get(m.id);
+      return this.combineMessageWithOcr(m, ocrText);
+    });
+    
+    // Step 3: Classify messages in batch
     const classifications = await this.mlClient.classifyBatch(texts);
 
-    // Step 2: Filter questions
+    // Step 4: Filter questions and track OCR contributions
     const questions: Message[] = [];
     const questionIndices: number[] = [];
+    const questionTexts: string[] = [];
+    let ocrQuestionCount = 0;
 
     classifications.forEach((classification, index) => {
       if (classification.is_question && classification.confidence >= 0.6) {
-        questions.push(messages[index]);
+        const message = messages[index];
+        questions.push(message);
         questionIndices.push(index);
+        questionTexts.push(texts[index]); // Use combined text
+        
+        // Track if this question was identified with OCR help
+        const hasOcrText = ocrTextMap.has(message.id);
+        if (hasOcrText) {
+          // Check if the message wouldn't be a question without OCR
+          if (!message.content || message.content.trim() === '') {
+            // Message only has image content
+            ocrQuestionCount++;
+            logger.debug(`Question identified from OCR only: ${message.id}`);
+          } else {
+            // Check if original text alone would be classified as question
+            this.mlClient.classify(message.content).then((originalClassification) => {
+              if (!originalClassification.is_question || originalClassification.confidence < 0.6) {
+                ocrQuestionCount++;
+                logger.debug(`Question identified with OCR help: ${message.id}`);
+              }
+            }).catch(() => {}); // Non-blocking check
+          }
+        }
       }
     });
 
@@ -128,17 +227,18 @@ export class QuestionProcessingService {
       return;
     }
 
-    logger.debug(`Identified ${questions.length} questions in chunk`);
+    logger.debug(`Identified ${questions.length} questions in chunk (${ocrQuestionCount} with OCR help)`);
     result.questionsIdentified += questions.length;
+    result.questionsFromOcr += ocrQuestionCount;
 
-    // Step 3: Generate embeddings for questions
-    const questionTexts = questions.map((q) => q.content);
+    // Step 5: Generate embeddings for questions (using combined text)
     const embeddings = await this.mlClient.embedBatch(questionTexts);
 
-    // Step 4: Process each question
+    // Step 6: Process each question
     for (let i = 0; i < questions.length; i++) {
       const message = questions[i];
       const embedding = embeddings[i].embedding;
+      const combinedText = questionTexts[i]; // Use combined text with OCR
 
       try {
         // Check if already processed
@@ -182,6 +282,7 @@ export class QuestionProcessingService {
 
             if (context.contextMessages.length > 0) {
               try {
+                // Include OCR text in rephrasing context
                 const rephraseResult = await this.mlClient.rephrase({
                   messages: [
                     ...context.contextMessages.map((m) => ({
@@ -190,7 +291,7 @@ export class QuestionProcessingService {
                       timestamp: m.platform_created_at.toISOString(),
                     })),
                     {
-                      text: message.content,
+                      text: combinedText, // Use combined text for rephrasing
                       author_id: message.anonymized_author_id,
                       timestamp: message.platform_created_at.toISOString(),
                     },
@@ -206,11 +307,11 @@ export class QuestionProcessingService {
             }
           }
 
-          // Create new cluster
+          // Create new cluster using combined text as representative
           await this.clusterRepo.create({
             id: clusterId,
             tenant_id: tenantId,
-            representative_text: rephrased || message.content,
+            representative_text: rephrased || combinedText, // Use combined text
             embedding,
             instance_count: 1,
             first_seen_at: message.platform_created_at,
@@ -218,19 +319,20 @@ export class QuestionProcessingService {
             metadata: {
               original_message_id: message.id,
               channel_id: message.channel_id,
+              has_ocr_content: ocrTextMap.has(message.id),
             },
           });
           result.clustersCreated++;
           logger.debug(`Created new cluster ${clusterId}`);
         }
 
-        // Create question instance
+        // Create question instance with combined text
         await this.instanceRepo.create({
           cluster_id: clusterId,
           thread_id: message.id,
-          original_text: message.content,
+          original_text: combinedText, // Store combined text
           rephrased_text: rephrased,
-          confidence_score: classifications[i].confidence,
+          confidence_score: classifications[questionIndices.indexOf(i)].confidence,
         });
       } catch (error) {
         logger.error(`Failed to process message ${message.id}`, error);
@@ -292,20 +394,28 @@ export class QuestionProcessingService {
     isQuestion: boolean;
     clusterId?: string;
     confidence: number;
+    hasOcrContent?: boolean;
   }> {
     try {
-      // Classify the message
-      const classification = await this.mlClient.classify(message.content);
+      // Fetch OCR results for this message
+      const ocrTextMap = await this.fetchOcrResultsForMessages([message]);
+      const ocrText = ocrTextMap.get(message.id);
+      const combinedText = this.combineMessageWithOcr(message, ocrText);
+      const hasOcrContent = !!ocrText;
+      
+      // Classify the combined text
+      const classification = await this.mlClient.classify(combinedText);
 
       if (!classification.is_question || classification.confidence < 0.6) {
         return {
           isQuestion: false,
           confidence: classification.confidence,
+          hasOcrContent,
         };
       }
 
-      // Generate embedding
-      const embeddingResult = await this.mlClient.embed(message.content);
+      // Generate embedding for combined text
+      const embeddingResult = await this.mlClient.embed(combinedText);
 
       // Find or create cluster
       const similarCluster = await this.clusterRepo.findMostSimilarCluster(
@@ -328,7 +438,7 @@ export class QuestionProcessingService {
         await this.clusterRepo.create({
           id: clusterId,
           tenant_id: tenantId,
-          representative_text: message.content,
+          representative_text: combinedText,
           embedding: embeddingResult.embedding,
           instance_count: 1,
           first_seen_at: message.platform_created_at,
@@ -336,6 +446,7 @@ export class QuestionProcessingService {
           metadata: {
             original_message_id: message.id,
             channel_id: message.channel_id,
+            has_ocr_content: hasOcrContent,
           },
         });
       }
@@ -344,14 +455,20 @@ export class QuestionProcessingService {
       await this.instanceRepo.create({
         cluster_id: clusterId,
         thread_id: message.id,
-        original_text: message.content,
+        original_text: combinedText,
         confidence_score: classification.confidence,
       });
+      
+      // Log if OCR helped identify this question
+      if (hasOcrContent && (!message.content || message.content.trim() === '')) {
+        logger.info(`Question identified from OCR only: ${message.id}`);
+      }
 
       return {
         isQuestion: true,
         clusterId,
         confidence: classification.confidence,
+        hasOcrContent,
       };
     } catch (error) {
       logger.error(`Failed to process single message ${message.id}`, error);

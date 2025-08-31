@@ -11,3 +11,7 @@ sentence-transformers==2.2.2
 numpy==1.24.3
 # For LLM integration (Phase 4) - Using OpenRouter via LiteLLM
 litellm==1.35.0
+# Image processing
+Pillow==10.1.0
+# For async HTTP requests to OpenRouter
+aiohttp==3.9.1

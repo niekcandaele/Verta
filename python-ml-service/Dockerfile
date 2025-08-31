@@ -36,10 +36,6 @@ ENV PYTHONUNBUFFERED=1
 ENV ML_SERVICE_HOST=0.0.0.0
 ENV ML_SERVICE_PORT=8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
 # Expose port
 EXPOSE 8000
 
