@@ -79,3 +79,6 @@ tsconfig.tsbuildinfo
 
 # Data directories
 _data/
+
+# MCP configuration (contains local settings)
+.mcp.json

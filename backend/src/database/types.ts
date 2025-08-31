@@ -7,6 +7,16 @@ import type {
 } from 'kysely';
 
 /**
+ * Custom type for TiDB vector columns
+ * Vectors are stored as JSON arrays of numbers in TiDB
+ */
+export type VectorColumn = ColumnType<
+  number[],
+  string | number[],
+  string | number[]
+>;
+
+/**
  * Database table types for multi-tenant system
  */
 
@@ -159,6 +169,61 @@ export interface TenantBrandingTable {
 }
 
 /**
+ * Database table schema for question clusters
+ */
+export interface QuestionClustersTable {
+  id: Generated<string>;
+  tenant_id: string;
+  representative_text: string;
+  thread_title: string | null;
+  embedding: VectorColumn;
+  instance_count: ColumnType<number, number | undefined, number>;
+  first_seen_at: ColumnType<Date, Date | string, Date | string>;
+  last_seen_at: ColumnType<Date, Date | string, Date | string>;
+  metadata: ColumnType<unknown, unknown | undefined, unknown>;
+  created_at: ColumnType<Date, string | undefined, never>;
+  updated_at: ColumnType<Date, string | undefined, string>;
+}
+
+/**
+ * Database table schema for question instances
+ */
+export interface QuestionInstancesTable {
+  id: Generated<string>;
+  cluster_id: string;
+  thread_id: string;
+  thread_title: string | null;
+  original_text: string;
+  rephrased_text: string | null;
+  confidence_score: ColumnType<number, number, number>;
+  created_at: ColumnType<Date, string | undefined, never>;
+}
+
+/**
+ * Database table schema for analysis jobs
+ */
+export interface AnalysisJobsTable {
+  id: Generated<string>;
+  tenant_id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  job_type: ColumnType<string, string | undefined, string>;
+  parameters: ColumnType<unknown, unknown | undefined, unknown>;
+  progress: ColumnType<number, number | undefined, number>;
+  total_items: ColumnType<number, number | undefined, number>;
+  processed_items: ColumnType<number, number | undefined, number>;
+  thread_min_age_days: ColumnType<number, number | undefined, number>;
+  error_details: ColumnType<unknown, unknown | undefined, unknown>;
+  started_at: ColumnType<Date | null, Date | string | undefined, Date | string>;
+  completed_at: ColumnType<
+    Date | null,
+    Date | string | undefined,
+    Date | string
+  >;
+  created_at: ColumnType<Date, string | undefined, never>;
+  updated_at: ColumnType<Date, string | undefined, string>;
+}
+
+/**
  * Database schema interface
  */
 export interface Database {
@@ -170,6 +235,9 @@ export interface Database {
   sync_progress: SyncProgressTable;
   channel_sync_jobs: ChannelSyncJobsTable;
   tenant_branding: TenantBrandingTable;
+  question_clusters: QuestionClustersTable;
+  question_instances: QuestionInstancesTable;
+  analysis_jobs: AnalysisJobsTable;
 }
 
 /**
@@ -218,3 +286,24 @@ export type SyncProgressUpdate = Updateable<SyncProgressTable>;
 export type TenantBranding = Selectable<TenantBrandingTable>;
 export type NewTenantBranding = Insertable<TenantBrandingTable>;
 export type TenantBrandingUpdate = Updateable<TenantBrandingTable>;
+
+/**
+ * Type helpers for working with question cluster records
+ */
+export type QuestionCluster = Selectable<QuestionClustersTable>;
+export type NewQuestionCluster = Insertable<QuestionClustersTable>;
+export type QuestionClusterUpdate = Updateable<QuestionClustersTable>;
+
+/**
+ * Type helpers for working with question instance records
+ */
+export type QuestionInstance = Selectable<QuestionInstancesTable>;
+export type NewQuestionInstance = Insertable<QuestionInstancesTable>;
+export type QuestionInstanceUpdate = Updateable<QuestionInstancesTable>;
+
+/**
+ * Type helpers for working with analysis job records
+ */
+export type AnalysisJob = Selectable<AnalysisJobsTable>;
+export type NewAnalysisJob = Insertable<AnalysisJobsTable>;
+export type AnalysisJobUpdate = Updateable<AnalysisJobsTable>;
