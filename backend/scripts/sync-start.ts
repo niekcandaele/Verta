@@ -3,7 +3,14 @@
 import axios from 'axios';
 
 const API_BASE = process.env.API_BASE || 'http://localhost:25000/api';
-const API_KEY = process.env.API_KEY || 'ikbeneenaap';
+const API_KEY = process.env.API_KEY || process.env.ADMIN_API_KEY;
+
+if (!API_KEY) {
+  console.error(
+    'Error: API_KEY or ADMIN_API_KEY environment variable is required'
+  );
+  process.exit(1);
+}
 
 // Parse command line arguments
 const args = process.argv.slice(2);

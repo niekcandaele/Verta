@@ -145,15 +145,21 @@ export class MlClientService {
           cb.halfOpenAttempts = 0;
           logger.info('Circuit breaker transitioned to HALF_OPEN');
         } else {
-          throw new Error('Circuit breaker is OPEN - ML service is unavailable');
+          throw new Error(
+            'Circuit breaker is OPEN - ML service is unavailable'
+          );
         }
         break;
       case CircuitState.HALF_OPEN:
         if (cb.halfOpenAttempts >= cb.config.halfOpenMaxAttempts) {
           cb.state = CircuitState.OPEN;
           cb.lastFailureTime = now;
-          logger.warn('Circuit breaker returned to OPEN after max half-open attempts');
-          throw new Error('Circuit breaker is OPEN - ML service is unavailable');
+          logger.warn(
+            'Circuit breaker returned to OPEN after max half-open attempts'
+          );
+          throw new Error(
+            'Circuit breaker is OPEN - ML service is unavailable'
+          );
         }
         cb.halfOpenAttempts++;
         break;
@@ -186,7 +192,9 @@ export class MlClientService {
       logger.warn('Circuit breaker transitioned to OPEN from HALF_OPEN');
     } else if (cb.failureCount >= cb.config.failureThreshold) {
       cb.state = CircuitState.OPEN;
-      logger.warn('Circuit breaker transitioned to OPEN after reaching failure threshold');
+      logger.warn(
+        'Circuit breaker transitioned to OPEN after reaching failure threshold'
+      );
     }
   }
 
@@ -200,7 +208,7 @@ export class MlClientService {
     this.checkCircuitBreaker();
 
     let lastError: Error | undefined;
-    
+
     for (let attempt = 1; attempt <= this.config.maxRetries; attempt++) {
       try {
         const result = await operation();
@@ -208,13 +216,21 @@ export class MlClientService {
         return result;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        
+
         // Don't retry on client errors (4xx)
-        if (axios.isAxiosError(error) && error.response?.status && error.response.status >= 400 && error.response.status < 500) {
-          logger.warn(`${operationName} failed with client error, not retrying`, {
-            status: error.response.status,
-            attempt,
-          });
+        if (
+          axios.isAxiosError(error) &&
+          error.response?.status &&
+          error.response.status >= 400 &&
+          error.response.status < 500
+        ) {
+          logger.warn(
+            `${operationName} failed with client error, not retrying`,
+            {
+              status: error.response.status,
+              attempt,
+            }
+          );
           this.recordFailure();
           throw error;
         }
@@ -226,7 +242,7 @@ export class MlClientService {
             maxRetries: this.config.maxRetries,
             error: this.getErrorMessage(error),
           });
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise((resolve) => setTimeout(resolve, delay));
         } else {
           logger.error(`${operationName} failed after all retries`, {
             attempts: this.config.maxRetries,
@@ -237,87 +253,76 @@ export class MlClientService {
       }
     }
 
-    throw lastError || new Error(`${operationName} failed after ${this.config.maxRetries} attempts`);
+    throw (
+      lastError ||
+      new Error(
+        `${operationName} failed after ${this.config.maxRetries} attempts`
+      )
+    );
   }
 
   /**
    * Classify text as question or statement
    */
   async classify(text: string): Promise<ClassificationResult> {
-    return this.executeWithRetry(
-      async () => {
-        const response = await this.client.post<ClassificationResult>(
-          '/api/ml/classify',
-          { text }
-        );
-        return response.data;
-      },
-      'Classification'
-    );
+    return this.executeWithRetry(async () => {
+      const response = await this.client.post<ClassificationResult>(
+        '/api/ml/classify',
+        { text }
+      );
+      return response.data;
+    }, 'Classification');
   }
 
   /**
    * Classify multiple texts in batch
    */
   async classifyBatch(texts: string[]): Promise<ClassificationResult[]> {
-    return this.executeWithRetry(
-      async () => {
-        const response = await this.client.post<{ results: ClassificationResult[] }>(
-          '/api/ml/classify/batch',
-          { texts }
-        );
-        return response.data.results;
-      },
-      'Batch classification'
-    );
+    return this.executeWithRetry(async () => {
+      const response = await this.client.post<{
+        results: ClassificationResult[];
+      }>('/api/ml/classify/batch', { texts });
+      return response.data.results;
+    }, 'Batch classification');
   }
 
   /**
    * Generate embedding for text
    */
   async embed(text: string): Promise<EmbeddingResult> {
-    return this.executeWithRetry(
-      async () => {
-        const response = await this.client.post<EmbeddingResult>(
-          '/api/ml/embed',
-          { text }
-        );
-        return response.data;
-      },
-      'Embedding generation'
-    );
+    return this.executeWithRetry(async () => {
+      const response = await this.client.post<EmbeddingResult>(
+        '/api/ml/embed',
+        { text }
+      );
+      return response.data;
+    }, 'Embedding generation');
   }
 
   /**
    * Generate embeddings for multiple texts
    */
   async embedBatch(texts: string[]): Promise<EmbeddingResult[]> {
-    return this.executeWithRetry(
-      async () => {
-        const response = await this.client.post<{ results: EmbeddingResult[] }>(
-          '/api/ml/embed/batch',
-          { texts }
-        );
-        return response.data.results;
-      },
-      'Batch embedding'
-    );
+    return this.executeWithRetry(async () => {
+      const response = await this.client.post<{ results: EmbeddingResult[] }>(
+        '/api/ml/embed/batch',
+        { texts }
+      );
+      return response.data.results;
+    }, 'Batch embedding');
   }
 
   /**
    * Rephrase multi-part questions using LLM
    */
   async rephrase(request: RephraseRequest): Promise<RephraseResult> {
-    return this.executeWithRetry(
-      async () => {
-        const response = await this.client.post<RephraseResult>(
-          '/api/ml/rephrase',
-          request
-        );
-        return response.data;
-      },
-      'Rephrasing'
-    );
+    return this.executeWithRetry(async () => {
+      const response = await this.client.post<RephraseResult>(
+        '/api/ml/rephrase',
+        request
+      );
+      return response.data;
+    }, 'Rephrasing');
   }
 
   /**
@@ -363,9 +368,12 @@ export class MlClientService {
   /**
    * Wait for ML service to be ready
    */
-  async waitForReady(maxAttempts: number = 30, delayMs: number = 2000): Promise<void> {
+  async waitForReady(
+    maxAttempts: number = 30,
+    delayMs: number = 2000
+  ): Promise<void> {
     logger.info('Waiting for ML service to be ready...');
-    
+
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const health = await this.healthCheck();
@@ -373,16 +381,20 @@ export class MlClientService {
           logger.info('ML service is ready', { version: health.version });
           return;
         }
-        logger.debug(`ML service not ready yet (attempt ${attempt}/${maxAttempts})`);
-      } catch (_error) {
-        logger.debug(`ML service health check failed (attempt ${attempt}/${maxAttempts})`);
+        logger.debug(
+          `ML service not ready yet (attempt ${attempt}/${maxAttempts})`
+        );
+      } catch {
+        logger.debug(
+          `ML service health check failed (attempt ${attempt}/${maxAttempts})`
+        );
       }
-      
+
       if (attempt < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
-    
+
     throw new Error('ML service failed to become ready');
   }
 }

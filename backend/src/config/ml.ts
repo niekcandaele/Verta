@@ -35,13 +35,23 @@ const mlConfigSchema = z.object({
 export type MlConfig = z.infer<typeof mlConfigSchema>;
 
 export function loadMlConfig(): MlConfig {
+  if (!process.env.ADMIN_API_KEY) {
+    throw new Error('ADMIN_API_KEY environment variable is required');
+  }
+
   const config = {
     // ML Service
     mlServiceUrl: process.env.ML_SERVICE_URL || 'http://ml-service:8000',
-    mlServiceApiKey: process.env.ML_SERVICE_API_KEY || process.env.ML_API_KEY || 'dev-api-key',
+    mlServiceApiKey: process.env.ADMIN_API_KEY,
     mlServiceTimeout: parseInt(process.env.ML_SERVICE_TIMEOUT || '30000', 10),
-    mlServiceMaxRetries: parseInt(process.env.ML_SERVICE_MAX_RETRIES || '3', 10),
-    mlServiceRetryDelay: parseInt(process.env.ML_SERVICE_RETRY_DELAY || '1000', 10),
+    mlServiceMaxRetries: parseInt(
+      process.env.ML_SERVICE_MAX_RETRIES || '3',
+      10
+    ),
+    mlServiceRetryDelay: parseInt(
+      process.env.ML_SERVICE_RETRY_DELAY || '1000',
+      10
+    ),
 
     // Gemini API
     geminiApiKey: process.env.GEMINI_API_KEY,
@@ -50,15 +60,26 @@ export function loadMlConfig(): MlConfig {
     geminiMaxTokens: parseInt(process.env.GEMINI_MAX_TOKENS || '512', 10),
 
     // Processing
-    questionConfidenceThreshold: parseFloat(process.env.QUESTION_CONFIDENCE_THRESHOLD || '0.6'),
-    clusterSimilarityThreshold: parseFloat(process.env.CLUSTER_SIMILARITY_THRESHOLD || '0.85'),
+    questionConfidenceThreshold: parseFloat(
+      process.env.QUESTION_CONFIDENCE_THRESHOLD || '0.6'
+    ),
+    clusterSimilarityThreshold: parseFloat(
+      process.env.CLUSTER_SIMILARITY_THRESHOLD || '0.85'
+    ),
     contextWindowSize: parseInt(process.env.CONTEXT_WINDOW_SIZE || '5', 10),
-    contextTimeWindowMinutes: parseInt(process.env.CONTEXT_TIME_WINDOW_MINUTES || '5', 10),
-    processingBatchSize: parseInt(process.env.PROCESSING_BATCH_SIZE || '100', 10),
+    contextTimeWindowMinutes: parseInt(
+      process.env.CONTEXT_TIME_WINDOW_MINUTES || '5',
+      10
+    ),
+    processingBatchSize: parseInt(
+      process.env.PROCESSING_BATCH_SIZE || '100',
+      10
+    ),
     enableRephrasing: process.env.ENABLE_REPHRASING !== 'false',
 
     // Feature Flags
-    enableQuestionClustering: process.env.ENABLE_QUESTION_CLUSTERING !== 'false',
+    enableQuestionClustering:
+      process.env.ENABLE_QUESTION_CLUSTERING !== 'false',
     enableLLMRephrasing: process.env.ENABLE_LLM_REPHRASING !== 'false',
     enableBatchProcessing: process.env.ENABLE_BATCH_PROCESSING !== 'false',
 

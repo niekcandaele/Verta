@@ -66,12 +66,14 @@ export class QuestionProcessingService {
       errors: [],
     };
 
-    logger.info(`Processing batch of ${messages.length} messages for tenant ${tenantId}`);
+    logger.info(
+      `Processing batch of ${messages.length} messages for tenant ${tenantId}`
+    );
 
     // Process messages in smaller chunks for efficiency
     for (let i = 0; i < messages.length; i += batchSize) {
       const chunk = messages.slice(i, Math.min(i + batchSize, messages.length));
-      
+
       try {
         await this.processChunk(
           chunk,
@@ -107,7 +109,7 @@ export class QuestionProcessingService {
     result: ProcessingResult
   ): Promise<void> {
     // Step 1: Classify messages in batch
-    const texts = messages.map(m => m.content);
+    const texts = messages.map((m) => m.content);
     const classifications = await this.mlClient.classifyBatch(texts);
 
     // Step 2: Filter questions
@@ -130,7 +132,7 @@ export class QuestionProcessingService {
     result.questionsIdentified += questions.length;
 
     // Step 3: Generate embeddings for questions
-    const questionTexts = questions.map(q => q.content);
+    const questionTexts = questions.map((q) => q.content);
     const embeddings = await this.mlClient.embedBatch(questionTexts);
 
     // Step 4: Process each question
@@ -140,7 +142,9 @@ export class QuestionProcessingService {
 
       try {
         // Check if already processed
-        const existingInstance = await this.instanceRepo.findByMessageId(message.id);
+        const existingInstance = await this.instanceRepo.findByMessageId(
+          message.id
+        );
         if (existingInstance) {
           logger.debug(`Message ${message.id} already processed`);
           continue;
@@ -168,19 +172,19 @@ export class QuestionProcessingService {
         } else {
           // Create new cluster
           clusterId = uuidv4();
-          
+
           // Get context for rephrasing if enabled
           if (options.includeRephrasing) {
             const context = await this.getMessageContext(
               message,
               options.contextWindowSize
             );
-            
+
             if (context.contextMessages.length > 0) {
               try {
                 const rephraseResult = await this.mlClient.rephrase({
                   messages: [
-                    ...context.contextMessages.map(m => ({
+                    ...context.contextMessages.map((m) => ({
                       text: m.content,
                       author_id: m.anonymized_author_id,
                       timestamp: m.platform_created_at.toISOString(),
@@ -192,7 +196,7 @@ export class QuestionProcessingService {
                     },
                   ],
                 });
-                
+
                 if (rephraseResult.confidence >= 0.7) {
                   rephrased = rephraseResult.rephrased_text;
                 }
@@ -229,7 +233,6 @@ export class QuestionProcessingService {
           confidence_score: classifications[i].confidence,
           context_messages: null, // Could store context here if needed
         });
-
       } catch (error) {
         logger.error(`Failed to process message ${message.id}`, error);
         result.errors.push({
