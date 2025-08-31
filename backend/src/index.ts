@@ -8,9 +8,13 @@ import {
   HourlyTriggerWorker,
   ChannelSyncWorker,
   AnalysisWorker,
+  OcrWorker,
 } from './workers/index.js';
-import { syncScheduler } from './scheduler/index.js';
+import { syncScheduler, ocrRetryScheduler } from './scheduler/index.js';
 import { discordClientManager } from './adapters/discord/DiscordClientManager.js';
+import { MlClientService } from './services/MlClientService.js';
+import { mlConfig } from './config/ml.js';
+import { db } from './database/index.js';
 
 const PORT = config.PORT;
 
@@ -19,6 +23,8 @@ let syncWorker: SyncWorker | null = null;
 let hourlyTriggerWorker: HourlyTriggerWorker | null = null;
 let channelSyncWorker: ChannelSyncWorker | null = null;
 let analysisWorker: AnalysisWorker | null = null;
+let ocrWorker: OcrWorker | null = null;
+let mlService: MlClientService | null = null;
 
 /**
  * Start the application
@@ -45,6 +51,18 @@ async function startServer() {
 
     // Start workers and scheduler
     if (config.NODE_ENV !== 'test') {
+      // Initialize ML service
+      logger.info('Initializing ML service client...');
+      mlService = new MlClientService({
+        baseUrl: mlConfig.mlServiceUrl,
+        apiKey: mlConfig.mlServiceApiKey,
+        timeout: mlConfig.mlServiceTimeout,
+        ocrTimeout: mlConfig.mlServiceOcrTimeout,
+        maxRetries: mlConfig.mlServiceMaxRetries,
+        retryDelay: mlConfig.mlServiceRetryDelay,
+      });
+      logger.info('ML service client initialized');
+
       // Start sync worker
       logger.info('Starting sync worker...');
       syncWorker = new SyncWorker();
@@ -69,10 +87,21 @@ async function startServer() {
       await analysisWorker.start();
       logger.info('Analysis worker started');
 
+      // Start OCR worker (handles both OCR processing and retry triggers)
+      logger.info('Starting OCR worker...');
+      ocrWorker = new OcrWorker(mlService, db);
+      await ocrWorker.start();
+      logger.info('OCR worker started');
+
       // Start sync scheduler
       logger.info('Starting sync scheduler...');
       await syncScheduler.start();
       logger.info('Sync scheduler started');
+
+      // Start OCR retry scheduler
+      logger.info('Starting OCR retry scheduler...');
+      await ocrRetryScheduler.start();
+      logger.info('OCR retry scheduler started');
     }
 
     // Create and start Express app
@@ -98,6 +127,11 @@ async function startServer() {
           logger.info('Stopping sync scheduler...');
           await syncScheduler.stop();
           logger.info('Sync scheduler stopped');
+
+          // Stop OCR retry scheduler
+          logger.info('Stopping OCR retry scheduler...');
+          await ocrRetryScheduler.stop();
+          logger.info('OCR retry scheduler stopped');
 
           // Stop hourly trigger worker
           if (hourlyTriggerWorker) {
@@ -125,6 +159,13 @@ async function startServer() {
             logger.info('Stopping analysis worker...');
             await analysisWorker.stop();
             logger.info('Analysis worker stopped');
+          }
+
+          // Stop OCR worker
+          if (ocrWorker) {
+            logger.info('Stopping OCR worker...');
+            await ocrWorker.stop();
+            logger.info('OCR worker stopped');
           }
 
           // Cleanup Discord client

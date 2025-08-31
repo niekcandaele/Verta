@@ -76,10 +76,10 @@ services:
     mem_limit: 6g
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
-      interval: 30s
-      timeout: 10s
-      start_period: 60s
-      retries: 3
+      interval: 60s
+      timeout: 60s
+      start_period: 120s
+      retries: 5
     restart: unless-stopped
 
 volumes:

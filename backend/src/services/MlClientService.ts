@@ -40,10 +40,38 @@ export interface RephraseResult {
   confidence: number;
 }
 
+export interface OcrRequest {
+  image_url?: string;
+  image_base64?: string;
+}
+
+export interface OcrResult {
+  text: string;
+  full_response: string;
+  visual_context: string;
+  confidence: number;
+  processing_time_ms: number;
+  model_used: string;
+  model_name: string;
+  attempts: number;
+}
+
+export interface BatchOcrRequest {
+  images: Array<{
+    image_url?: string;
+    image_base64?: string;
+  }>;
+}
+
+export interface BatchOcrResult {
+  results: OcrResult[];
+}
+
 export interface MlServiceConfig {
   baseUrl: string;
   apiKey: string;
   timeout?: number;
+  ocrTimeout?: number;
   maxRetries?: number;
   retryDelay?: number;
 }
@@ -61,9 +89,10 @@ export class MlClientService {
 
   constructor(config: MlServiceConfig) {
     this.config = {
-      timeout: 30000,
+      timeout: 120000, // 2 minutes default
+      ocrTimeout: 300000, // 5 minutes for OCR
       maxRetries: 3,
-      retryDelay: 1000,
+      retryDelay: 5000, // 5 seconds
       ...config,
     };
 
@@ -82,8 +111,8 @@ export class MlClientService {
       lastFailureTime: 0,
       halfOpenAttempts: 0,
       config: {
-        failureThreshold: 5,
-        resetTimeout: 60000, // 1 minute
+        failureThreshold: 10, // Increased from 5 to be more tolerant
+        resetTimeout: 300000, // 5 minutes (increased from 1 minute)
         halfOpenMaxAttempts: 3,
       },
     };
@@ -316,6 +345,36 @@ export class MlClientService {
 
       return response.data;
     }, 'Rephrasing');
+  }
+
+  /**
+   * Extract text from image using OCR
+   */
+  async ocr(request: OcrRequest): Promise<OcrResult> {
+    return this.executeWithRetry(async () => {
+      // Use longer timeout for OCR operations
+      const response = await this.client.post<OcrResult>(
+        '/api/ml/ocr',
+        request,
+        { timeout: this.config.ocrTimeout }
+      );
+      return response.data;
+    }, 'OCR extraction');
+  }
+
+  /**
+   * Extract text from multiple images using OCR
+   */
+  async ocrBatch(request: BatchOcrRequest): Promise<OcrResult[]> {
+    return this.executeWithRetry(async () => {
+      // Use longer timeout for batch OCR operations
+      const response = await this.client.post<BatchOcrResult>(
+        '/api/ml/ocr/batch',
+        request,
+        { timeout: this.config.ocrTimeout }
+      );
+      return response.data.results;
+    }, 'Batch OCR extraction');
   }
 
   /**

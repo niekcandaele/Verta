@@ -4,6 +4,7 @@ import { ExpressAdapter } from '@bull-board/express';
 import { syncQueue } from '../queues/syncQueue.js';
 import { channelSyncQueue } from '../queues/channelSyncQueue.js';
 import { getAnalysisQueue } from '../queues/analysisQueue.js';
+import { getOcrQueue } from '../queues/ocrQueue.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -17,6 +18,8 @@ export function createBullBoardAdapter() {
   try {
     // Get the analysis queue instance
     const analysisQueue = getAnalysisQueue();
+    // Get the OCR queue instance
+    const ocrQueue = getOcrQueue();
 
     // Create Bull Board with all queues
     createBullBoard({
@@ -34,6 +37,11 @@ export function createBullBoardAdapter() {
           readOnlyMode: false,
           description:
             'Thread analysis queue for question extraction and clustering',
+        }),
+        new BullMQAdapter(ocrQueue, {
+          readOnlyMode: false,
+          description:
+            'OCR processing queue for extracting text from image attachments',
         }),
       ],
       serverAdapter,

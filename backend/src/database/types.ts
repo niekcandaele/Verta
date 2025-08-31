@@ -224,6 +224,28 @@ export interface AnalysisJobsTable {
 }
 
 /**
+ * OCR result status enum
+ */
+export type OcrStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+/**
+ * Database table schema for OCR results
+ */
+export interface OcrResultsTable {
+  id: Generated<string>;
+  attachment_id: string;
+  model_version: string;
+  extracted_text: string | null;
+  confidence: ColumnType<number | null, number | null, number | null>;
+  status: OcrStatus;
+  error_message: string | null;
+  retry_count: ColumnType<number, number | undefined, number>;
+  processing_time_ms: number | null;
+  created_at: ColumnType<Date, string | undefined, never>;
+  updated_at: ColumnType<Date, string | undefined, string>;
+}
+
+/**
  * Database schema interface
  */
 export interface Database {
@@ -238,6 +260,7 @@ export interface Database {
   question_clusters: QuestionClustersTable;
   question_instances: QuestionInstancesTable;
   analysis_jobs: AnalysisJobsTable;
+  ocr_results: OcrResultsTable;
 }
 
 /**
@@ -307,3 +330,10 @@ export type QuestionInstanceUpdate = Updateable<QuestionInstancesTable>;
 export type AnalysisJob = Selectable<AnalysisJobsTable>;
 export type NewAnalysisJob = Insertable<AnalysisJobsTable>;
 export type AnalysisJobUpdate = Updateable<AnalysisJobsTable>;
+
+/**
+ * Type helpers for working with OCR result records
+ */
+export type OcrResult = Selectable<OcrResultsTable>;
+export type NewOcrResult = Insertable<OcrResultsTable>;
+export type OcrResultUpdate = Updateable<OcrResultsTable>;

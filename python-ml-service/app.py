@@ -10,7 +10,8 @@ from pydantic import BaseModel
 from config import settings
 from models.classifier import get_classifier
 from models.embeddings import get_embedding_model
-from endpoints import classify, embed, rephrase
+from models.openrouter_ocr import get_ocr_model
+from endpoints import classify, embed, rephrase, ocr
 from middleware.auth import verify_api_key
 
 # Configure logging
@@ -58,6 +59,14 @@ async def lifespan(app: FastAPI):
         embedding_model.load()
         logger.info("Embedding model loaded successfully")
         
+        # Load OCR model (OpenRouter)
+        logger.info("Getting OpenRouter OCR model instance...")
+        ocr_model = get_ocr_model()
+        logger.info("Discovering free vision models from OpenRouter...")
+        import asyncio
+        await ocr_model.load()
+        logger.info("OpenRouter OCR model loaded successfully")
+        
         app.state.models_loaded = True
         logger.info("All ML models loaded successfully")
         
@@ -98,6 +107,10 @@ app.include_router(
 )
 app.include_router(
     rephrase.router,
+    dependencies=[Depends(verify_api_key)]
+)
+app.include_router(
+    ocr.router,
     dependencies=[Depends(verify_api_key)]
 )
 
