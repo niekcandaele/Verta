@@ -146,17 +146,23 @@ class LLMService:
             for msg in messages
         ])
         
-        prompt = f"""Task: Combine and rephrase the following messages into a single, clear, coherent question.
+        prompt = f"""Task: Extract the CORE question from these messages. Be concise.
 
 Rules:
-1. Preserve the original intent and meaning
-2. Combine related parts into one comprehensive question
-3. Remove Discord-specific language (mentions, emojis, etc.)
-4. Fix typos and grammar issues
-5. Make the question standalone (no context needed to understand it)
-6. If messages aren't actually a question, return "NOT_A_QUESTION"
+1. Focus on the main problem or issue only
+2. Remove ALL specific details (error codes, file names, tool names)
+3. Keep it under 15 words if possible
+4. Use simple, general language
+5. If messages aren't a question, return "NOT_A_QUESTION"
 
-Messages to rephrase:
+Examples:
+- Instead of: "Why does my Discord bot receive a 403 error when sending items to players?"
+- Write: "Why does my bot get permission errors?"
+
+- Instead of: "How do I configure CSMM on a separate server and adjust zombie settings?"
+- Write: "How do I configure the server management tool?"
+
+Messages to extract from:
 {message_text}
 """
         

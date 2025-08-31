@@ -39,6 +39,7 @@ async def rephrase_messages(request: RephraseRequest):
         llm_service = get_llm_service()
         
         if not llm_service.is_available():
+            logger.error("LLM service not available - OPENROUTER_API_KEY not configured")
             raise HTTPException(
                 status_code=503,
                 detail="LLM service is not available - OPENROUTER_API_KEY not configured"
@@ -55,6 +56,7 @@ async def rephrase_messages(request: RephraseRequest):
         ]
         
         # Perform rephrasing (use sync version for now)
+        logger.info("Calling LLM service for rephrasing")
         result = llm_service.rephrase_messages_sync(
             messages=messages,
             context=request.context

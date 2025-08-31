@@ -1,28 +1,9 @@
 services:
-  tidb:
-    image: pingcap/tidb:v8.5.0
-    container_name: verta-tidb
-    environment:
-      TIDB_USER: verta_user
-      TIDB_PASSWORD: verta_password
-    ports:
-      - '25001:4000'  # MySQL protocol port
-      - '10080:10080' # Status API port
-    volumes:
-      - tidb_data:/var/lib/tidb
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:10080/status']
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-    restart: unless-stopped
-
   redis:
     image: redis:7-alpine
     container_name: verta-redis
     ports:
-      - '25002:6379'
+      - '6379:6379'
     volumes:
       - redis_data:/data
     healthcheck:
@@ -31,25 +12,6 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-
-  db-init:
-    build:
-      context: ./backend
-      target: dev
-    container_name: verta-db-init
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
-    env_file:
-      - .env
-    environment:
-      - NODE_ENV=development
-      - DATABASE_URL=mysql://root:@tidb:4000/verta
-    depends_on:
-      tidb:
-        condition: service_healthy
-    command: /app/scripts/init-db.sh
-    restart: "no"
 
   app:
     build:
@@ -67,16 +29,12 @@ services:
       - NODE_ENV=development
       - DOCKERIZED=true
       - PORT=25000
-      - DATABASE_URL=mysql://root:@tidb:4000/verta
       - DATABASE_POOL_SIZE=10
       - LOG_LEVEL=debug
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - ML_SERVICE_URL=http://ml-service:8000
     depends_on:
-      db-init:
-        condition: service_completed_successfully
-      tidb:
-        condition: service_healthy
       redis:
         condition: service_healthy
     command: npm run dev
@@ -115,7 +73,7 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - ML_SERVICE_WORKERS=1
       - ML_SERVICE_MODEL_CACHE_DIR=/models
-    mem_limit: 4g
+    mem_limit: 6g
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
       interval: 30s
@@ -125,5 +83,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  tidb_data:
   redis_data:

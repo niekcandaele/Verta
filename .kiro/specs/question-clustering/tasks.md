@@ -1,7 +1,46 @@
 # Implementation Tasks: Question Clustering and Analysis System
 
 ## Overview
-Building an ML-powered question clustering system that identifies, rephrases, and groups similar questions from Discord messages. The implementation uses a two-service architecture: Node.js for orchestration and Python for ML model hosting. We'll build this in 6 phases, starting with basic infrastructure and progressively adding ML capabilities, clustering logic, and API endpoints.
+Building an ML-powered question clustering system that identifies, rephrases, and groups similar questions from Discord threads. The implementation uses a two-service architecture: Node.js for orchestration and Python for ML model hosting. We'll build this in 7 phases, starting with a pivot to thread-based processing, then basic infrastructure and progressively adding ML capabilities, clustering logic, and API endpoints.
+
+## Phase 0: Thread-Based Pivot & Cleanup
+**Goal**: Refactor from message-based to thread-based processing
+**Demo**: "At standup, I can show: updated schema and repositories ready for thread processing"
+
+### Tasks
+- [x] Task 0.1: Create migration to update schema for threads
+  - **Output**: Migration adding thread support columns
+  - **Files**: `backend/src/database/migrations/010_pivot_to_thread_clustering.ts`
+  - **Verify**: Migration runs without errors
+
+- [x] Task 0.2: Update QuestionCluster repository for threads
+  - **Depends on**: 0.1
+  - **Output**: Repository methods work with thread_id
+  - **Files**: Update `backend/src/repositories/QuestionClusterRepository.ts`
+  - **Verify**: Repository compiles with thread support
+
+- [x] Task 0.3: Update QuestionInstance repository for threads
+  - **Depends on**: 0.1
+  - **Output**: Repository uses thread_id instead of message_id
+  - **Files**: Update `backend/src/repositories/QuestionInstanceRepository.ts`
+  - **Verify**: Repository compiles with thread support
+
+- [x] Task 0.4: Update database types for thread support
+  - **Depends on**: 0.1
+  - **Output**: TypeScript types match new schema
+  - **Files**: Update `backend/src/database/types.ts`
+  - **Verify**: No TypeScript errors
+
+- [x] Task 0.5: Update ML config for thread processing
+  - **Output**: Configuration reflects thread-based approach
+  - **Files**: Update `backend/src/config/ml.ts`
+  - **Verify**: Config loads thread-specific settings
+
+### Phase 0 Checkpoint
+- [x] Run migrations: `npm run migrate:latest`
+- [x] Run build: `npm run build`
+- [x] Run lint: `npm run lint`
+- [x] **Demo ready**: Show updated schema supporting threads
 
 ## Phase 1: Python ML Service Skeleton
 **Goal**: Create a containerized Python FastAPI service with health checks
@@ -80,41 +119,41 @@ Building an ML-powered question clustering system that identifies, rephrases, an
 **Demo**: "At standup, I can show: new tables in TiDB and repository classes that can perform CRUD operations"
 
 ### Tasks
-- [ ] Task 3.1: Create database migration for question tables
+- [x] Task 3.1: Create database migration for question tables
   - **Output**: Migration files for three new tables
   - **Files**: `backend/src/db/migrations/add_question_clustering_tables.ts`
   - **Verify**: Migration runs without errors
 
-- [ ] Task 3.2: Add vector column support to Kysely types
+- [x] Task 3.2: Add vector column support to Kysely types
   - **Depends on**: 3.1
   - **Output**: TypeScript types for vector columns
   - **Files**: `backend/src/db/types.ts`, `shared-types/src/db.ts`
   - **Verify**: TypeScript compilation succeeds
 
-- [ ] Task 3.3: Create QuestionCluster repository
+- [x] Task 3.3: Create QuestionCluster repository
   - **Depends on**: 3.2
   - **Output**: Repository for question clusters with vector search
   - **Files**: `backend/src/repositories/QuestionClusterRepository.ts`
   - **Verify**: Repository methods compile without errors
 
-- [ ] Task 3.4: Create QuestionInstance repository
+- [x] Task 3.4: Create QuestionInstance repository
   - **Depends on**: 3.2
   - **Output**: Repository for individual question instances
   - **Files**: `backend/src/repositories/QuestionInstanceRepository.ts`
   - **Verify**: Repository methods compile without errors
 
-- [ ] Task 3.5: Create AnalysisJob repository
+- [x] Task 3.5: Create AnalysisJob repository
   - **Depends on**: 3.2
   - **Output**: Repository for tracking analysis jobs
   - **Files**: `backend/src/repositories/AnalysisJobRepository.ts`
   - **Verify**: Repository methods compile without errors
 
 ### Phase 3 Checkpoint
-- [ ] Run migrations: `npm run migrate:latest`
-- [ ] Run lint: `npm run lint`
-- [ ] Run build: `npm run build`
-- [ ] Manual verification: Check tables exist in TiDB with proper indexes
-- [ ] **Demo ready**: Show new tables in database and basic repository operations
+- [x] Run migrations: `npm run migrate:latest`
+- [x] Run lint: `npm run lint`
+- [x] Run build: `npm run build`
+- [x] Manual verification: Check tables exist in TiDB with proper indexes
+- [x] **Demo ready**: Show new tables in database and basic repository operations
 
 ## Phase 4: Node.js ML Client & LLM Integration
 **Goal**: Create Node.js service to communicate with Python ML service and Gemini Flash
@@ -155,99 +194,107 @@ Building an ML-powered question clustering system that identifies, rephrases, an
 - [x] **Demo ready**: Show end-to-end question processing pipeline
 
 ## Phase 5: Analysis Worker & Queue Integration
-**Goal**: Create background worker for processing messages through ML pipeline
-**Demo**: "At standup, I can show: messages being processed in batches with progress tracking"
+**Goal**: Create background worker for processing threads through ML pipeline
+**Demo**: "At standup, I can show: threads being processed with progress tracking"
 
 ### Tasks
-- [ ] Task 5.1: Create analysis queue definition
+- [x] Task 5.1: Create analysis queue definition
   - **Output**: BullMQ queue for analysis jobs
   - **Files**: `backend/src/queues/analysisQueue.ts`
   - **Verify**: Queue connects to Redis
 
-- [ ] Task 5.2: Implement analysis worker
+- [x] Task 5.2: Implement thread analysis worker
   - **Depends on**: 5.1
-  - **Output**: Worker processing messages in rolling window
+  - **Output**: Worker processing threads older than 5 days
   - **Files**: `backend/src/workers/analysisWorker.ts`
-  - **Verify**: Worker starts and processes test job
+  - **Verify**: Worker starts and processes test thread
 
-- [ ] Task 5.3: Add message batching logic
+- [x] Task 5.3: Add thread eligibility check
   - **Depends on**: 5.2
-  - **Output**: Efficient batch processing of messages
+  - **Output**: Only processes threads with first message 5+ days old
   - **Files**: Update `backend/src/workers/analysisWorker.ts`
-  - **Verify**: Processes 100 messages per batch
+  - **Verify**: Skips newer threads
 
-- [ ] Task 5.4: Implement context extraction
+- [x] Task 5.4: Implement thread content aggregation
   - **Depends on**: 5.2
-  - **Output**: Extracts 5-message context window
-  - **Files**: `backend/src/services/MessageContextService.ts`
-  - **Verify**: Returns surrounding messages from same author
+  - **Output**: Concatenates all messages in thread
+  - **Files**: `backend/src/services/ThreadProcessingService.ts`
+  - **Verify**: Returns complete thread content
 
-- [ ] Task 5.5: Add vector similarity search
+- [x] Task 5.5: Add primary question extraction
+  - **Depends on**: 5.4
+  - **Output**: Extracts one main question per thread
+  - **Files**: Update `backend/src/services/ThreadProcessingService.ts`
+  - **Verify**: Returns single question from thread
+
+- [x] Task 5.6: Add vector similarity search
   - **Output**: Find similar questions using TiDB vectors
   - **Files**: Update `backend/src/repositories/QuestionClusterRepository.ts`
   - **Verify**: Returns questions above similarity threshold
 
-- [ ] Task 5.6: Implement clustering logic
-  - **Depends on**: 5.5
+- [x] Task 5.7: Implement clustering logic
+  - **Depends on**: 5.6
   - **Output**: Groups similar questions or creates new clusters
   - **Files**: `backend/src/services/ClusteringService.ts`
   - **Verify**: Questions with >0.85 similarity get clustered
 
 ### Phase 5 Checkpoint
-- [ ] Process test batch: 100 messages processed successfully
-- [ ] Check clustering: Similar questions grouped together
-- [ ] Monitor memory: Worker stays within limits
-- [ ] **Demo ready**: Show live processing with progress updates
+- [x] Process test thread: Thread analyzed successfully
+- [x] Check question extraction: Primary question identified
+- [x] Check clustering: Similar questions grouped together
+- [x] Monitor memory: Worker stays within limits
+- [x] **Demo ready**: Show live thread processing with progress updates
 
 ## Phase 6: REST API Endpoints
 **Goal**: Expose admin and public APIs for triggering analysis and viewing results
 **Demo**: "At standup, I can show: triggering analysis via admin API and retrieving clusters via public API"
 
 ### Tasks
-- [ ] Task 6.1: Create admin analysis endpoint
+- [x] Task 6.1: Create admin analysis endpoint
   - **Output**: Protected endpoint to trigger processing
   - **Files**: `backend/src/routes/api/admin/analysis.ts`
   - **Verify**: Requires admin API key
 
-- [ ] Task 6.2: Add job progress tracking
+- [x] Task 6.2: Add job progress tracking
   - **Depends on**: 6.1
   - **Output**: Real-time job status updates
   - **Files**: Update `backend/src/workers/analysisWorker.ts`
   - **Verify**: Progress updates in database
 
-- [ ] Task 6.3: Create public clusters endpoint
+- [x] Task 6.3: Create public clusters endpoint
   - **Output**: Endpoint returning clustered questions
   - **Files**: `backend/src/routes/api/v1/questions.ts`
   - **Verify**: Returns clusters with counts
 
-- [ ] Task 6.4: Add cluster statistics endpoint
+- [x] Task 6.4: Add cluster statistics endpoint
   - **Depends on**: 6.3
   - **Output**: Aggregated statistics by tenant
   - **Files**: Update `backend/src/routes/api/v1/questions.ts`
   - **Verify**: Returns meaningful metrics
 
-- [ ] Task 6.5: Implement feature flags
+- [x] Task 6.5: Implement feature flags
   - **Output**: Runtime control of processing features
   - **Files**: `backend/src/config/features.ts`
   - **Verify**: Features can be toggled without restart
 
-- [ ] Task 6.6: Add API documentation
+- [x] Task 6.6: Add API documentation
   - **Output**: OpenAPI spec for new endpoints
   - **Files**: `backend/src/routes/api/openapi.yaml`
   - **Verify**: Documentation accessible at `/api/docs`
 
 ### Phase 6 Checkpoint
-- [ ] Test admin API: Successfully triggers analysis
-- [ ] Test public API: Returns clustered questions
-- [ ] Run full build: `npm run build`
-- [ ] Run lint: `npm run lint`
-- [ ] **Demo ready**: Complete flow from triggering to viewing results
+- [x] Test admin API: Successfully triggers analysis
+- [x] Test public API: Returns clustered questions
+- [x] Run full build: `npm run build`
+- [x] Run lint: `npm run lint`
+- [x] **Demo ready**: Complete flow from triggering to viewing results
 
 ## Final Verification
 - [ ] All requirements from design doc met
-- [ ] Process 1000 messages in under 1 minute
+- [ ] Process threads efficiently
 - [ ] Similarity threshold configurable via environment
-- [ ] Rolling window (30-7 days) working correctly
+- [ ] Thread age check (5+ days) working correctly
+- [ ] Only Discord threads processed (not channel messages)
 - [ ] Admin endpoints require authentication
 - [ ] Public endpoints accessible without auth
 - [ ] Docker memory limits enforced (4GB for ML service)
