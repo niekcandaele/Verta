@@ -11,6 +11,7 @@ import { BaseCrudRepositoryImpl } from './BaseCrudRepository.js';
 export interface QuestionInstanceWithCluster extends QuestionInstance {
   cluster_representative_text?: string;
   cluster_instance_count?: number;
+  cluster_thread_title?: string | null;
 }
 
 export class QuestionInstanceRepository extends BaseCrudRepositoryImpl<
@@ -47,13 +48,13 @@ export class QuestionInstanceRepository extends BaseCrudRepositoryImpl<
   }
 
   /**
-   * Find instance by message ID (unique)
+   * Find instance by thread ID (unique)
    */
-  async findByMessageId(messageId: string): Promise<QuestionInstance | null> {
+  async findByThreadId(threadId: string): Promise<QuestionInstance | null> {
     const result = await this.db
       .selectFrom('question_instances')
       .selectAll()
-      .where('message_id', '=', messageId)
+      .where('thread_id', '=', threadId)
       .executeTakeFirst();
 
     return result ? this.mapRowToEntity(result) : null;
@@ -78,14 +79,15 @@ export class QuestionInstanceRepository extends BaseCrudRepositoryImpl<
       .select([
         'qi.id',
         'qi.cluster_id',
-        'qi.message_id',
+        'qi.thread_id',
+        'qi.thread_title',
         'qi.original_text',
-        'qi.context_messages',
         'qi.rephrased_text',
         'qi.confidence_score',
         'qi.created_at',
         'qc.representative_text as cluster_representative_text',
         'qc.instance_count as cluster_instance_count',
+        'qc.thread_title as cluster_thread_title',
       ])
       .where('qc.tenant_id', '=', tenantId)
       .where('qi.confidence_score', '>=', minConfidence)
@@ -98,6 +100,7 @@ export class QuestionInstanceRepository extends BaseCrudRepositoryImpl<
       ...this.mapRowToEntity(row),
       cluster_representative_text: row.cluster_representative_text,
       cluster_instance_count: row.cluster_instance_count,
+      cluster_thread_title: row.cluster_thread_title,
     }));
   }
 
@@ -165,9 +168,9 @@ export class QuestionInstanceRepository extends BaseCrudRepositoryImpl<
     return {
       id: row.id,
       cluster_id: row.cluster_id,
-      message_id: row.message_id,
+      thread_id: row.thread_id,
+      thread_title: row.thread_title,
       original_text: row.original_text,
-      context_messages: row.context_messages,
       rephrased_text: row.rephrased_text,
       confidence_score: Number(row.confidence_score),
       created_at: new Date(row.created_at),
@@ -178,11 +181,9 @@ export class QuestionInstanceRepository extends BaseCrudRepositoryImpl<
     return {
       id: data.id || uuidv4(),
       cluster_id: data.cluster_id,
-      message_id: data.message_id,
+      thread_id: data.thread_id,
+      thread_title: data.thread_title || null,
       original_text: data.original_text,
-      context_messages: data.context_messages
-        ? JSON.stringify(data.context_messages)
-        : null,
       rephrased_text: data.rephrased_text || null,
       confidence_score: data.confidence_score,
     };
@@ -197,8 +198,8 @@ export class QuestionInstanceRepository extends BaseCrudRepositoryImpl<
     if (data.rephrased_text !== undefined) {
       row.rephrased_text = data.rephrased_text;
     }
-    if (data.context_messages !== undefined) {
-      row.context_messages = JSON.stringify(data.context_messages);
+    if (data.thread_title !== undefined) {
+      row.thread_title = data.thread_title;
     }
     if (data.confidence_score !== undefined) {
       row.confidence_score = data.confidence_score;

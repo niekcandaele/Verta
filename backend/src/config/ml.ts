@@ -16,16 +16,16 @@ const mlConfigSchema = z.object({
 
   // Processing Configuration
   questionConfidenceThreshold: z.number().min(0).max(1).default(0.6),
-  clusterSimilarityThreshold: z.number().min(0).max(1).default(0.85),
-  contextWindowSize: z.number().positive().default(5),
-  contextTimeWindowMinutes: z.number().positive().default(5),
-  processingBatchSize: z.number().positive().default(100),
+  clusterSimilarityThreshold: z.number().min(0).max(1).default(0.7), // Lowered from 0.85 for better clustering
+  threadMinAgeDays: z.number().positive().default(5),
+  processOnlyThreads: z.boolean().default(true),
+  extractPrimaryQuestion: z.boolean().default(true),
   enableRephrasing: z.boolean().default(true),
 
   // Feature Flags
   enableQuestionClustering: z.boolean().default(true),
   enableLLMRephrasing: z.boolean().default(true),
-  enableBatchProcessing: z.boolean().default(true),
+  enableThreadProcessing: z.boolean().default(true),
 
   // Vector Search Configuration
   vectorDimension: z.number().positive().default(1024), // BGE-M3 dimension
@@ -64,24 +64,18 @@ export function loadMlConfig(): MlConfig {
       process.env.QUESTION_CONFIDENCE_THRESHOLD || '0.6'
     ),
     clusterSimilarityThreshold: parseFloat(
-      process.env.CLUSTER_SIMILARITY_THRESHOLD || '0.85'
+      process.env.CLUSTER_SIMILARITY_THRESHOLD || '0.70' // Lowered from 0.85 for better clustering
     ),
-    contextWindowSize: parseInt(process.env.CONTEXT_WINDOW_SIZE || '5', 10),
-    contextTimeWindowMinutes: parseInt(
-      process.env.CONTEXT_TIME_WINDOW_MINUTES || '5',
-      10
-    ),
-    processingBatchSize: parseInt(
-      process.env.PROCESSING_BATCH_SIZE || '100',
-      10
-    ),
+    threadMinAgeDays: parseInt(process.env.THREAD_MIN_AGE_DAYS || '5', 10),
+    processOnlyThreads: process.env.PROCESS_ONLY_THREADS !== 'false',
+    extractPrimaryQuestion: process.env.EXTRACT_PRIMARY_QUESTION !== 'false',
     enableRephrasing: process.env.ENABLE_REPHRASING !== 'false',
 
     // Feature Flags
     enableQuestionClustering:
       process.env.ENABLE_QUESTION_CLUSTERING !== 'false',
     enableLLMRephrasing: process.env.ENABLE_LLM_REPHRASING !== 'false',
-    enableBatchProcessing: process.env.ENABLE_BATCH_PROCESSING !== 'false',
+    enableThreadProcessing: process.env.ENABLE_THREAD_PROCESSING !== 'false',
 
     // Vector Search
     vectorDimension: parseInt(process.env.VECTOR_DIMENSION || '1024', 10),

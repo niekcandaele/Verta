@@ -7,6 +7,7 @@ import {
   SyncWorker,
   HourlyTriggerWorker,
   ChannelSyncWorker,
+  AnalysisWorker,
 } from './workers/index.js';
 import { syncScheduler } from './scheduler/index.js';
 import { discordClientManager } from './adapters/discord/DiscordClientManager.js';
@@ -17,6 +18,7 @@ const PORT = config.PORT;
 let syncWorker: SyncWorker | null = null;
 let hourlyTriggerWorker: HourlyTriggerWorker | null = null;
 let channelSyncWorker: ChannelSyncWorker | null = null;
+let analysisWorker: AnalysisWorker | null = null;
 
 /**
  * Start the application
@@ -60,6 +62,12 @@ async function startServer() {
       channelSyncWorker = new ChannelSyncWorker();
       await channelSyncWorker.start();
       logger.info('Channel sync worker started');
+
+      // Start analysis worker
+      logger.info('Starting analysis worker...');
+      analysisWorker = new AnalysisWorker();
+      await analysisWorker.start();
+      logger.info('Analysis worker started');
 
       // Start sync scheduler
       logger.info('Starting sync scheduler...');
@@ -110,6 +118,13 @@ async function startServer() {
             logger.info('Stopping channel sync worker...');
             await channelSyncWorker.stop();
             logger.info('Channel sync worker stopped');
+          }
+
+          // Stop analysis worker
+          if (analysisWorker) {
+            logger.info('Stopping analysis worker...');
+            await analysisWorker.stop();
+            logger.info('Analysis worker stopped');
           }
 
           // Cleanup Discord client

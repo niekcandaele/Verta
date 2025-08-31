@@ -175,6 +175,7 @@ export interface QuestionClustersTable {
   id: Generated<string>;
   tenant_id: string;
   representative_text: string;
+  thread_title: string | null;
   embedding: VectorColumn;
   instance_count: ColumnType<number, number | undefined, number>;
   first_seen_at: ColumnType<Date, Date | string, Date | string>;
@@ -190,9 +191,9 @@ export interface QuestionClustersTable {
 export interface QuestionInstancesTable {
   id: Generated<string>;
   cluster_id: string;
-  message_id: string;
+  thread_id: string;
+  thread_title: string | null;
   original_text: string;
-  context_messages: ColumnType<unknown, unknown | undefined, unknown>;
   rephrased_text: string | null;
   confidence_score: ColumnType<number, number, number>;
   created_at: ColumnType<Date, string | undefined, never>;
@@ -210,6 +211,7 @@ export interface AnalysisJobsTable {
   progress: ColumnType<number, number | undefined, number>;
   total_items: ColumnType<number, number | undefined, number>;
   processed_items: ColumnType<number, number | undefined, number>;
+  thread_min_age_days: ColumnType<number, number | undefined, number>;
   error_details: ColumnType<unknown, unknown | undefined, unknown>;
   started_at: ColumnType<Date | null, Date | string | undefined, Date | string>;
   completed_at: ColumnType<

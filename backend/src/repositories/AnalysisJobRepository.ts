@@ -230,6 +230,7 @@ export class AnalysisJobRepository extends BaseCrudRepositoryImpl<
       progress: row.progress,
       total_items: row.total_items,
       processed_items: row.processed_items,
+      thread_min_age_days: row.thread_min_age_days,
       error_details: row.error_details,
       started_at: row.started_at ? new Date(row.started_at) : null,
       completed_at: row.completed_at ? new Date(row.completed_at) : null,

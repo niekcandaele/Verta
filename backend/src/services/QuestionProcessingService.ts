@@ -142,7 +142,7 @@ export class QuestionProcessingService {
 
       try {
         // Check if already processed
-        const existingInstance = await this.instanceRepo.findByMessageId(
+        const existingInstance = await this.instanceRepo.findByThreadId(
           message.id
         );
         if (existingInstance) {
@@ -227,11 +227,10 @@ export class QuestionProcessingService {
         // Create question instance
         await this.instanceRepo.create({
           cluster_id: clusterId,
-          message_id: message.id,
+          thread_id: message.id,
           original_text: message.content,
           rephrased_text: rephrased,
           confidence_score: classifications[i].confidence,
-          context_messages: null, // Could store context here if needed
         });
       } catch (error) {
         logger.error(`Failed to process message ${message.id}`, error);
@@ -344,7 +343,7 @@ export class QuestionProcessingService {
       // Create question instance
       await this.instanceRepo.create({
         cluster_id: clusterId,
-        message_id: message.id,
+        thread_id: message.id,
         original_text: message.content,
         confidence_score: classification.confidence,
       });

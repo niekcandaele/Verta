@@ -11,6 +11,7 @@ import { BaseCrudRepositoryImpl } from './BaseCrudRepository.js';
 export interface SimilarCluster {
   id: string;
   representative_text: string;
+  thread_title?: string | null;
   similarity: number;
   instance_count: number;
 }
@@ -45,6 +46,7 @@ export class QuestionClusterRepository extends BaseCrudRepositoryImpl<
       SELECT 
         id,
         representative_text,
+        thread_title,
         instance_count,
         1 - VEC_COSINE_DISTANCE(embedding, ${embeddingStr}) as similarity
       FROM question_clusters
@@ -153,6 +155,7 @@ export class QuestionClusterRepository extends BaseCrudRepositoryImpl<
       id: row.id,
       tenant_id: row.tenant_id,
       representative_text: row.representative_text,
+      thread_title: row.thread_title,
       embedding:
         typeof row.embedding === 'string'
           ? JSON.parse(row.embedding)
@@ -171,6 +174,7 @@ export class QuestionClusterRepository extends BaseCrudRepositoryImpl<
       id: data.id || uuidv4(),
       tenant_id: data.tenant_id,
       representative_text: data.representative_text,
+      thread_title: data.thread_title || null,
       embedding: JSON.stringify(data.embedding),
       instance_count: data.instance_count ?? 1,
       first_seen_at:

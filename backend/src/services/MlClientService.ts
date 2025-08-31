@@ -98,11 +98,6 @@ export class MlClientService {
     // Request interceptor
     this.client.interceptors.request.use(
       (config) => {
-        logger.debug('ML Service Request', {
-          method: config.method,
-          url: config.url,
-          data: config.data,
-        });
         return config;
       },
       (error) => {
@@ -114,10 +109,6 @@ export class MlClientService {
     // Response interceptor
     this.client.interceptors.response.use(
       (response) => {
-        logger.debug('ML Service Response', {
-          status: response.status,
-          url: response.config.url,
-        });
         return response;
       },
       (error: AxiosError) => {
@@ -125,6 +116,7 @@ export class MlClientService {
           status: error.response?.status,
           url: error.config?.url,
           message: error.message,
+          responseData: error.response?.data,
         });
         return Promise.reject(error);
       }
@@ -143,7 +135,7 @@ export class MlClientService {
         if (now - cb.lastFailureTime > cb.config.resetTimeout) {
           cb.state = CircuitState.HALF_OPEN;
           cb.halfOpenAttempts = 0;
-          logger.info('Circuit breaker transitioned to HALF_OPEN');
+          logger.debug('Circuit breaker transitioned to HALF_OPEN');
         } else {
           throw new Error(
             'Circuit breaker is OPEN - ML service is unavailable'
@@ -174,7 +166,7 @@ export class MlClientService {
     if (cb.state === CircuitState.HALF_OPEN) {
       cb.state = CircuitState.CLOSED;
       cb.failureCount = 0;
-      logger.info('Circuit breaker transitioned to CLOSED');
+      logger.debug('Circuit breaker transitioned to CLOSED');
     }
     cb.failureCount = 0;
   }
@@ -321,6 +313,7 @@ export class MlClientService {
         '/api/ml/rephrase',
         request
       );
+
       return response.data;
     }, 'Rephrasing');
   }
@@ -372,22 +365,14 @@ export class MlClientService {
     maxAttempts: number = 30,
     delayMs: number = 2000
   ): Promise<void> {
-    logger.info('Waiting for ML service to be ready...');
-
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const health = await this.healthCheck();
         if (health.healthy && health.models_loaded) {
-          logger.info('ML service is ready', { version: health.version });
           return;
         }
-        logger.debug(
-          `ML service not ready yet (attempt ${attempt}/${maxAttempts})`
-        );
       } catch {
-        logger.debug(
-          `ML service health check failed (attempt ${attempt}/${maxAttempts})`
-        );
+        // Health check failed, will retry
       }
 
       if (attempt < maxAttempts) {

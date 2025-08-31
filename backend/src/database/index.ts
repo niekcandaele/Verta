@@ -10,6 +10,9 @@ const createConnectionPool = () => {
   // Parse the DATABASE_URL to extract connection details
   const url = new URL(config.DATABASE_URL);
 
+  // Check if we're connecting to TiDB Cloud (requires SSL)
+  const isTiDBCloud = url.hostname.includes('tidbcloud.com');
+
   // Using non-promise mysql2 to fix Kysely/TiDB compatibility issue
   return mysql.createPool({
     host: url.hostname,
@@ -23,6 +26,13 @@ const createConnectionPool = () => {
     queueLimit: 0,
     enableKeepAlive: true,
     keepAliveInitialDelay: 0,
+    // SSL configuration for TiDB Cloud
+    ...(isTiDBCloud && {
+      ssl: {
+        rejectUnauthorized: true,
+        minVersion: 'TLSv1.2',
+      },
+    }),
   });
 };
 
