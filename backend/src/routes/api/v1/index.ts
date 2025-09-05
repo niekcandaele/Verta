@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import contentRouter from './content.js';
 import questionsRouter from './questions.js';
+import faqRouter from './faq.js';
 
 const router = Router();
 
@@ -13,5 +14,8 @@ router.use('/', contentRouter);
 
 // Mount questions routes
 router.use('/questions', questionsRouter);
+
+// Mount FAQ routes
+router.use('/faq', faqRouter);
 
 export default router;

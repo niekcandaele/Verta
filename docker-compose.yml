@@ -54,6 +54,7 @@ services:
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_TENANT_SLUG=${TEST_DISCORD_TENANT_SLUG}
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
     depends_on:
       - app
     command: npm run dev

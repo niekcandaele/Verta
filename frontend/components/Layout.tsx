@@ -58,8 +58,8 @@ export default function Layout({ children, metadata, currentChannelId, syncStatu
             </Link>
           </div>
           
-          {/* Stats Display - Hidden on mobile */}
-          <div className="navbar-center hidden lg:flex gap-2">
+          {/* Stats Display and FAQ Link - Hidden on mobile */}
+          <div className="navbar-center hidden lg:flex gap-2 items-center">
             <div className="badge badge-primary badge-outline">
               <span className="text-primary-content/80 mr-1">Channels:</span>
               <span className="font-semibold">{metadata.channels.length}</span>
@@ -68,6 +68,12 @@ export default function Layout({ children, metadata, currentChannelId, syncStatu
               <span className="text-primary-content/80 mr-1">Platform:</span>
               <span className="capitalize font-semibold">{metadata.tenant.platform}</span>
             </div>
+            <Link 
+              href="/faq" 
+              className="btn btn-sm btn-ghost text-primary hover:bg-primary/10 ml-2"
+            >
+              FAQ
+            </Link>
           </div>
           
           <div className="navbar-end gap-2">
@@ -101,6 +107,15 @@ export default function Layout({ children, metadata, currentChannelId, syncStatu
               >
                 <FiX size={16} />
               </button>
+            </div>
+            <div className="mb-4">
+              <Link 
+                href="/faq" 
+                className="btn btn-block btn-primary btn-outline"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                View FAQ
+              </Link>
             </div>
             <ChannelList channels={metadata.channels} currentChannelId={currentChannelId} />
           </div>

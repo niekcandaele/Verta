@@ -1,4 +1,4 @@
-import type { ForumThreadsPage, ThreadSummary } from '@/lib/data';
+import type { ForumThreadsPage } from '@/lib/data';
 import { FiMessageSquare, FiClock, FiUser, FiLock, FiArchive } from 'react-icons/fi';
 import Link from 'next/link';
 
@@ -79,10 +79,12 @@ export default function ForumChannelView({ threadData, currentPage }: ForumChann
                         Locked
                       </span>
                     )}
-                    <span className="flex items-center gap-1">
-                      <FiClock className="opacity-60" />
-                      {formatRelativeTime(thread.lastActivity)}
-                    </span>
+                    {thread.lastActivity && (
+                      <span className="flex items-center gap-1">
+                        <FiClock className="opacity-60" />
+                        {formatRelativeTime(thread.lastActivity)}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
