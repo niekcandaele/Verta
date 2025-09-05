@@ -34,6 +34,8 @@ export class ClusteringService {
    * @param question The extracted question text
    * @param originalContent The original thread content
    * @param confidence The confidence score for the question
+   * @param firstMessageAt The timestamp of the first message in the thread
+   * @param lastMessageAt The timestamp of the last message in the thread
    * @returns The cluster ID and whether it was newly created
    */
   async clusterQuestion(
@@ -42,7 +44,9 @@ export class ClusteringService {
     threadTitle: string | null,
     question: string,
     originalContent: string,
-    confidence: number
+    confidence: number,
+    firstMessageAt: Date,
+    lastMessageAt: Date
   ): Promise<{
     clusterId: string;
     isNewCluster: boolean;
@@ -83,8 +87,8 @@ export class ClusteringService {
           `Adding question to existing cluster ${clusterId} with similarity ${similarity}`
         );
 
-        // Update cluster statistics
-        await this.clusterRepo.incrementInstanceCount(clusterId, new Date());
+        // Update cluster statistics with the actual message date
+        await this.clusterRepo.incrementInstanceCount(clusterId, lastMessageAt);
 
         // Optionally update representative text if this question is better
         // (This could be based on confidence, length, clarity, etc.)
@@ -95,15 +99,15 @@ export class ClusteringService {
           });
         }
       } else {
-        // Create new cluster
+        // Create new cluster with actual message dates
         const newCluster = await this.clusterRepo.create({
           tenant_id: tenantId,
           representative_text: question,
           thread_title: threadTitle,
           embedding: embedding.embedding,
           instance_count: 1,
-          first_seen_at: new Date().toISOString(),
-          last_seen_at: new Date().toISOString(),
+          first_seen_at: firstMessageAt.toISOString(),
+          last_seen_at: lastMessageAt.toISOString(),
           metadata: {
             source: 'thread_analysis',
             confidence,
@@ -119,13 +123,14 @@ export class ClusteringService {
       }
 
       // Create question instance
+      // Use similarity score for existing clusters, confidence for new clusters
       await this.instanceRepo.create({
         cluster_id: clusterId,
         thread_id: threadId,
         thread_title: threadTitle,
         original_text: originalContent,
         rephrased_text: question,
-        confidence_score: confidence,
+        confidence_score: similarity !== undefined ? similarity : confidence,
       });
 
       return {

@@ -246,6 +246,25 @@ export interface OcrResultsTable {
 }
 
 /**
+ * Answer format enum
+ */
+export type AnswerFormat = 'markdown' | 'plaintext';
+
+/**
+ * Database table schema for golden answers
+ */
+export interface GoldenAnswersTable {
+  id: Generated<string>;
+  cluster_id: string;
+  tenant_id: string;
+  answer: string;
+  answer_format: ColumnType<AnswerFormat, AnswerFormat | undefined, AnswerFormat>;
+  created_by: string;
+  created_at: ColumnType<Date, string | undefined, never>;
+  updated_at: ColumnType<Date, string | undefined, string>;
+}
+
+/**
  * Database schema interface
  */
 export interface Database {
@@ -261,6 +280,7 @@ export interface Database {
   question_instances: QuestionInstancesTable;
   analysis_jobs: AnalysisJobsTable;
   ocr_results: OcrResultsTable;
+  golden_answers: GoldenAnswersTable;
 }
 
 /**
@@ -337,3 +357,10 @@ export type AnalysisJobUpdate = Updateable<AnalysisJobsTable>;
 export type OcrResult = Selectable<OcrResultsTable>;
 export type NewOcrResult = Insertable<OcrResultsTable>;
 export type OcrResultUpdate = Updateable<OcrResultsTable>;
+
+/**
+ * Type helpers for working with golden answer records
+ */
+export type GoldenAnswer = Selectable<GoldenAnswersTable>;
+export type NewGoldenAnswer = Insertable<GoldenAnswersTable>;
+export type GoldenAnswerUpdate = Updateable<GoldenAnswersTable>;

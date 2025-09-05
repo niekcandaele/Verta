@@ -299,14 +299,16 @@ export class AnalysisWorker {
 
       result.questionExtracted = true;
 
-      // Cluster the question
+      // Cluster the question with actual message dates
       const clusterResult = await this.clusteringService.clusterQuestion(
         tenantId,
         thread.id,
         thread.name,
         threadData.extractedQuestion,
         threadData.originalContent,
-        threadData.confidence
+        threadData.confidence,
+        threadData.firstMessageAt,
+        threadData.lastMessageAt
       );
 
       if (clusterResult.isNewCluster) {

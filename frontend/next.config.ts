@@ -6,6 +6,15 @@ const nextConfig: NextConfig = {
     unoptimized: true,
   },
   trailingSlash: true,
+  skipTrailingSlashRedirect: true,
+  async rewrites() {
+    return [
+      {
+        source: '/api/admin/:path*/',
+        destination: '/api/admin/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;

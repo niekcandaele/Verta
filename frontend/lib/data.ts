@@ -40,13 +40,27 @@ export interface MessagePageData {
   messages: MessageWithExtras[];
 }
 
+// Extended channel type for forum threads
+export interface ForumThread extends Channel {
+  archived?: boolean;
+  locked?: boolean;
+  lastActivity?: string;
+  firstMessage?: {
+    content: string;
+  };
+  messageCount?: number;
+}
+
 // Forum threads page interface
 export interface ForumThreadsPage {
   channelId: string;
   channelName: string;
+  forumId: string;
+  forumName: string;
   page: number;
   totalPages: number;
-  threads: Channel[];
+  totalThreads: number;
+  threads: ForumThread[];
 }
 
 // Load tenant metadata (combines tenant, channels, and branding)
@@ -175,8 +189,11 @@ export async function getForumThreadsPage(forumChannelId: string, page: number):
     return {
       channelId: channel.id,
       channelName: channel.name,
+      forumId: channel.id,
+      forumName: channel.name,
       page: meta.page || page,
       totalPages: meta.totalPages || 1,
+      totalThreads: meta.total || threads.length,
       threads: threads
     };
   } catch (error) {

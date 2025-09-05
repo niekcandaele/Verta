@@ -153,6 +153,8 @@ ${context}`;
     confidence: number;
     messageCount: number;
     participantCount: number;
+    firstMessageAt: Date;
+    lastMessageAt: Date;
   } | null> {
     try {
       // Step 1: Aggregate thread content
@@ -174,6 +176,8 @@ ${context}`;
         confidence: questionData.confidence,
         messageCount: aggregated.messageCount,
         participantCount: aggregated.participants.size,
+        firstMessageAt: aggregated.firstMessageAt,
+        lastMessageAt: aggregated.lastMessageAt,
       };
     } catch (error) {
       logger.error(`Failed to process thread ${threadId}`, { error });
