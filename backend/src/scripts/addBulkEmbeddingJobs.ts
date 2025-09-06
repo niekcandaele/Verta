@@ -11,17 +11,21 @@ import logger from '../utils/logger.js';
 const TENANT_ID = 'dcc3a375-90d8-40dd-8761-2d622936c90b'; // Takaro tenant
 const MESSAGES_WITHOUT_EMBEDDINGS = 250067;
 const MESSAGES_PER_JOB = 100;
-const TOTAL_JOBS_NEEDED = Math.ceil(MESSAGES_WITHOUT_EMBEDDINGS / MESSAGES_PER_JOB);
+const TOTAL_JOBS_NEEDED = Math.ceil(
+  MESSAGES_WITHOUT_EMBEDDINGS / MESSAGES_PER_JOB
+);
 const BATCH_SIZE = 100; // Add jobs in batches
 const DELAY_BETWEEN_BATCHES = 1000; // 1 second delay between batches
 
 async function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function main() {
   logger.info(`Starting bulk job creation for ${TOTAL_JOBS_NEEDED} jobs`);
-  logger.info(`This will process approximately ${MESSAGES_WITHOUT_EMBEDDINGS} messages`);
+  logger.info(
+    `This will process approximately ${MESSAGES_WITHOUT_EMBEDDINGS} messages`
+  );
 
   let jobsCreated = 0;
   const jobIds: string[] = [];
@@ -29,24 +33,28 @@ async function main() {
   try {
     for (let i = 0; i < TOTAL_JOBS_NEEDED; i += BATCH_SIZE) {
       const batchSize = Math.min(BATCH_SIZE, TOTAL_JOBS_NEEDED - i);
-      logger.info(`Creating batch of ${batchSize} jobs (${i + 1} to ${i + batchSize} of ${TOTAL_JOBS_NEEDED})`);
+      logger.info(
+        `Creating batch of ${batchSize} jobs (${i + 1} to ${i + batchSize} of ${TOTAL_JOBS_NEEDED})`
+      );
 
       const batchPromises: Promise<string>[] = [];
-      
+
       for (let j = 0; j < batchSize; j++) {
         const jobIndex = i + j;
         if (jobIndex >= TOTAL_JOBS_NEEDED) break;
 
         // Add job with a slight delay to spread them out
         const delayMs = j * 100; // 100ms between each job in the batch
-        
+
         const promise = addMessageEmbeddingJob(
           { tenantId: TENANT_ID },
           { delay: delayMs }
-        ).then(jobId => {
+        ).then((jobId) => {
           jobsCreated++;
           if (jobsCreated % 100 === 0) {
-            logger.info(`Progress: ${jobsCreated}/${TOTAL_JOBS_NEEDED} jobs created`);
+            logger.info(
+              `Progress: ${jobsCreated}/${TOTAL_JOBS_NEEDED} jobs created`
+            );
           }
           return jobId;
         });
@@ -79,7 +87,7 @@ async function main() {
 }
 
 // Run the script
-main().catch(error => {
+main().catch((error) => {
   logger.error('Script failed', error);
   process.exit(1);
 });

@@ -142,9 +142,15 @@ export class MlClientService {
 
     // Initialize separate circuit breakers for each operation type
     this.circuitBreakers = new Map();
-    const operationTypes: OperationType[] = ['ocr', 'embed', 'classify', 'rephrase', 'search'];
-    
-    operationTypes.forEach(opType => {
+    const operationTypes: OperationType[] = [
+      'ocr',
+      'embed',
+      'classify',
+      'rephrase',
+      'search',
+    ];
+
+    operationTypes.forEach((opType) => {
       this.circuitBreakers.set(opType, {
         state: CircuitState.CLOSED,
         failureCount: 0,
@@ -256,7 +262,9 @@ export class MlClientService {
 
     if (cb.state === CircuitState.HALF_OPEN) {
       cb.state = CircuitState.OPEN;
-      logger.warn(`Circuit breaker for ${operationType} transitioned to OPEN from HALF_OPEN`);
+      logger.warn(
+        `Circuit breaker for ${operationType} transitioned to OPEN from HALF_OPEN`
+      );
     } else if (cb.failureCount >= cb.config.failureThreshold) {
       cb.state = CircuitState.OPEN;
       logger.warn(
@@ -303,6 +311,24 @@ export class MlClientService {
           throw error;
         }
 
+        // Check if the error is due to an expired or invalid URL
+        if (
+          error instanceof Error &&
+          (error.message.includes('Could not load image from URL') ||
+            error.message.includes('403') ||
+            error.message.includes('404'))
+        ) {
+          logger.warn(
+            `${operationName} failed with permanent error, not retrying`,
+            {
+              error: error.message,
+              attempt,
+            }
+          );
+          this.recordFailure(operationType);
+          throw error;
+        }
+
         if (attempt < this.config.maxRetries) {
           const delay = this.config.retryDelay * Math.pow(2, attempt - 1); // Exponential backoff
           logger.warn(`${operationName} failed, retrying in ${delay}ms`, {
@@ -333,114 +359,136 @@ export class MlClientService {
    * Classify text as question or statement
    */
   async classify(text: string): Promise<ClassificationResult> {
-    return this.executeWithRetry(async () => {
-      const response = await this.client.post<ClassificationResult>(
-        '/api/ml/classify',
-        { text }
-      );
-      return response.data;
-    }, 'Classification', 'classify');
+    return this.executeWithRetry(
+      async () => {
+        const response = await this.client.post<ClassificationResult>(
+          '/api/ml/classify',
+          { text }
+        );
+        return response.data;
+      },
+      'Classification',
+      'classify'
+    );
   }
 
   /**
    * Classify multiple texts in batch
    */
   async classifyBatch(texts: string[]): Promise<ClassificationResult[]> {
-    return this.executeWithRetry(async () => {
-      const response = await this.client.post<{
-        results: ClassificationResult[];
-      }>('/api/ml/classify/batch', { texts });
-      return response.data.results;
-    }, 'Batch classification', 'classify');
+    return this.executeWithRetry(
+      async () => {
+        const response = await this.client.post<{
+          results: ClassificationResult[];
+        }>('/api/ml/classify/batch', { texts });
+        return response.data.results;
+      },
+      'Batch classification',
+      'classify'
+    );
   }
 
   /**
    * Generate embedding for text
    */
   async embed(text: string): Promise<EmbeddingResult> {
-    return this.executeWithRetry(async () => {
-      const response = await this.client.post<{
-        embedding: number[];
-        dimensions: number;
-      }>(
-        '/api/ml/embed',
-        { text }
-      );
-      
-      // Transform ML service response to expected format
-      return {
-        embedding: response.data.embedding,
-        dimension: response.data.dimensions,
-        text: text
-      };
-    }, 'Embedding generation', 'embed');
+    return this.executeWithRetry(
+      async () => {
+        const response = await this.client.post<{
+          embedding: number[];
+          dimensions: number;
+        }>('/api/ml/embed', { text });
+
+        // Transform ML service response to expected format
+        return {
+          embedding: response.data.embedding,
+          dimension: response.data.dimensions,
+          text: text,
+        };
+      },
+      'Embedding generation',
+      'embed'
+    );
   }
 
   /**
    * Generate embeddings for multiple texts
    */
   async embedBatch(texts: string[]): Promise<EmbeddingResult[]> {
-    return this.executeWithRetry(async () => {
-      const response = await this.client.post<{
-        embeddings: number[][];
-        dimensions: number;
-        count: number;
-      }>(
-        '/api/ml/embed/batch',
-        { texts }
-      );
-      
-      // Transform ML service response to expected format
-      return response.data.embeddings.map((embedding, index) => ({
-        embedding: embedding,
-        dimension: response.data.dimensions,
-        text: texts[index]
-      }));
-    }, 'Batch embedding', 'embed');
+    return this.executeWithRetry(
+      async () => {
+        const response = await this.client.post<{
+          embeddings: number[][];
+          dimensions: number;
+          count: number;
+        }>('/api/ml/embed/batch', { texts });
+
+        // Transform ML service response to expected format
+        return response.data.embeddings.map((embedding, index) => ({
+          embedding: embedding,
+          dimension: response.data.dimensions,
+          text: texts[index],
+        }));
+      },
+      'Batch embedding',
+      'embed'
+    );
   }
 
   /**
    * Rephrase multi-part questions using LLM
    */
   async rephrase(request: RephraseRequest): Promise<RephraseResult> {
-    return this.executeWithRetry(async () => {
-      const response = await this.client.post<RephraseResult>(
-        '/api/ml/rephrase',
-        request
-      );
+    return this.executeWithRetry(
+      async () => {
+        const response = await this.client.post<RephraseResult>(
+          '/api/ml/rephrase',
+          request
+        );
 
-      return response.data;
-    }, 'Rephrasing', 'rephrase');
+        return response.data;
+      },
+      'Rephrasing',
+      'rephrase'
+    );
   }
 
   /**
    * Extract text from image using OCR
    */
   async ocr(request: OcrRequest): Promise<OcrResult> {
-    return this.executeWithRetry(async () => {
-      // Use longer timeout for OCR operations
-      const response = await this.client.post<OcrResult>(
-        '/api/ml/ocr',
-        request,
-        { timeout: this.config.ocrTimeout }
-      );
-      return response.data;
-    }, 'OCR extraction', 'ocr');
+    return this.executeWithRetry(
+      async () => {
+        // Use longer timeout for OCR operations
+        const response = await this.client.post<OcrResult>(
+          '/api/ml/ocr',
+          request,
+          { timeout: this.config.ocrTimeout }
+        );
+        return response.data;
+      },
+      'OCR extraction',
+      'ocr'
+    );
   }
 
   /**
    * Extract text from multiple images using OCR
    */
   async ocrBatch(request: BatchOcrRequest): Promise<OcrResult[]> {
-    return this.executeWithRetry(async () => {
-      // Use longer timeout for batch OCR operations
-      const response = await this.client.post<BatchOcrResult>(
-        '/api/ml/ocr/batch',
-        request,
-        { timeout: this.config.ocrTimeout }
-      );
-      return response.data.results;
-    }, 'Batch OCR extraction', 'ocr');
+    return this.executeWithRetry(
+      async () => {
+        // Use longer timeout for batch OCR operations
+        const response = await this.client.post<BatchOcrResult>(
+          '/api/ml/ocr/batch',
+          request,
+          { timeout: this.config.ocrTimeout }
+        );
+        return response.data.results;
+      },
+      'Batch OCR extraction',
+      'ocr'
+    );
   }
 
   /**
@@ -487,13 +535,17 @@ export class MlClientService {
    * Execute hybrid search
    */
   async search(request: SearchRequest): Promise<SearchResponse> {
-    return this.executeWithRetry(async () => {
-      const response = await this.client.post<SearchResponse>(
-        '/api/ml/search',
-        request
-      );
-      return response.data;
-    }, 'Search', 'search');
+    return this.executeWithRetry(
+      async () => {
+        const response = await this.client.post<SearchResponse>(
+          '/api/ml/search',
+          request
+        );
+        return response.data;
+      },
+      'Search',
+      'search'
+    );
   }
 
   /**

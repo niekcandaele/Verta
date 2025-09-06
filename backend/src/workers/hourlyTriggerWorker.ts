@@ -4,7 +4,10 @@
 
 import { Worker, type Job } from 'bullmq';
 import { syncQueue, SYNC_QUEUE_NAME } from '../queues/syncQueue.js';
-import { addGoldenAnswerEmbeddingJob, addMessageEmbeddingJob } from '../queues/analysisQueue.js';
+import {
+  addGoldenAnswerEmbeddingJob,
+  addMessageEmbeddingJob,
+} from '../queues/analysisQueue.js';
 import { TenantRepositoryImpl } from '../repositories/tenant/index.js';
 import { db } from '../database/index.js';
 import logger from '../utils/logger.js';
@@ -112,7 +115,7 @@ export class HourlyTriggerWorker {
 
       // Queue golden answer embedding generation for all active tenants
       logger.info('Queueing golden answer embedding generation jobs');
-      
+
       const embeddingPromises = discordTenants.map(async (tenant) => {
         try {
           const jobId = await addGoldenAnswerEmbeddingJob({
@@ -133,12 +136,12 @@ export class HourlyTriggerWorker {
       });
 
       await Promise.all(embeddingPromises);
-      
+
       logger.info('Golden answer embedding jobs queued successfully');
 
       // Queue message embedding generation for all active tenants
       logger.info('Queueing message embedding generation jobs');
-      
+
       const messageEmbeddingPromises = discordTenants.map(async (tenant) => {
         try {
           const jobId = await addMessageEmbeddingJob({
@@ -159,7 +162,7 @@ export class HourlyTriggerWorker {
       });
 
       await Promise.all(messageEmbeddingPromises);
-      
+
       logger.info('Message embedding jobs queued successfully');
     } catch (error) {
       logger.error('Failed to run hourly sync', { error });

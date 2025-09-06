@@ -8,17 +8,17 @@
  * These are considered safe for user-generated content
  */
 export const ALLOWED_MARKDOWN_FEATURES = {
-  bold: true,           // **text** or __text__
-  italic: true,         // *text* or _text_
-  strikethrough: true,  // ~~text~~
-  headings: true,       // # Heading
-  lists: true,          // - item or 1. item
-  links: true,          // [text](url) - URLs will be validated
-  code: true,           // `inline code`
-  codeBlocks: true,     // ```code blocks```
-  blockquotes: true,    // > quote
+  bold: true, // **text** or __text__
+  italic: true, // *text* or _text_
+  strikethrough: true, // ~~text~~
+  headings: true, // # Heading
+  lists: true, // - item or 1. item
+  links: true, // [text](url) - URLs will be validated
+  code: true, // `inline code`
+  codeBlocks: true, // ```code blocks```
+  blockquotes: true, // > quote
   horizontalRule: true, // ---
-  lineBreaks: true,     // Two spaces at end of line
+  lineBreaks: true, // Two spaces at end of line
 };
 
 /**
@@ -61,7 +61,7 @@ export function sanitizeMarkdown(content: string): string {
   let sanitized = content;
 
   // Remove HTML tags that could be dangerous
-  DANGEROUS_TAGS.forEach(tag => {
+  DANGEROUS_TAGS.forEach((tag) => {
     const regex = new RegExp(`<${tag}[^>]*>.*?</${tag}>`, 'gi');
     sanitized = sanitized.replace(regex, '');
     const selfClosing = new RegExp(`<${tag}[^>]*/>`, 'gi');
@@ -69,7 +69,7 @@ export function sanitizeMarkdown(content: string): string {
   });
 
   // Remove dangerous URL schemes from links
-  DANGEROUS_SCHEMES.forEach(scheme => {
+  DANGEROUS_SCHEMES.forEach((scheme) => {
     const regex = new RegExp(`\\[([^\\]]+)\\]\\(${scheme}[^)]*\\)`, 'gi');
     sanitized = sanitized.replace(regex, '$1'); // Keep text, remove link
   });
@@ -90,7 +90,7 @@ export function isUrlSafe(url: string): boolean {
   if (!url) return false;
 
   const lowerUrl = url.toLowerCase();
-  
+
   // Check for dangerous schemes
   for (const scheme of DANGEROUS_SCHEMES) {
     if (lowerUrl.startsWith(scheme)) {
@@ -99,10 +99,12 @@ export function isUrlSafe(url: string): boolean {
   }
 
   // Allow http, https, and relative URLs
-  if (lowerUrl.startsWith('http://') || 
-      lowerUrl.startsWith('https://') || 
-      lowerUrl.startsWith('/') ||
-      lowerUrl.startsWith('#')) {
+  if (
+    lowerUrl.startsWith('http://') ||
+    lowerUrl.startsWith('https://') ||
+    lowerUrl.startsWith('/') ||
+    lowerUrl.startsWith('#')
+  ) {
     return true;
   }
 
@@ -121,33 +123,33 @@ export function stripMarkdown(content: string): string {
 
   // Remove code blocks
   stripped = stripped.replace(/```[\s\S]*?```/g, '');
-  
+
   // Remove inline code
   stripped = stripped.replace(/`([^`]+)`/g, '$1');
-  
+
   // Remove bold and italic
   stripped = stripped.replace(/(\*\*|__)(.*?)\1/g, '$2');
   stripped = stripped.replace(/(\*|_)(.*?)\1/g, '$2');
-  
+
   // Remove strikethrough
   stripped = stripped.replace(/~~(.*?)~~/g, '$1');
-  
+
   // Remove headings
   stripped = stripped.replace(/^#+\s+/gm, '');
-  
+
   // Remove links but keep text
   stripped = stripped.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
-  
+
   // Remove blockquotes
   stripped = stripped.replace(/^>\s+/gm, '');
-  
+
   // Remove horizontal rules
   stripped = stripped.replace(/^---+$/gm, '');
-  
+
   // Remove list markers
   stripped = stripped.replace(/^[*\-+]\s+/gm, '');
   stripped = stripped.replace(/^\d+\.\s+/gm, '');
-  
+
   return stripped.trim();
 }
 
@@ -155,20 +157,23 @@ export function stripMarkdown(content: string): string {
  * Get a safe preview of markdown content
  * Truncates to specified length and strips formatting
  */
-export function getMarkdownPreview(content: string, maxLength: number = 200): string {
+export function getMarkdownPreview(
+  content: string,
+  maxLength: number = 200
+): string {
   const stripped = stripMarkdown(content);
-  
+
   if (stripped.length <= maxLength) {
     return stripped;
   }
-  
+
   // Try to break at a word boundary
   const truncated = stripped.substring(0, maxLength);
   const lastSpace = truncated.lastIndexOf(' ');
-  
+
   if (lastSpace > maxLength * 0.8) {
     return truncated.substring(0, lastSpace) + '...';
   }
-  
+
   return truncated + '...';
 }

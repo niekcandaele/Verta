@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GoldenAnswerRepository } from '../GoldenAnswerRepository.js';
-import type { NewGoldenAnswer, GoldenAnswerUpdate } from '../../database/types.js';
+import type {
+  NewGoldenAnswer,
+  GoldenAnswerUpdate,
+} from '../../database/types.js';
 
 describe('GoldenAnswerRepository', () => {
   let repository: GoldenAnswerRepository;
@@ -60,7 +63,7 @@ describe('GoldenAnswerRepository', () => {
       expect(result.answer).toBe(newAnswer.answer);
       expect(result.answer_format).toBe('markdown');
       expect(result.created_by).toBe('admin');
-      
+
       expect(mockDb.insertInto).toHaveBeenCalledWith('golden_answers');
       expect(mockDb.values).toHaveBeenCalled();
     });
@@ -110,7 +113,7 @@ describe('GoldenAnswerRepository', () => {
       expect(found).toBeDefined();
       expect(found?.cluster_id).toBe(clusterId);
       expect(found?.answer).toBe('Test answer');
-      
+
       expect(mockDb.selectFrom).toHaveBeenCalledWith('golden_answers');
       expect(mockDb.where).toHaveBeenCalledWith('cluster_id', '=', clusterId);
     });
@@ -119,7 +122,7 @@ describe('GoldenAnswerRepository', () => {
       mockDb.executeTakeFirst.mockResolvedValueOnce(undefined);
 
       const found = await repository.findByClusterId('non-existent');
-      
+
       expect(found).toBeNull();
     });
   });
@@ -157,7 +160,7 @@ describe('GoldenAnswerRepository', () => {
       expect(result.data).toHaveLength(2);
       expect(result.pagination.total).toBe(2);
       expect(result.pagination.totalPages).toBe(1);
-      
+
       expect(mockDb.where).toHaveBeenCalledWith('tenant_id', '=', tenantId);
     });
 
@@ -190,7 +193,7 @@ describe('GoldenAnswerRepository', () => {
 
       // Mock findByClusterId returns null (no existing answer)
       mockDb.executeTakeFirst.mockResolvedValueOnce(undefined);
-      
+
       // Mock create operation
       mockDb.execute.mockResolvedValueOnce({});
       mockDb.executeTakeFirstOrThrow.mockResolvedValueOnce({
@@ -230,7 +233,7 @@ describe('GoldenAnswerRepository', () => {
 
       // Mock findByClusterId returns existing answer
       mockDb.executeTakeFirst.mockResolvedValueOnce(existingAnswer);
-      
+
       // Mock update operation
       mockDb.execute.mockResolvedValueOnce({});
       mockDb.executeTakeFirst.mockResolvedValueOnce({
@@ -275,7 +278,7 @@ describe('GoldenAnswerRepository', () => {
       expect(result).toBeDefined();
       expect(result?.answer).toBe('Updated answer');
       expect(result?.answer_format).toBe('plaintext');
-      
+
       expect(mockDb.updateTable).toHaveBeenCalledWith('golden_answers');
       expect(mockDb.where).toHaveBeenCalledWith('id', '=', 'answer-id');
     });
@@ -358,9 +361,11 @@ describe('GoldenAnswerRepository', () => {
       expect(result.data).toHaveLength(1);
       expect(result.data[0].answer).toBe('Detailed answer');
       expect(result.data[0].cluster).toBeDefined();
-      expect(result.data[0].cluster.representative_text).toBe('How do I get started?');
+      expect(result.data[0].cluster.representative_text).toBe(
+        'How do I get started?'
+      );
       expect(result.data[0].cluster.instance_count).toBe(10);
-      
+
       expect(mockDb.innerJoin).toHaveBeenCalledWith(
         'question_clusters',
         'golden_answers.cluster_id',
@@ -374,7 +379,10 @@ describe('GoldenAnswerRepository', () => {
 
       await repository.findWithClusterDetails(tenantId);
 
-      expect(mockDb.orderBy).toHaveBeenCalledWith('question_clusters.instance_count', 'desc');
+      expect(mockDb.orderBy).toHaveBeenCalledWith(
+        'question_clusters.instance_count',
+        'desc'
+      );
     });
 
     it('should allow custom sorting', async () => {
@@ -388,7 +396,10 @@ describe('GoldenAnswerRepository', () => {
         sortOrder: 'asc',
       });
 
-      expect(mockDb.orderBy).toHaveBeenCalledWith('question_clusters.first_seen_at', 'asc');
+      expect(mockDb.orderBy).toHaveBeenCalledWith(
+        'question_clusters.first_seen_at',
+        'asc'
+      );
     });
   });
 });

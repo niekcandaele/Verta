@@ -24,7 +24,7 @@ describe('Admin Clusters API Integration', () => {
     const { db: database } = await import('../../../../database/index.js');
     db = database;
     app = createApp(db);
-    
+
     // Create test tenant
     testTenantId = uuidv4();
     await db
@@ -49,26 +49,23 @@ describe('Admin Clusters API Integration', () => {
         .deleteFrom('golden_answers')
         .where('tenant_id', '=', testTenantId)
         .execute();
-      
+
       await db
         .deleteFrom('question_clusters')
         .where('tenant_id', '=', testTenantId)
         .execute();
-      
-      await db
-        .deleteFrom('tenants')
-        .where('id', '=', testTenantId)
-        .execute();
+
+      await db.deleteFrom('tenants').where('id', '=', testTenantId).execute();
     }
   });
 
   beforeEach(async () => {
     // Create a test cluster for each test
     testClusterId = uuidv4();
-    
+
     // Create embedding array with 1024 dimensions (all zeros for testing)
     const embedding = JSON.stringify(new Array(1024).fill(0));
-    
+
     await db
       .insertInto('question_clusters')
       .values({
@@ -89,8 +86,7 @@ describe('Admin Clusters API Integration', () => {
 
   describe('GET /api/admin/clusters', () => {
     it('should require authentication', async () => {
-      const response = await request(app)
-        .get('/api/admin/clusters');
+      const response = await request(app).get('/api/admin/clusters');
 
       expect(response.status).toBe(401);
       expect(response.body).toHaveProperty('error', 'Unauthorized');
@@ -126,12 +122,13 @@ describe('Admin Clusters API Integration', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('data');
-      
+
       // Check if sorted correctly (if there are multiple items)
       if (response.body.data.length > 1) {
         for (let i = 1; i < response.body.data.length; i++) {
-          expect(response.body.data[i - 1].instance_count)
-            .toBeGreaterThanOrEqual(response.body.data[i].instance_count);
+          expect(
+            response.body.data[i - 1].instance_count
+          ).toBeGreaterThanOrEqual(response.body.data[i].instance_count);
         }
       }
     });
@@ -166,7 +163,10 @@ describe('Admin Clusters API Integration', () => {
         .set('X-API-KEY', 'ikbeneenaap');
 
       expect(response.status).toBe(400);
-      expect(response.body).toHaveProperty('error', 'Invalid cluster ID format');
+      expect(response.body).toHaveProperty(
+        'error',
+        'Invalid cluster ID format'
+      );
     });
   });
 
@@ -184,10 +184,15 @@ describe('Admin Clusters API Integration', () => {
         .send(answerData);
 
       expect(response.status).toBe(201);
-      expect(response.body).toHaveProperty('message', 'Golden answer saved successfully');
+      expect(response.body).toHaveProperty(
+        'message',
+        'Golden answer saved successfully'
+      );
       expect(response.body).toHaveProperty('golden_answer');
       expect(response.body.golden_answer.answer).toBe(answerData.answer);
-      expect(response.body.golden_answer.answer_format).toBe(answerData.answer_format);
+      expect(response.body.golden_answer.answer_format).toBe(
+        answerData.answer_format
+      );
     });
 
     it('should update existing golden answer', async () => {
@@ -213,7 +218,9 @@ describe('Admin Clusters API Integration', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.golden_answer.answer).toBe(updatedData.answer);
-      expect(response.body.golden_answer.answer_format).toBe(updatedData.answer_format);
+      expect(response.body.golden_answer.answer_format).toBe(
+        updatedData.answer_format
+      );
     });
 
     it('should sanitize dangerous markdown', async () => {
@@ -280,7 +287,10 @@ describe('Admin Clusters API Integration', () => {
         .set('X-API-KEY', 'ikbeneenaap');
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('message', 'Golden answer deleted successfully');
+      expect(response.body).toHaveProperty(
+        'message',
+        'Golden answer deleted successfully'
+      );
 
       // Verify it's actually deleted
       const checkResponse = await request(app)
@@ -310,7 +320,8 @@ describe('Admin Clusters API Integration', () => {
     it('should complete full workflow from admin to public FAQ', async () => {
       // Step 1: Create golden answer via admin API
       const answerData = {
-        answer: '## Complete Answer\n\nThis is a comprehensive answer with:\n- Bullet points\n- **Bold text**\n- *Italic text*',
+        answer:
+          '## Complete Answer\n\nThis is a comprehensive answer with:\n- Bullet points\n- **Bold text**\n- *Italic text*',
         answer_format: 'markdown',
         created_by: 'admin',
       };
@@ -332,8 +343,9 @@ describe('Admin Clusters API Integration', () => {
       expect(detailsResponse.body.golden_answer.answer).toBe(answerData.answer);
 
       // Step 3: Verify it appears in public FAQ endpoint
-      const faqResponse = await request(app)
-        .get(`/api/v1/faq?tenant_id=${testTenantId}`);
+      const faqResponse = await request(app).get(
+        `/api/v1/faq?tenant_id=${testTenantId}`
+      );
 
       expect(faqResponse.status).toBe(200);
       expect(faqResponse.body.data).toHaveLength(1);
@@ -346,8 +358,9 @@ describe('Admin Clusters API Integration', () => {
       });
 
       // Step 4: Verify caching works
-      const cachedResponse = await request(app)
-        .get(`/api/v1/faq/cached?tenant_id=${testTenantId}`);
+      const cachedResponse = await request(app).get(
+        `/api/v1/faq/cached?tenant_id=${testTenantId}`
+      );
 
       expect(cachedResponse.status).toBe(200);
       expect(cachedResponse.body).toHaveProperty('cached_at');

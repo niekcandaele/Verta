@@ -19,24 +19,24 @@ async function testSearchEndpoint() {
   try {
     // Test with mock data since we're just verifying the endpoint structure
     const searchRequest = {
-      query: "How do I configure webhooks?",
+      query: 'How do I configure webhooks?',
       embedding: Array(1024).fill(0.1), // Mock embedding vector
       search_configs: [
         {
-          table: "golden_answers",
-          text_field: "answer",
-          vector_field: "embedding",
-          filters: { tenant_id: "takaro" }
+          table: 'golden_answers',
+          text_field: 'answer',
+          vector_field: 'embedding',
+          filters: { tenant_id: 'takaro' },
         },
         {
-          table: "messages",
-          text_field: "content",
-          vector_field: "embedding",
-          filters: { channel_id: "1234567890" }
-        }
+          table: 'messages',
+          text_field: 'content',
+          vector_field: 'embedding',
+          filters: { channel_id: '1234567890' },
+        },
       ],
       limit: 10,
-      rerank: false // Skip reranking for initial test
+      rerank: false, // Skip reranking for initial test
     };
 
     const response = await axios.post(
@@ -45,9 +45,9 @@ async function testSearchEndpoint() {
       {
         headers: {
           'Content-Type': 'application/json',
-          'X-API-Key': API_KEY
+          'X-API-Key': API_KEY,
         },
-        timeout: 10000
+        timeout: 10000,
       }
     );
 
@@ -56,23 +56,24 @@ async function testSearchEndpoint() {
       query: response.data.query,
       total_results: response.data.total_results,
       processing_time_ms: response.data.processing_time_ms,
-      results_count: response.data.results?.length || 0
+      results_count: response.data.results?.length || 0,
     });
 
     if (response.data.results?.length > 0) {
       console.log('\n📋 Sample result:', response.data.results[0]);
     }
-
   } catch (error: any) {
     if (error.response) {
       console.error('❌ API Error:', {
         status: error.response.status,
         statusText: error.response.statusText,
-        data: error.response.data
+        data: error.response.data,
       });
 
       if (error.response.status === 503) {
-        console.log('ℹ️  This is expected if TiDB hybrid search is not available');
+        console.log(
+          'ℹ️  This is expected if TiDB hybrid search is not available'
+        );
       }
     } else if (error.request) {
       console.error('❌ No response from ML service - is it running?');

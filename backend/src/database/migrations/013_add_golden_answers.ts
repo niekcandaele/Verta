@@ -12,7 +12,7 @@ export async function up(db: Kysely<any>): Promise<void> {
       col.notNull().references('tenants.id').onDelete('cascade')
     )
     .addColumn('answer', 'text', (col) => col.notNull())
-    .addColumn('answer_format', 'varchar(20)', (col) => 
+    .addColumn('answer_format', 'varchar(20)', (col) =>
       col.notNull().defaultTo('markdown')
     )
     .addColumn('created_by', 'varchar(255)', (col) => col.notNull())

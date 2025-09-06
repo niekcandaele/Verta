@@ -21,10 +21,7 @@ export class OcrWorker {
   private messageRepo: MessageRepositoryImpl;
   private db: Kysely<Database>;
 
-  constructor(
-    mlService: MlClientService,
-    db: Kysely<Database>
-  ) {
+  constructor(mlService: MlClientService, db: Kysely<Database>) {
     this.mlService = mlService;
     this.db = db;
     this.ocrRepository = new OcrResultRepositoryImpl(db);
@@ -52,7 +49,7 @@ export class OcrWorker {
             logger.info('Processing OCR retry trigger', { jobId: job.id });
             await this.runOcrRetry();
             return { success: true, message: 'OCR retry completed' };
-          
+
           default:
             // Regular OCR processing job
             return this.processOcrJob(job);
@@ -93,14 +90,42 @@ export class OcrWorker {
   }
 
   /**
+   * Check if a Discord CDN URL has expired
+   */
+  private isDiscordUrlExpired(url: string): boolean {
+    try {
+      // Parse Discord CDN URLs that have expiration parameters
+      const urlObj = new URL(url);
+      if (!urlObj.hostname.includes('cdn.discordapp.com')) {
+        return false; // Not a Discord URL, can't check expiration
+      }
+
+      // Get the 'ex' parameter which contains the expiration timestamp
+      const exParam = urlObj.searchParams.get('ex');
+      if (!exParam) {
+        return false; // No expiration parameter, assume it's valid
+      }
+
+      // Discord 'ex' parameter is a hex timestamp in seconds
+      const expirationTimestamp = parseInt(exParam, 16) * 1000; // Convert to milliseconds
+      const now = Date.now();
+
+      return now > expirationTimestamp;
+    } catch (error) {
+      logger.error('Error checking Discord URL expiration', { url, error });
+      return false; // On error, assume URL is valid and let OCR fail naturally
+    }
+  }
+
+  /**
    * Process a single OCR job
    */
   private async processOcrJob(job: Job<OcrJobData>): Promise<OcrJobResult> {
     const startTime = Date.now();
-    const { 
-      tenantId, 
-      messageId, 
-      attachmentId, 
+    const {
+      tenantId,
+      messageId,
+      attachmentId,
       attachmentUrl,
       attachmentFilename,
       attempt = 1,
@@ -116,13 +141,38 @@ export class OcrWorker {
     });
 
     try {
+      // Check if URL has expired before attempting OCR
+      if (this.isDiscordUrlExpired(attachmentUrl)) {
+        const errorMessage = 'Discord attachment URL has expired';
+        logger.warn('Skipping OCR for expired URL', {
+          attachmentId,
+          url: attachmentUrl,
+        });
+
+        // Store as permanently failed
+        await this.ocrRepository.create({
+          attachment_id: attachmentId,
+          model_version: 'skipped',
+          extracted_text: null,
+          confidence: null,
+          status: 'failed',
+          error_message: errorMessage,
+          retry_count: attempt - 1,
+          processing_time_ms: Date.now() - startTime,
+        });
+
+        // Return failure but don't throw to prevent retry
+        return {
+          success: false,
+          error: errorMessage,
+        };
+      }
       // Update job progress
       await job.updateProgress(10);
 
       // Check if we already have OCR results for this attachment
-      const existingResult = await this.ocrRepository.findLatestByAttachment(
-        attachmentId
-      );
+      const existingResult =
+        await this.ocrRepository.findLatestByAttachment(attachmentId);
 
       if (existingResult && !this.shouldReprocess(existingResult)) {
         logger.info('OCR result already exists, skipping', {
@@ -132,7 +182,7 @@ export class OcrWorker {
         return {
           success: true,
           text: existingResult.extracted_text || '',
-          full_response: existingResult.extracted_text || '',  // Same as text for existing results
+          full_response: existingResult.extracted_text || '', // Same as text for existing results
           confidence: existingResult.confidence || 0,
           processingTimeMs: existingResult.processing_time_ms || 0,
           model_name: existingResult.model_version || 'unknown',
@@ -153,8 +203,9 @@ export class OcrWorker {
       // Store OCR results in database with full response
       await this.ocrRepository.create({
         attachment_id: attachmentId,
-        model_version: ocrResult.model_name || ocrResult.model_used || 'openrouter',
-        extracted_text: ocrResult.full_response || ocrResult.text,  // Store full response with visual context
+        model_version:
+          ocrResult.model_name || ocrResult.model_used || 'openrouter',
+        extracted_text: ocrResult.full_response || ocrResult.text, // Store full response with visual context
         confidence: ocrResult.confidence,
         status: 'completed',
         error_message: null,
@@ -176,7 +227,7 @@ export class OcrWorker {
 
       return {
         success: true,
-        text: ocrResult.full_response || ocrResult.text,  // Use full_response for backward compat
+        text: ocrResult.full_response || ocrResult.text, // Use full_response for backward compat
         full_response: ocrResult.full_response,
         visual_context: ocrResult.visual_context,
         confidence: ocrResult.confidence,
@@ -187,7 +238,11 @@ export class OcrWorker {
       };
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      // Check if this is a permanent failure
+      const isPermanentFailure = this.isPermanentFailure(error);
 
       logger.error('OCR processing failed', {
         jobId: job.id,
@@ -195,10 +250,11 @@ export class OcrWorker {
         error: errorMessage,
         attempt,
         processingTimeMs: processingTime,
+        isPermanentFailure,
       });
 
-      // Store failure in database if first attempt
-      if (!await this.ocrRepository.findLatestByAttachment(attachmentId)) {
+      // Store failure in database
+      if (!(await this.ocrRepository.findLatestByAttachment(attachmentId))) {
         await this.ocrRepository.create({
           attachment_id: attachmentId,
           model_version: 'openrouter',
@@ -211,14 +267,19 @@ export class OcrWorker {
         });
       } else {
         // Update existing result as failed
-        const existing = await this.ocrRepository.findLatestByAttachment(attachmentId);
+        const existing =
+          await this.ocrRepository.findLatestByAttachment(attachmentId);
         if (existing) {
-          await this.ocrRepository.markFailed(existing.id, errorMessage, attempt - 1);
+          await this.ocrRepository.markFailed(
+            existing.id,
+            errorMessage,
+            attempt - 1
+          );
         }
       }
 
-      // If this is the last attempt, return a failure result
-      if (attempt >= 3) {
+      // If permanent failure or last attempt, return failure without retrying
+      if (isPermanentFailure || attempt >= 3) {
         return {
           success: false,
           error: errorMessage,
@@ -231,13 +292,32 @@ export class OcrWorker {
   }
 
   /**
+   * Check if an error represents a permanent failure that shouldn't be retried
+   */
+  private isPermanentFailure(error: unknown): boolean {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check for permanent failure indicators
+    const permanentFailurePatterns = [
+      'Could not load image from URL', // URL is invalid or inaccessible
+      'Request failed with status code 403', // Forbidden
+      'Request failed with status code 404', // Not found
+      'Discord attachment URL has expired', // Expired Discord URL
+    ];
+
+    return permanentFailurePatterns.some((pattern) =>
+      errorMessage.includes(pattern)
+    );
+  }
+
+  /**
    * Check if OCR result should be reprocessed
    */
   private shouldReprocess(existingResult: any): boolean {
     // Don't reprocess if:
     // 1. Result is successful and less than 7 days old
     // 2. Result has failed 3 times already
-    
+
     if (existingResult.status === 'completed') {
       const age = Date.now() - new Date(existingResult.created_at).getTime();
       const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
@@ -303,7 +383,7 @@ export class OcrWorker {
         ])
         .where('ocr.id', 'is', null)
         .where((eb) => {
-          const conditions = imageTypes.map(type => 
+          const conditions = imageTypes.map((type) =>
             eb('ma.content_type', '=', type)
           );
           return eb.or(conditions);
@@ -316,7 +396,9 @@ export class OcrWorker {
         return 0;
       }
 
-      logger.info(`Found ${missingOcrAttachments.length} image attachments without OCR results`);
+      logger.info(
+        `Found ${missingOcrAttachments.length} image attachments without OCR results`
+      );
 
       // Queue OCR jobs for each missing attachment
       const queuePromises = missingOcrAttachments.map(async (attachment) => {
@@ -347,9 +429,11 @@ export class OcrWorker {
       });
 
       const results = await Promise.all(queuePromises);
-      const successCount = results.filter(r => r !== null).length;
-      
-      logger.info(`Successfully queued ${successCount} OCR jobs for missing attachments`);
+      const successCount = results.filter((r) => r !== null).length;
+
+      logger.info(
+        `Successfully queued ${successCount} OCR jobs for missing attachments`
+      );
       return successCount;
     } catch (error) {
       logger.error('Failed to queue missing OCR jobs', { error });
@@ -367,14 +451,33 @@ export class OcrWorker {
       // First, queue OCR jobs for images that don't have OCR results yet
       const missingCount = await this.queueMissingOcrJobs();
       if (missingCount > 0) {
-        logger.info(`Queued ${missingCount} OCR jobs for images without results`);
+        logger.info(
+          `Queued ${missingCount} OCR jobs for images without results`
+        );
       }
-      
+
+      // First, clean up very old failed results that shouldn't be retried
+      const cleanupResult = await this.db
+        .deleteFrom('ocr_results')
+        .where('status', '=', 'failed')
+        .where(
+          'created_at',
+          '<',
+          new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        ) // 30 days old
+        .executeTakeFirst();
+
+      if (cleanupResult.numDeletedRows > 0) {
+        logger.info(
+          `Cleaned up ${cleanupResult.numDeletedRows} old failed OCR results`
+        );
+      }
+
       // Find failed OCR results that are ready for retry
       const failedResults = await this.ocrRepository.findFailedResults({
         minAgeMs: 3600000, // 1 hour old
-        maxRetryCount: 10, // Max 10 total retries
-        limit: 5000, // Process up to 5000 at a time
+        maxRetryCount: 3, // Reduced from 10 to 3 max retries
+        limit: 100, // Process up to 100 at a time (reduced from 5000)
       });
 
       logger.info(`Found ${failedResults.length} failed OCR results to retry`);
@@ -383,7 +486,9 @@ export class OcrWorker {
       const retryPromises = failedResults.map(async (result) => {
         try {
           // Get attachment details
-          const attachment = await this.attachmentRepo.findById(result.attachment_id);
+          const attachment = await this.attachmentRepo.findById(
+            result.attachment_id
+          );
           if (!attachment) {
             logger.warn('Attachment not found for OCR result', {
               ocrResultId: result.id,

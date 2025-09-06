@@ -18,7 +18,10 @@ export async function up(db: Kysely<Database>): Promise<void> {
     if (error?.code === 'ER_DUP_KEYNAME') {
       console.log('Vector index on messages table already exists, skipping');
     } else {
-      console.warn('Warning: Could not create vector index on messages table:', error?.message || error);
+      console.warn(
+        'Warning: Could not create vector index on messages table:',
+        error?.message || error
+      );
       // Continue without failing the migration
     }
   }
@@ -33,9 +36,14 @@ export async function up(db: Kysely<Database>): Promise<void> {
     console.log('Successfully created vector index on golden_answers table');
   } catch (error: any) {
     if (error?.code === 'ER_DUP_KEYNAME') {
-      console.log('Vector index on golden_answers table already exists, skipping');
+      console.log(
+        'Vector index on golden_answers table already exists, skipping'
+      );
     } else {
-      console.warn('Warning: Could not create vector index on golden_answers table:', error?.message || error);
+      console.warn(
+        'Warning: Could not create vector index on golden_answers table:',
+        error?.message || error
+      );
       // Continue without failing the migration
     }
   }

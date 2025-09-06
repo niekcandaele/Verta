@@ -167,14 +167,14 @@ export class OcrResultRepositoryImpl implements OcrResultRepository {
     maxRetryCount?: number; // Maximum retry count to consider
     limit?: number;
   }): Promise<OcrResult[]> {
-    const { 
+    const {
       minAgeMs = 3600000, // Default 1 hour
       maxRetryCount = 10, // Default max 10 total retries
-      limit = 100 
+      limit = 100,
     } = options || {};
 
     const minAge = new Date(Date.now() - minAgeMs);
-    
+
     const results = await this.db
       .selectFrom('ocr_results')
       .selectAll()

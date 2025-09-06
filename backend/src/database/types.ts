@@ -259,7 +259,11 @@ export interface GoldenAnswersTable {
   cluster_id: string;
   tenant_id: string;
   answer: string;
-  answer_format: ColumnType<AnswerFormat, AnswerFormat | undefined, AnswerFormat>;
+  answer_format: ColumnType<
+    AnswerFormat,
+    AnswerFormat | undefined,
+    AnswerFormat
+  >;
   embedding: VectorColumn | null;
   created_by: string;
   created_at: ColumnType<Date, string | undefined, never>;

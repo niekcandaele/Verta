@@ -193,7 +193,7 @@ describe('MlClientService', () => {
           results: [
             {
               text: 'URL image',
-              confidence: 0.90,
+              confidence: 0.9,
               blocks: [],
               processing_time_ms: 1000,
             },

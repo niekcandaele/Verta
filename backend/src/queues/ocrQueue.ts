@@ -34,23 +34,22 @@ export interface OcrJobResult {
 /**
  * Create the OCR queue
  */
-export function createOcrQueue(
-  redis: Redis
-): Queue<OcrJobData, OcrJobResult> {
+export function createOcrQueue(redis: Redis): Queue<OcrJobData, OcrJobResult> {
   return new Queue<OcrJobData, OcrJobResult>('ocr-processing', {
     connection: redis,
     defaultJobOptions: {
       attempts: 3,
       backoff: {
         type: 'exponential',
-        delay: 2000, // Start with 2 seconds
+        delay: 5000, // Start with 5 seconds
       },
       removeOnComplete: {
         age: 24 * 3600, // Keep completed jobs for 1 day
         count: 100, // Keep last 100 completed jobs
       },
       removeOnFail: {
-        age: 24 * 3600, // Keep failed jobs for 1 day
+        age: 7 * 24 * 3600, // Keep failed jobs for 7 days
+        count: 1000, // Keep last 1000 failed jobs
       },
     },
   });
@@ -167,20 +166,15 @@ export async function getOcrJobStatus(jobId: string) {
  */
 export async function getOcrQueueMetrics() {
   const queue = getOcrQueue();
-  
-  const [
-    waitingCount,
-    activeCount,
-    completedCount,
-    failedCount,
-    delayedCount,
-  ] = await Promise.all([
-    queue.getWaitingCount(),
-    queue.getActiveCount(),
-    queue.getCompletedCount(),
-    queue.getFailedCount(),
-    queue.getDelayedCount(),
-  ]);
+
+  const [waitingCount, activeCount, completedCount, failedCount, delayedCount] =
+    await Promise.all([
+      queue.getWaitingCount(),
+      queue.getActiveCount(),
+      queue.getCompletedCount(),
+      queue.getFailedCount(),
+      queue.getDelayedCount(),
+    ]);
 
   return {
     waiting: waitingCount,

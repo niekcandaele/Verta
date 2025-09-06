@@ -104,24 +104,28 @@ export class QuestionProcessingService {
     messages: Message[]
   ): Promise<Map<string, string>> {
     const ocrTextMap = new Map<string, string>();
-    
+
     try {
       // Get all message IDs
-      const messageIds = messages.map(m => m.id);
-      
+      const messageIds = messages.map((m) => m.id);
+
       // Fetch OCR results for these messages
       const ocrResults = await this.db
         .selectFrom('ocr_results')
-        .innerJoin('message_attachments', 'message_attachments.id', 'ocr_results.attachment_id')
+        .innerJoin(
+          'message_attachments',
+          'message_attachments.id',
+          'ocr_results.attachment_id'
+        )
         .select([
           'message_attachments.message_id',
           'ocr_results.extracted_text',
-          'ocr_results.status'
+          'ocr_results.status',
         ])
         .where('message_attachments.message_id', 'in', messageIds)
         .where('ocr_results.status', '=', 'completed')
         .execute();
-      
+
       // Aggregate OCR text by message ID
       for (const result of ocrResults) {
         if (result.extracted_text) {
@@ -129,16 +133,18 @@ export class QuestionProcessingService {
           // Append OCR text with a separator if there are multiple attachments
           ocrTextMap.set(
             result.message_id,
-            existing ? `${existing}\n\n[Image Description]:\n${result.extracted_text}` : result.extracted_text
+            existing
+              ? `${existing}\n\n[Image Description]:\n${result.extracted_text}`
+              : result.extracted_text
           );
         }
       }
-      
+
       logger.debug(`Fetched OCR results for ${ocrTextMap.size} messages`);
     } catch (error) {
       logger.error('Failed to fetch OCR results', error);
     }
-    
+
     return ocrTextMap;
   }
 
@@ -152,13 +158,13 @@ export class QuestionProcessingService {
     if (!ocrText) {
       return message.content;
     }
-    
+
     // Combine message text with OCR text
     // If message has no text content (just an image), use only OCR text
     if (!message.content || message.content.trim() === '') {
       return ocrText;
     }
-    
+
     // Otherwise combine both
     return `${message.content}\n\n[Image Content]:\n${ocrText}`;
   }
@@ -178,13 +184,13 @@ export class QuestionProcessingService {
   ): Promise<void> {
     // Step 1: Fetch OCR results for messages with attachments
     const ocrTextMap = await this.fetchOcrResultsForMessages(messages);
-    
+
     // Step 2: Combine message content with OCR text
     const texts = messages.map((m) => {
       const ocrText = ocrTextMap.get(m.id);
       return this.combineMessageWithOcr(m, ocrText);
     });
-    
+
     // Step 3: Classify messages in batch
     const classifications = await this.mlClient.classifyBatch(texts);
 
@@ -200,7 +206,7 @@ export class QuestionProcessingService {
         questions.push(message);
         questionIndices.push(index);
         questionTexts.push(texts[index]); // Use combined text
-        
+
         // Track if this question was identified with OCR help
         const hasOcrText = ocrTextMap.has(message.id);
         if (hasOcrText) {
@@ -211,12 +217,20 @@ export class QuestionProcessingService {
             logger.debug(`Question identified from OCR only: ${message.id}`);
           } else {
             // Check if original text alone would be classified as question
-            this.mlClient.classify(message.content).then((originalClassification) => {
-              if (!originalClassification.is_question || originalClassification.confidence < 0.6) {
-                ocrQuestionCount++;
-                logger.debug(`Question identified with OCR help: ${message.id}`);
-              }
-            }).catch(() => {}); // Non-blocking check
+            this.mlClient
+              .classify(message.content)
+              .then((originalClassification) => {
+                if (
+                  !originalClassification.is_question ||
+                  originalClassification.confidence < 0.6
+                ) {
+                  ocrQuestionCount++;
+                  logger.debug(
+                    `Question identified with OCR help: ${message.id}`
+                  );
+                }
+              })
+              .catch(() => {}); // Non-blocking check
           }
         }
       }
@@ -227,7 +241,9 @@ export class QuestionProcessingService {
       return;
     }
 
-    logger.debug(`Identified ${questions.length} questions in chunk (${ocrQuestionCount} with OCR help)`);
+    logger.debug(
+      `Identified ${questions.length} questions in chunk (${ocrQuestionCount} with OCR help)`
+    );
     result.questionsIdentified += questions.length;
     result.questionsFromOcr += ocrQuestionCount;
 
@@ -332,7 +348,8 @@ export class QuestionProcessingService {
           thread_id: message.id,
           original_text: combinedText, // Store combined text
           rephrased_text: rephrased,
-          confidence_score: classifications[questionIndices.indexOf(i)].confidence,
+          confidence_score:
+            classifications[questionIndices.indexOf(i)].confidence,
         });
       } catch (error) {
         logger.error(`Failed to process message ${message.id}`, error);
@@ -402,7 +419,7 @@ export class QuestionProcessingService {
       const ocrText = ocrTextMap.get(message.id);
       const combinedText = this.combineMessageWithOcr(message, ocrText);
       const hasOcrContent = !!ocrText;
-      
+
       // Classify the combined text
       const classification = await this.mlClient.classify(combinedText);
 
@@ -458,9 +475,12 @@ export class QuestionProcessingService {
         original_text: combinedText,
         confidence_score: classification.confidence,
       });
-      
+
       // Log if OCR helped identify this question
-      if (hasOcrContent && (!message.content || message.content.trim() === '')) {
+      if (
+        hasOcrContent &&
+        (!message.content || message.content.trim() === '')
+      ) {
         logger.info(`Question identified from OCR only: ${message.id}`);
       }
 

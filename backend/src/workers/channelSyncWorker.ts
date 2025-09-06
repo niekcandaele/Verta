@@ -381,33 +381,33 @@ export class ChannelSyncWorker {
         const batchSize = 10;
         for (let i = 0; i < created.length; i += batchSize) {
           const batch = created.slice(i, i + batchSize);
-          
+
           // Extract message contents, handling empty content
-          const texts = batch.map(m => m.content || '');
-          
+          const texts = batch.map((m) => m.content || '');
+
           // Skip batch if all texts are empty
-          if (texts.every(text => text === '')) {
+          if (texts.every((text) => text === '')) {
             continue;
           }
-          
+
           // Generate embeddings
           const embeddings = await this.mlClient.embedBatch(texts);
-          
+
           // Update messages with embeddings
           for (let j = 0; j < batch.length; j++) {
             const message = batch[j];
             const embeddingResult = embeddings[j];
-            
+
             // Skip if content was empty
             if (!message.content || message.content.trim() === '') {
               continue;
             }
-            
+
             if (embeddingResult && embeddingResult.embedding) {
               const embedding = embeddingResult.embedding;
               // Convert embedding array to JSON string for TiDB vector storage
               const embeddingJson = `[${embedding.join(',')}]`;
-              
+
               // Update message with embedding
               await db
                 .updateTable('messages')
@@ -417,7 +417,7 @@ export class ChannelSyncWorker {
             }
           }
         }
-        
+
         logger.debug('Generated embeddings for new messages', {
           channelId,
           messageCount: created.length,
@@ -470,13 +470,17 @@ export class ChannelSyncWorker {
             })
           );
 
-          const createdAttachments = await this.attachmentRepo.bulkCreate(attachmentData);
+          const createdAttachments =
+            await this.attachmentRepo.bulkCreate(attachmentData);
 
           // Queue OCR jobs for image attachments
-          const imageAttachments = createdAttachments.filter((_attachment, index) => {
-            const contentType = platformMessage.attachments![index].contentType;
-            return this.isImageContentType(contentType);
-          });
+          const imageAttachments = createdAttachments.filter(
+            (_attachment, index) => {
+              const contentType =
+                platformMessage.attachments![index].contentType;
+              return this.isImageContentType(contentType);
+            }
+          );
 
           if (imageAttachments.length > 0) {
             const ocrJobs = imageAttachments.map((attachment) => ({
@@ -484,9 +488,14 @@ export class ChannelSyncWorker {
                 tenantId: tenantId,
                 messageId: createdMessage.id,
                 attachmentId: attachment.id,
-                attachmentUrl: platformMessage.attachments![
-                  attachmentData.findIndex(a => a.messageId === attachment.messageId && a.filename === attachment.filename)
-                ].url,
+                attachmentUrl:
+                  platformMessage.attachments![
+                    attachmentData.findIndex(
+                      (a) =>
+                        a.messageId === attachment.messageId &&
+                        a.filename === attachment.filename
+                    )
+                  ].url,
                 attachmentFilename: attachment.filename,
               },
             }));
@@ -583,10 +592,12 @@ export class ChannelSyncWorker {
       'image/tiff',
       'image/svg+xml',
     ];
-    
+
     // Check exact match or starts with image/
-    return imageTypes.includes(contentType.toLowerCase()) || 
-           contentType.toLowerCase().startsWith('image/');
+    return (
+      imageTypes.includes(contentType.toLowerCase()) ||
+      contentType.toLowerCase().startsWith('image/')
+    );
   }
 
   /**

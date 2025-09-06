@@ -27,14 +27,14 @@ export class OcrRetryWorker {
 
     // Create the worker to process OCR retry triggers
     this.worker = new Worker(
-      'ocr-processing', 
+      'ocr-processing',
       async (job: Job) => {
         // Only process retry trigger jobs, ignore all others
         if (job.name !== 'ocr-retry-trigger') {
           // Don't process this job - another worker will handle it
           throw new Error('Job not for this worker');
         }
-        
+
         await this.runOcrRetry();
         return { success: true, message: 'OCR retry triggered' };
       },
@@ -83,7 +83,9 @@ export class OcrRetryWorker {
       const retryPromises = failedResults.map(async (result) => {
         try {
           // Get attachment details
-          const attachment = await this.attachmentRepo.findById(result.attachment_id);
+          const attachment = await this.attachmentRepo.findById(
+            result.attachment_id
+          );
           if (!attachment) {
             logger.warn('Attachment not found for OCR result', {
               ocrResultId: result.id,

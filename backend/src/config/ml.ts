@@ -45,7 +45,10 @@ export function loadMlConfig(): MlConfig {
     mlServiceUrl: process.env.ML_SERVICE_URL || 'http://ml-service:8000',
     mlServiceApiKey: process.env.ADMIN_API_KEY,
     mlServiceTimeout: parseInt(process.env.ML_SERVICE_TIMEOUT || '120000', 10),
-    mlServiceOcrTimeout: parseInt(process.env.ML_SERVICE_OCR_TIMEOUT || '300000', 10),
+    mlServiceOcrTimeout: parseInt(
+      process.env.ML_SERVICE_OCR_TIMEOUT || '300000',
+      10
+    ),
     mlServiceMaxRetries: parseInt(
       process.env.ML_SERVICE_MAX_RETRIES || '3',
       10

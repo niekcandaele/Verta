@@ -353,7 +353,7 @@ export class AnalysisWorker {
     job: Job<AnalysisJobData>
   ): Promise<AnalysisJobResult> {
     const { tenantId } = job.data;
-    
+
     const result: AnalysisJobResult = {
       threadsProcessed: 0,
       questionsExtracted: 0,
@@ -387,7 +387,9 @@ export class AnalysisWorker {
         .execute();
 
       const totalAnswers = goldenAnswers.length;
-      logger.info(`Found ${totalAnswers} golden answers without embeddings for tenant ${tenantId}`);
+      logger.info(
+        `Found ${totalAnswers} golden answers without embeddings for tenant ${tenantId}`
+      );
 
       if (totalAnswers === 0) {
         // Update job as completed
@@ -415,38 +417,44 @@ export class AnalysisWorker {
       const batchSize = 10;
       for (let i = 0; i < goldenAnswers.length; i += batchSize) {
         const batch = goldenAnswers.slice(i, i + batchSize);
-        
+
         try {
           // Extract answer texts
-          const texts = batch.map(ga => ga.answer);
-          
+          const texts = batch.map((ga) => ga.answer);
+
           // Generate embeddings using the ML service
           const embeddings = await this.mlClient.embedBatch(texts);
-          
+
           // Validate embeddings response
           if (!embeddings || !Array.isArray(embeddings)) {
-            throw new Error(`Invalid embeddings response: expected array, got ${typeof embeddings}`);
+            throw new Error(
+              `Invalid embeddings response: expected array, got ${typeof embeddings}`
+            );
           }
-          
+
           if (embeddings.length !== batch.length) {
-            throw new Error(`Embeddings count mismatch: expected ${batch.length}, got ${embeddings.length}`);
+            throw new Error(
+              `Embeddings count mismatch: expected ${batch.length}, got ${embeddings.length}`
+            );
           }
-          
+
           // Update golden answers with embeddings
           for (let j = 0; j < batch.length; j++) {
             const goldenAnswer = batch[j];
             const embeddingResult = embeddings[j];
-            
+
             if (!embeddingResult || !embeddingResult.embedding) {
-              logger.error(`Invalid embedding result at index ${j}`, { embeddingResult });
+              logger.error(`Invalid embedding result at index ${j}`, {
+                embeddingResult,
+              });
               throw new Error(`Missing embedding for index ${j}`);
             }
-            
+
             const embedding = embeddingResult.embedding;
-            
+
             // Convert embedding array to JSON string for TiDB vector storage
             const embeddingJson = `[${embedding.join(',')}]`;
-            
+
             await this.db
               .updateTable('golden_answers')
               .set({ embedding: embeddingJson as any })
@@ -501,7 +509,7 @@ export class AnalysisWorker {
     job: Job<AnalysisJobData>
   ): Promise<AnalysisJobResult> {
     const { tenantId, channelIds } = job.data;
-    
+
     const result: AnalysisJobResult = {
       threadsProcessed: 0,
       questionsExtracted: 0,
@@ -544,8 +552,8 @@ export class AnalysisWorker {
           .select('id')
           .where('tenant_id', '=', tenantId)
           .execute();
-        
-        const channelIdList = channels.map(c => c.id);
+
+        const channelIdList = channels.map((c) => c.id);
         if (channelIdList.length > 0) {
           query = query.where('channel_id', 'in', channelIdList);
         } else {
@@ -563,7 +571,9 @@ export class AnalysisWorker {
       const messages = await query.execute();
 
       const totalMessages = messages.length;
-      logger.info(`Found ${totalMessages} messages without embeddings for tenant ${tenantId}`);
+      logger.info(
+        `Found ${totalMessages} messages without embeddings for tenant ${tenantId}`
+      );
 
       if (totalMessages === 0) {
         // Update job as completed
@@ -590,56 +600,66 @@ export class AnalysisWorker {
       // Process in batches of 10 for efficiency
       const batchSize = 10;
       let processedCount = 0;
-      
+
       for (let i = 0; i < messages.length; i += batchSize) {
         const batch = messages.slice(i, i + batchSize);
-        
+
         try {
           // Filter out messages with empty content
-          const messagesWithContent = batch.filter(m => m.content && m.content.trim() !== '');
-          
+          const messagesWithContent = batch.filter(
+            (m) => m.content && m.content.trim() !== ''
+          );
+
           // Skip batch if all messages have empty content
           if (messagesWithContent.length === 0) {
-            logger.debug(`Skipping batch ${i} - all messages have empty content`);
+            logger.debug(
+              `Skipping batch ${i} - all messages have empty content`
+            );
             continue;
           }
-          
+
           // Extract texts only from messages with content
-          const texts = messagesWithContent.map(m => m.content!);
-          
+          const texts = messagesWithContent.map((m) => m.content!);
+
           // Generate embeddings using the ML service
           const embeddings = await this.mlClient.embedBatch(texts);
-          
+
           // Validate embeddings response
           if (!embeddings || !Array.isArray(embeddings)) {
-            throw new Error(`Invalid embeddings response: expected array, got ${typeof embeddings}`);
+            throw new Error(
+              `Invalid embeddings response: expected array, got ${typeof embeddings}`
+            );
           }
-          
+
           if (embeddings.length !== messagesWithContent.length) {
-            throw new Error(`Embeddings count mismatch: expected ${messagesWithContent.length}, got ${embeddings.length}`);
+            throw new Error(
+              `Embeddings count mismatch: expected ${messagesWithContent.length}, got ${embeddings.length}`
+            );
           }
-          
+
           // Update messages with embeddings
           for (let j = 0; j < messagesWithContent.length; j++) {
             const message = messagesWithContent[j];
             const embeddingResult = embeddings[j];
-            
+
             if (!embeddingResult || !embeddingResult.embedding) {
-              logger.error(`Invalid embedding result at index ${j}`, { embeddingResult });
+              logger.error(`Invalid embedding result at index ${j}`, {
+                embeddingResult,
+              });
               throw new Error(`Missing embedding for index ${j}`);
             }
-            
+
             const embedding = embeddingResult.embedding;
-            
+
             // Convert embedding array to JSON string for TiDB vector storage
             const embeddingJson = `[${embedding.join(',')}]`;
-            
+
             await this.db
               .updateTable('messages')
               .set({ embedding: embeddingJson as any })
               .where('id', '=', message.id)
               .execute();
-              
+
             processedCount++;
           }
 

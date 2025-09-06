@@ -95,7 +95,7 @@ export class GoldenAnswerRepository extends BaseCrudRepositoryImpl<
         answer_format: data.answer_format,
         created_by: data.created_by,
       };
-      
+
       const updated = await this.update(existing.id, updateData);
       if (!updated) {
         throw new Error('Failed to update golden answer');

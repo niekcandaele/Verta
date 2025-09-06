@@ -10,7 +10,10 @@ import logger from '../../../utils/logger.js';
 // Initialize ML client and search service
 const mlClient = new MlClientService({
   baseUrl: process.env.ML_SERVICE_URL || 'http://ml-service:8000',
-  apiKey: process.env.ML_SERVICE_API_KEY || process.env.ADMIN_API_KEY || 'ml-service-key'
+  apiKey:
+    process.env.ML_SERVICE_API_KEY ||
+    process.env.ADMIN_API_KEY ||
+    'ml-service-key',
 });
 
 const searchService = new SearchService(mlClient);
@@ -50,10 +53,10 @@ router.post(
   validateTenantHeader,
   asyncHandler(async (req: Request, res: Response) => {
     const tenantSlug = (req as any).tenantSlug;
-    
+
     // Validate request body
     const { query, limit } = req.body as SearchApiRequest;
-    
+
     if (!query || typeof query !== 'string' || query.trim().length === 0) {
       throw new ApiError(
         400,
@@ -61,8 +64,11 @@ router.post(
         'Query parameter is required and must be a non-empty string'
       );
     }
-    
-    if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 100)) {
+
+    if (
+      limit !== undefined &&
+      (!Number.isInteger(limit) || limit < 1 || limit > 100)
+    ) {
       throw new ApiError(
         400,
         'Invalid Request',
@@ -72,24 +78,24 @@ router.post(
 
     const searchRequest: SearchApiRequest = {
       query: query.trim(),
-      limit: limit || 10
+      limit: limit || 10,
     };
 
     logger.info('Processing search request', {
       tenant: tenantSlug,
       query: searchRequest.query,
-      limit: searchRequest.limit
+      limit: searchRequest.limit,
     });
 
     try {
       const results = await searchService.search(tenantSlug, searchRequest);
-      
+
       res.json({
         data: results,
         meta: {
           query: searchRequest.query,
-          limit: searchRequest.limit
-        }
+          limit: searchRequest.limit,
+        },
       });
     } catch (error) {
       // Let error handler middleware deal with it

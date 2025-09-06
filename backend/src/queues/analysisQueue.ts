@@ -117,10 +117,14 @@ export async function addGoldenAnswerEmbeddingJob(
   }
 ): Promise<string> {
   const queue = getAnalysisQueue();
-  const job = await queue.add('generate-golden-answer-embeddings', data as AnalysisJobData, {
-    priority: options?.priority,
-    delay: options?.delay,
-  });
+  const job = await queue.add(
+    'generate-golden-answer-embeddings',
+    data as AnalysisJobData,
+    {
+      priority: options?.priority,
+      delay: options?.delay,
+    }
+  );
   return job.id!;
 }
 
