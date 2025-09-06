@@ -88,6 +88,7 @@ export interface MessagesTable {
   platform_created_at: ColumnType<Date, Date | string, never>;
   created_at: ColumnType<Date, string | undefined, never>;
   updated_at: ColumnType<Date, string | undefined, string>;
+  embedding: VectorColumn | null;
 }
 
 /**
@@ -259,6 +260,7 @@ export interface GoldenAnswersTable {
   tenant_id: string;
   answer: string;
   answer_format: ColumnType<AnswerFormat, AnswerFormat | undefined, AnswerFormat>;
+  embedding: VectorColumn | null;
   created_by: string;
   created_at: ColumnType<Date, string | undefined, never>;
   updated_at: ColumnType<Date, string | undefined, string>;

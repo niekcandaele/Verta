@@ -61,6 +61,40 @@ def download_models():
         logger.error(f"Failed to download embedding model: {e}")
         sys.exit(1)
     
+    # Download Jina reranker model
+    logger.info("Downloading Jina reranker model...")
+    try:
+        from transformers import AutoModelForSequenceClassification
+        import shutil
+        
+        model_name = "jinaai/jina-reranker-v2-base-multilingual"
+        
+        # Clear any existing cache for this model to ensure clean download
+        cache_path = os.path.join(CACHE_DIR, f"models--{model_name.replace('/', '--')}")
+        if os.path.exists(cache_path):
+            logger.info(f"Clearing existing cache at {cache_path}")
+            shutil.rmtree(cache_path)
+        # Download with trust_remote_code since it uses custom architecture
+        model = AutoModelForSequenceClassification.from_pretrained(
+            model_name,
+            trust_remote_code=True,
+            cache_dir=CACHE_DIR
+        )
+        
+        # Test the model to ensure it's fully downloaded
+        if hasattr(model, 'compute_score'):
+            logger.info(f"✓ Successfully downloaded {model_name} with compute_score method")
+        else:
+            logger.info(f"✓ Successfully downloaded {model_name}")
+        
+        # Clean up
+        del model
+        
+    except Exception as e:
+        logger.warning(f"Failed to download reranker model: {e}")
+        logger.warning("Reranking will be disabled at runtime")
+        # Don't exit - reranking is optional
+    
     logger.info("All models downloaded successfully!")
     
     # List downloaded files for verification

@@ -89,3 +89,13 @@ export function loadMlConfig(): MlConfig {
 
 // Export singleton instance
 export const mlConfig = loadMlConfig();
+
+// Export ML service configuration for MlClientService
+export const mlServiceConfig = {
+  baseUrl: mlConfig.mlServiceUrl,
+  apiKey: mlConfig.mlServiceApiKey,
+  timeout: mlConfig.mlServiceTimeout,
+  ocrTimeout: mlConfig.mlServiceOcrTimeout,
+  maxRetries: mlConfig.mlServiceMaxRetries,
+  retryDelay: mlConfig.mlServiceRetryDelay,
+};

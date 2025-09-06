@@ -11,7 +11,8 @@ from config import settings
 from models.classifier import get_classifier
 from models.embeddings import get_embedding_model
 from models.openrouter_ocr import get_ocr_model
-from endpoints import classify, embed, rephrase, ocr
+from services.rerank import rerank_service
+from endpoints import classify, embed, rephrase, ocr, search
 from middleware.auth import verify_api_key
 
 # Configure logging
@@ -67,6 +68,18 @@ async def lifespan(app: FastAPI):
         await ocr_model.load()
         logger.info("OpenRouter OCR model loaded successfully")
         
+        # Load reranker model (optional - don't fail if it can't load)
+        try:
+            logger.info("Loading reranker model...")
+            rerank_service.load_model()
+            if rerank_service.loaded:
+                logger.info("Reranker model loaded successfully")
+            else:
+                logger.warning("Reranker model could not be loaded, reranking will be disabled")
+        except Exception as e:
+            logger.warning(f"Failed to load reranker model: {e}")
+            logger.warning("Search will work but without reranking")
+        
         app.state.models_loaded = True
         logger.info("All ML models loaded successfully")
         
@@ -111,6 +124,10 @@ app.include_router(
 )
 app.include_router(
     ocr.router,
+    dependencies=[Depends(verify_api_key)]
+)
+app.include_router(
+    search.router,
     dependencies=[Depends(verify_api_key)]
 )
 

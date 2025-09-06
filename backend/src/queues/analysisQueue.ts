@@ -107,6 +107,42 @@ export async function addAnalysisJob(
 }
 
 /**
+ * Add a golden answer embedding generation job to the queue
+ */
+export async function addGoldenAnswerEmbeddingJob(
+  data: Pick<AnalysisJobData, 'tenantId'>,
+  options?: {
+    priority?: number;
+    delay?: number;
+  }
+): Promise<string> {
+  const queue = getAnalysisQueue();
+  const job = await queue.add('generate-golden-answer-embeddings', data as AnalysisJobData, {
+    priority: options?.priority,
+    delay: options?.delay,
+  });
+  return job.id!;
+}
+
+/**
+ * Add a message embedding generation job to the queue
+ */
+export async function addMessageEmbeddingJob(
+  data: AnalysisJobData,
+  options?: {
+    priority?: number;
+    delay?: number;
+  }
+): Promise<string> {
+  const queue = getAnalysisQueue();
+  const job = await queue.add('generate-message-embeddings', data, {
+    priority: options?.priority,
+    delay: options?.delay,
+  });
+  return job.id!;
+}
+
+/**
  * Get job status
  */
 export async function getJobStatus(jobId: string) {

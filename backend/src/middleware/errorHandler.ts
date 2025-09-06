@@ -149,6 +149,13 @@ export function errorHandler(
 
   logger.error('Request error', errorInfo);
 
+  // Ensure CORS headers are set even for error responses
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', '*');
+  res.header('Access-Control-Allow-Headers', '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '3600');
+
   const timestamp = new Date().toISOString();
 
   // Handle Zod validation errors

@@ -3,3 +3,4 @@ export * from './channel';
 export * from './message';
 export * from './archive';
 export * from './sync';
+export * from './search';

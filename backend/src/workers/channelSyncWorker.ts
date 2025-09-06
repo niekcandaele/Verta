@@ -26,6 +26,8 @@ import { anonymizeUserId } from '../utils/crypto.js';
 import type { PlatformMessage, ChannelSyncState } from '../types/sync.js';
 import type { Platform } from '../database/types.js';
 import { addOcrJobsBatch } from '../queues/ocrQueue.js';
+import { MlClientService } from '../services/MlClientService.js';
+import { mlServiceConfig } from '../config/ml.js';
 
 /**
  * Channel sync worker implementation
@@ -39,6 +41,7 @@ export class ChannelSyncWorker {
   private attachmentRepo: MessageAttachmentRepository;
   private progressRepo: SyncProgressRepository;
   private platformAdapters: Map<Platform, PlatformAdapter> = new Map();
+  private mlClient: MlClientService;
 
   constructor() {
     // Generate unique worker ID
@@ -50,6 +53,7 @@ export class ChannelSyncWorker {
     this.reactionRepo = new MessageEmojiReactionRepository(db);
     this.attachmentRepo = new MessageAttachmentRepository(db);
     this.progressRepo = new SyncProgressRepository(db);
+    this.mlClient = new MlClientService(mlServiceConfig);
 
     // Create the worker with concurrency from config
     this.worker = new Worker<ChannelSyncJobData, ChannelSyncState>(
@@ -369,6 +373,66 @@ export class ChannelSyncWorker {
 
     // Bulk upsert messages
     const { created, skipped } = await this.messageRepo.bulkUpsert(messageData);
+
+    // Generate embeddings for newly created messages
+    if (created.length > 0) {
+      try {
+        // Process in batches of 10 to avoid overwhelming the ML service
+        const batchSize = 10;
+        for (let i = 0; i < created.length; i += batchSize) {
+          const batch = created.slice(i, i + batchSize);
+          
+          // Extract message contents, handling empty content
+          const texts = batch.map(m => m.content || '');
+          
+          // Skip batch if all texts are empty
+          if (texts.every(text => text === '')) {
+            continue;
+          }
+          
+          // Generate embeddings
+          const embeddings = await this.mlClient.embedBatch(texts);
+          
+          // Update messages with embeddings
+          for (let j = 0; j < batch.length; j++) {
+            const message = batch[j];
+            const embeddingResult = embeddings[j];
+            
+            // Skip if content was empty
+            if (!message.content || message.content.trim() === '') {
+              continue;
+            }
+            
+            if (embeddingResult && embeddingResult.embedding) {
+              const embedding = embeddingResult.embedding;
+              // Convert embedding array to JSON string for TiDB vector storage
+              const embeddingJson = `[${embedding.join(',')}]`;
+              
+              // Update message with embedding
+              await db
+                .updateTable('messages')
+                .set({ embedding: embeddingJson as any })
+                .where('id', '=', message.id)
+                .execute();
+            }
+          }
+        }
+        
+        logger.debug('Generated embeddings for new messages', {
+          channelId,
+          messageCount: created.length,
+          workerId: this.workerId,
+        });
+      } catch (error) {
+        // Log error but don't fail the sync - embeddings can be generated later
+        logger.error('Failed to generate embeddings for new messages', {
+          channelId,
+          messageCount: created.length,
+          error,
+          workerId: this.workerId,
+        });
+      }
+    }
 
     // Process reactions and attachments for created messages
     for (let i = 0; i < messages.length; i++) {
