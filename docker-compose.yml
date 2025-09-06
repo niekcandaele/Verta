@@ -74,6 +74,7 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - ML_SERVICE_WORKERS=1
       - ML_SERVICE_MODEL_CACHE_DIR=/models
+      - DATABASE_URL=${DATABASE_URL}
     mem_limit: 6g
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']

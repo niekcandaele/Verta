@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     message_age_min_days: int = 7
     message_age_max_days: int = 30
     
+    # Database configuration
+    database_url: Optional[str] = os.getenv("DATABASE_URL")
+    database_pool_size: int = 10
+    database_timeout: int = 30
+    
     class Config:
         env_file = ".env"
         env_prefix = "ML_SERVICE_"

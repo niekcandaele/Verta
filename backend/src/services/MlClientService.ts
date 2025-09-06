@@ -67,6 +67,37 @@ export interface BatchOcrResult {
   results: OcrResult[];
 }
 
+export interface SearchConfig {
+  table: string;
+  text_field: string;
+  vector_field: string;
+  filters: Record<string, any>;
+}
+
+export interface SearchRequest {
+  query: string;
+  embedding: number[];
+  search_configs: SearchConfig[];
+  limit?: number;
+  rerank?: boolean;
+}
+
+export interface SearchResultItem {
+  type: 'golden_answer' | 'message';
+  score: number;
+  content?: string;
+  excerpt?: string;
+  message_id?: string;
+  metadata: Record<string, any>;
+}
+
+export interface SearchResponse {
+  results: SearchResultItem[];
+  query: string;
+  total_results: number;
+  processing_time_ms: number;
+}
+
 export interface MlServiceConfig {
   baseUrl: string;
   apiKey: string;
@@ -76,16 +107,20 @@ export interface MlServiceConfig {
   retryDelay?: number;
 }
 
+type OperationType = 'ocr' | 'embed' | 'classify' | 'rephrase' | 'search';
+
+interface CircuitBreakerInstance {
+  state: CircuitState;
+  failureCount: number;
+  lastFailureTime: number;
+  halfOpenAttempts: number;
+  config: CircuitBreakerConfig;
+}
+
 export class MlClientService {
   private client: AxiosInstance;
   private config: Required<MlServiceConfig>;
-  private circuitBreaker: {
-    state: CircuitState;
-    failureCount: number;
-    lastFailureTime: number;
-    halfOpenAttempts: number;
-    config: CircuitBreakerConfig;
-  };
+  private circuitBreakers: Map<OperationType, CircuitBreakerInstance>;
 
   constructor(config: MlServiceConfig) {
     this.config = {
@@ -105,17 +140,23 @@ export class MlClientService {
       },
     });
 
-    this.circuitBreaker = {
-      state: CircuitState.CLOSED,
-      failureCount: 0,
-      lastFailureTime: 0,
-      halfOpenAttempts: 0,
-      config: {
-        failureThreshold: 10, // Increased from 5 to be more tolerant
-        resetTimeout: 300000, // 5 minutes (increased from 1 minute)
-        halfOpenMaxAttempts: 3,
-      },
-    };
+    // Initialize separate circuit breakers for each operation type
+    this.circuitBreakers = new Map();
+    const operationTypes: OperationType[] = ['ocr', 'embed', 'classify', 'rephrase', 'search'];
+    
+    operationTypes.forEach(opType => {
+      this.circuitBreakers.set(opType, {
+        state: CircuitState.CLOSED,
+        failureCount: 0,
+        lastFailureTime: 0,
+        halfOpenAttempts: 0,
+        config: {
+          failureThreshold: opType === 'ocr' ? 5 : 10, // OCR is more lenient
+          resetTimeout: 300000, // 5 minutes
+          halfOpenMaxAttempts: 3,
+        },
+      });
+    });
 
     this.setupInterceptors();
   }
@@ -155,8 +196,11 @@ export class MlClientService {
   /**
    * Check circuit breaker state
    */
-  private checkCircuitBreaker(): void {
-    const cb = this.circuitBreaker;
+  private checkCircuitBreaker(operationType: OperationType): void {
+    const cb = this.circuitBreakers.get(operationType);
+    if (!cb) {
+      throw new Error(`Unknown operation type: ${operationType}`);
+    }
     const now = Date.now();
 
     switch (cb.state) {
@@ -167,7 +211,7 @@ export class MlClientService {
           logger.debug('Circuit breaker transitioned to HALF_OPEN');
         } else {
           throw new Error(
-            'Circuit breaker is OPEN - ML service is unavailable'
+            `Circuit breaker is OPEN for ${operationType} - ML service is unavailable`
           );
         }
         break;
@@ -179,7 +223,7 @@ export class MlClientService {
             'Circuit breaker returned to OPEN after max half-open attempts'
           );
           throw new Error(
-            'Circuit breaker is OPEN - ML service is unavailable'
+            `Circuit breaker is OPEN for ${operationType} - ML service is unavailable`
           );
         }
         cb.halfOpenAttempts++;
@@ -190,8 +234,9 @@ export class MlClientService {
   /**
    * Record circuit breaker success
    */
-  private recordSuccess(): void {
-    const cb = this.circuitBreaker;
+  private recordSuccess(operationType: OperationType): void {
+    const cb = this.circuitBreakers.get(operationType);
+    if (!cb) return;
     if (cb.state === CircuitState.HALF_OPEN) {
       cb.state = CircuitState.CLOSED;
       cb.failureCount = 0;
@@ -203,18 +248,19 @@ export class MlClientService {
   /**
    * Record circuit breaker failure
    */
-  private recordFailure(): void {
-    const cb = this.circuitBreaker;
+  private recordFailure(operationType: OperationType): void {
+    const cb = this.circuitBreakers.get(operationType);
+    if (!cb) return;
     cb.failureCount++;
     cb.lastFailureTime = Date.now();
 
     if (cb.state === CircuitState.HALF_OPEN) {
       cb.state = CircuitState.OPEN;
-      logger.warn('Circuit breaker transitioned to OPEN from HALF_OPEN');
+      logger.warn(`Circuit breaker for ${operationType} transitioned to OPEN from HALF_OPEN`);
     } else if (cb.failureCount >= cb.config.failureThreshold) {
       cb.state = CircuitState.OPEN;
       logger.warn(
-        'Circuit breaker transitioned to OPEN after reaching failure threshold'
+        `Circuit breaker for ${operationType} transitioned to OPEN after reaching failure threshold`
       );
     }
   }
@@ -224,16 +270,17 @@ export class MlClientService {
    */
   private async executeWithRetry<T>(
     operation: () => Promise<T>,
-    operationName: string
+    operationName: string,
+    operationType: OperationType
   ): Promise<T> {
-    this.checkCircuitBreaker();
+    this.checkCircuitBreaker(operationType);
 
     let lastError: Error | undefined;
 
     for (let attempt = 1; attempt <= this.config.maxRetries; attempt++) {
       try {
         const result = await operation();
-        this.recordSuccess();
+        this.recordSuccess(operationType);
         return result;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
@@ -252,7 +299,7 @@ export class MlClientService {
               attempt,
             }
           );
-          this.recordFailure();
+          this.recordFailure(operationType);
           throw error;
         }
 
@@ -269,7 +316,7 @@ export class MlClientService {
             attempts: this.config.maxRetries,
             error: this.getErrorMessage(error),
           });
-          this.recordFailure();
+          this.recordFailure(operationType);
         }
       }
     }
@@ -292,7 +339,7 @@ export class MlClientService {
         { text }
       );
       return response.data;
-    }, 'Classification');
+    }, 'Classification', 'classify');
   }
 
   /**
@@ -304,7 +351,7 @@ export class MlClientService {
         results: ClassificationResult[];
       }>('/api/ml/classify/batch', { texts });
       return response.data.results;
-    }, 'Batch classification');
+    }, 'Batch classification', 'classify');
   }
 
   /**
@@ -312,12 +359,21 @@ export class MlClientService {
    */
   async embed(text: string): Promise<EmbeddingResult> {
     return this.executeWithRetry(async () => {
-      const response = await this.client.post<EmbeddingResult>(
+      const response = await this.client.post<{
+        embedding: number[];
+        dimensions: number;
+      }>(
         '/api/ml/embed',
         { text }
       );
-      return response.data;
-    }, 'Embedding generation');
+      
+      // Transform ML service response to expected format
+      return {
+        embedding: response.data.embedding,
+        dimension: response.data.dimensions,
+        text: text
+      };
+    }, 'Embedding generation', 'embed');
   }
 
   /**
@@ -325,12 +381,22 @@ export class MlClientService {
    */
   async embedBatch(texts: string[]): Promise<EmbeddingResult[]> {
     return this.executeWithRetry(async () => {
-      const response = await this.client.post<{ results: EmbeddingResult[] }>(
+      const response = await this.client.post<{
+        embeddings: number[][];
+        dimensions: number;
+        count: number;
+      }>(
         '/api/ml/embed/batch',
         { texts }
       );
-      return response.data.results;
-    }, 'Batch embedding');
+      
+      // Transform ML service response to expected format
+      return response.data.embeddings.map((embedding, index) => ({
+        embedding: embedding,
+        dimension: response.data.dimensions,
+        text: texts[index]
+      }));
+    }, 'Batch embedding', 'embed');
   }
 
   /**
@@ -344,7 +410,7 @@ export class MlClientService {
       );
 
       return response.data;
-    }, 'Rephrasing');
+    }, 'Rephrasing', 'rephrase');
   }
 
   /**
@@ -359,7 +425,7 @@ export class MlClientService {
         { timeout: this.config.ocrTimeout }
       );
       return response.data;
-    }, 'OCR extraction');
+    }, 'OCR extraction', 'ocr');
   }
 
   /**
@@ -374,7 +440,7 @@ export class MlClientService {
         { timeout: this.config.ocrTimeout }
       );
       return response.data.results;
-    }, 'Batch OCR extraction');
+    }, 'Batch OCR extraction', 'ocr');
   }
 
   /**
@@ -415,6 +481,19 @@ export class MlClientService {
       return error.message;
     }
     return 'Unknown error';
+  }
+
+  /**
+   * Execute hybrid search
+   */
+  async search(request: SearchRequest): Promise<SearchResponse> {
+    return this.executeWithRetry(async () => {
+      const response = await this.client.post<SearchResponse>(
+        '/api/ml/search',
+        request
+      );
+      return response.data;
+    }, 'Search', 'search');
   }
 
   /**

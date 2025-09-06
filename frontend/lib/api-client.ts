@@ -26,11 +26,19 @@ export interface ApiError {
 // Create axios instance with default configuration
 const createApiClient = (): AxiosInstance => {
   // Get environment variables
-  // Use app:25000 when running server-side in container, localhost:25000 for client-side
   const isServer = typeof window === 'undefined';
-  const defaultUrl = isServer ? 'http://app:25000' : 'http://localhost:25000';
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || defaultUrl;
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG;
+  
+  // Determine API URL based on environment
+  let apiUrl: string;
+  if (isServer) {
+    // Server-side: always use internal Docker network hostname
+    apiUrl = 'http://app:25000';
+  } else {
+    // Client-side: use environment variable or dynamically determine from window.location
+    apiUrl = process.env.NEXT_PUBLIC_API_URL || 
+             `http://${window.location.hostname}:25000`;
+  }
 
   if (!tenantSlug) {
     throw new Error('NEXT_PUBLIC_TENANT_SLUG environment variable is required');
@@ -121,6 +129,10 @@ export const api = {
     apiClient.get<ApiResponse<any>>(`/channels/${channelId}/threads/${threadId}/messages`, {
       params: { page, limit }
     }),
+
+  // Search messages and golden answers
+  search: (query: string, limit: number = 10) =>
+    apiClient.post<ApiResponse<any>>('/search', { query, limit }),
 };
 
 export default api;

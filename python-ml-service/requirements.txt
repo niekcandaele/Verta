@@ -5,9 +5,9 @@ pydantic-settings==2.1.0
 python-dotenv==1.0.0
 httpx==0.25.1
 # ML dependencies for Phase 2 - using CPU-only versions
-transformers==4.35.0
-torch==2.1.0
-sentence-transformers==2.2.2
+transformers==4.56.1
+torch==2.8.0
+sentence-transformers==3.3.1
 numpy==1.24.3
 # For LLM integration (Phase 4) - Using OpenRouter via LiteLLM
 litellm==1.35.0
@@ -15,3 +15,7 @@ litellm==1.35.0
 Pillow==10.1.0
 # For async HTTP requests to OpenRouter
 aiohttp==3.9.1
+# TiDB database connection
+pytidb==0.0.3
+# For Jina reranker model
+einops==0.7.0

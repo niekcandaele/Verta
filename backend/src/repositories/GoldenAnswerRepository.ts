@@ -198,6 +198,7 @@ export class GoldenAnswerRepository extends BaseCrudRepositoryImpl<
       tenant_id: row.tenant_id,
       answer: row.answer,
       answer_format: row.answer_format,
+      embedding: row.embedding,
       created_by: row.created_by,
       created_at: new Date(row.created_at),
       updated_at: new Date(row.updated_at),

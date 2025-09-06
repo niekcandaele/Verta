@@ -1,12 +1,18 @@
 import { GetStaticProps } from 'next';
 import { getTenantMetadata, type TenantMetadata } from '@/lib/data';
 import Layout from '@/components/Layout';
+import { useEffect, useState } from 'react';
 
 interface HomeProps {
   metadata: TenantMetadata;
 }
 
 export default function Home({ metadata }: HomeProps) {
+  const [formattedDate, setFormattedDate] = useState<string>('');
+
+  useEffect(() => {
+    setFormattedDate(new Date(metadata.generatedAt).toLocaleString());
+  }, [metadata.generatedAt]);
   return (
     <Layout metadata={metadata}>
       <div className="max-w-6xl mx-auto">
@@ -45,7 +51,7 @@ export default function Home({ metadata }: HomeProps) {
             <h2 className="text-2xl font-semibold text-primary">Getting Started</h2>
             <p className="text-base-content/80 text-lg leading-relaxed mt-4">
               Select a channel from the sidebar to view its message history. 
-              This archive was generated on {new Date(metadata.generatedAt).toLocaleString()}.
+              {formattedDate && `This archive was generated on ${formattedDate}.`}
             </p>
           </div>
         </div>

@@ -9,6 +9,8 @@ import { QuestionInstanceRepository } from '../repositories/QuestionInstanceRepo
 import { AnalysisJobRepository } from '../repositories/AnalysisJobRepository.js';
 import { ThreadProcessingService } from '../services/ThreadProcessingService.js';
 import { ClusteringService } from '../services/ClusteringService.js';
+import { MlClientService } from '../services/MlClientService.js';
+import { mlServiceConfig } from '../config/ml.js';
 import logger from '../utils/logger.js';
 import type {
   AnalysisJobData,
@@ -26,6 +28,7 @@ export class AnalysisWorker {
   private jobRepo: AnalysisJobRepository;
   private threadService: ThreadProcessingService;
   private clusteringService: ClusteringService;
+  private mlClient: MlClientService;
 
   constructor(db?: Kysely<Database>) {
     this.db = db || database;
@@ -33,6 +36,7 @@ export class AnalysisWorker {
     this.jobRepo = new AnalysisJobRepository(this.db);
     this.threadService = new ThreadProcessingService(this.db);
     this.clusteringService = new ClusteringService(this.db);
+    this.mlClient = new MlClientService(mlServiceConfig);
   }
 
   /**
@@ -44,7 +48,18 @@ export class AnalysisWorker {
     this.worker = new Worker<AnalysisJobData, AnalysisJobResult>(
       'thread-analysis',
       async (job: Job<AnalysisJobData>) => {
-        return this.processJob(job);
+        // Handle different job types
+        switch (job.name) {
+          case 'analyze-threads':
+            return this.processThreadAnalysisJob(job);
+          case 'generate-golden-answer-embeddings':
+            return this.processGoldenAnswerEmbeddingsJob(job);
+          case 'generate-message-embeddings':
+            return this.processMessageEmbeddingsJob(job);
+          default:
+            logger.warn(`Unknown job type: ${job.name}`);
+            throw new Error(`Unknown job type: ${job.name}`);
+        }
       },
       {
         connection: redis,
@@ -86,9 +101,9 @@ export class AnalysisWorker {
   }
 
   /**
-   * Process a job
+   * Process a thread analysis job
    */
-  private async processJob(
+  private async processThreadAnalysisJob(
     job: Job<AnalysisJobData>
   ): Promise<AnalysisJobResult> {
     const { tenantId, channelIds, threadMinAgeDays, forceReprocess } = job.data;
@@ -329,5 +344,342 @@ export class AnalysisWorker {
     }
 
     return result;
+  }
+
+  /**
+   * Process golden answer embeddings generation job
+   */
+  private async processGoldenAnswerEmbeddingsJob(
+    job: Job<AnalysisJobData>
+  ): Promise<AnalysisJobResult> {
+    const { tenantId } = job.data;
+    
+    const result: AnalysisJobResult = {
+      threadsProcessed: 0,
+      questionsExtracted: 0,
+      clustersCreated: 0,
+      clustersUpdated: 0,
+      errors: [],
+    };
+
+    try {
+      // Create or update analysis job record
+      const analysisJob = await this.jobRepo.create({
+        tenant_id: tenantId,
+        status: 'processing',
+        job_type: 'golden_answer_embeddings',
+        parameters: job.data,
+      });
+
+      // Update database job status
+      await this.jobRepo.update(analysisJob.id, {
+        status: 'processing',
+        started_at: new Date().toISOString(),
+      });
+
+      // Fetch golden answers without embeddings
+      const goldenAnswers = await this.db
+        .selectFrom('golden_answers')
+        .selectAll()
+        .where('tenant_id', '=', tenantId)
+        .where('embedding', 'is', null)
+        .limit(100)
+        .execute();
+
+      const totalAnswers = goldenAnswers.length;
+      logger.info(`Found ${totalAnswers} golden answers without embeddings for tenant ${tenantId}`);
+
+      if (totalAnswers === 0) {
+        // Update job as completed
+        await this.jobRepo.update(analysisJob.id, {
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          processed_items: 0,
+          total_items: 0,
+        });
+        return result;
+      }
+
+      await job.updateProgress({
+        stage: 'generating_embeddings',
+        processed: 0,
+        total: totalAnswers,
+      });
+
+      // Update database with total items
+      await this.jobRepo.update(analysisJob.id, {
+        total_items: totalAnswers,
+      });
+
+      // Process in batches of 10 for efficiency
+      const batchSize = 10;
+      for (let i = 0; i < goldenAnswers.length; i += batchSize) {
+        const batch = goldenAnswers.slice(i, i + batchSize);
+        
+        try {
+          // Extract answer texts
+          const texts = batch.map(ga => ga.answer);
+          
+          // Generate embeddings using the ML service
+          const embeddings = await this.mlClient.embedBatch(texts);
+          
+          // Validate embeddings response
+          if (!embeddings || !Array.isArray(embeddings)) {
+            throw new Error(`Invalid embeddings response: expected array, got ${typeof embeddings}`);
+          }
+          
+          if (embeddings.length !== batch.length) {
+            throw new Error(`Embeddings count mismatch: expected ${batch.length}, got ${embeddings.length}`);
+          }
+          
+          // Update golden answers with embeddings
+          for (let j = 0; j < batch.length; j++) {
+            const goldenAnswer = batch[j];
+            const embeddingResult = embeddings[j];
+            
+            if (!embeddingResult || !embeddingResult.embedding) {
+              logger.error(`Invalid embedding result at index ${j}`, { embeddingResult });
+              throw new Error(`Missing embedding for index ${j}`);
+            }
+            
+            const embedding = embeddingResult.embedding;
+            
+            // Convert embedding array to JSON string for TiDB vector storage
+            const embeddingJson = `[${embedding.join(',')}]`;
+            
+            await this.db
+              .updateTable('golden_answers')
+              .set({ embedding: embeddingJson as any })
+              .where('id', '=', goldenAnswer.id)
+              .execute();
+          }
+
+          result.questionsExtracted += batch.length; // Reusing this field for embeddings generated
+
+          // Update progress
+          await job.updateProgress({
+            stage: 'generating_embeddings',
+            processed: Math.min(i + batchSize, totalAnswers),
+            total: totalAnswers,
+          });
+
+          // Update database progress periodically
+          if ((i + batchSize) % 20 === 0 || i + batchSize >= totalAnswers) {
+            await this.jobRepo.update(analysisJob.id, {
+              processed_items: Math.min(i + batchSize, totalAnswers),
+            });
+          }
+        } catch (error: any) {
+          logger.error(`Failed to process golden answer batch`, error);
+          result.errors.push({
+            threadId: `batch_${i}`,
+            error: error.message,
+          });
+        }
+      }
+
+      // Update analysis job as completed
+      await this.jobRepo.update(analysisJob.id, {
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        processed_items: result.questionsExtracted,
+        total_items: totalAnswers,
+      });
+
+      logger.info('Golden answer embeddings job completed', result);
+      return result;
+    } catch (error: any) {
+      logger.error('Golden answer embeddings job failed', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Process message embeddings generation job
+   */
+  private async processMessageEmbeddingsJob(
+    job: Job<AnalysisJobData>
+  ): Promise<AnalysisJobResult> {
+    const { tenantId, channelIds } = job.data;
+    
+    const result: AnalysisJobResult = {
+      threadsProcessed: 0,
+      questionsExtracted: 0,
+      clustersCreated: 0,
+      clustersUpdated: 0,
+      errors: [],
+    };
+
+    try {
+      // Create or update analysis job record
+      const analysisJob = await this.jobRepo.create({
+        tenant_id: tenantId,
+        status: 'processing',
+        job_type: 'message_embeddings',
+        parameters: job.data,
+      });
+
+      // Update database job status
+      await this.jobRepo.update(analysisJob.id, {
+        status: 'processing',
+        started_at: new Date().toISOString(),
+      });
+
+      // Build query for messages without embeddings
+      let query = this.db
+        .selectFrom('messages')
+        .selectAll()
+        .where('embedding', 'is', null)
+        .where('content', '!=', '')
+        .where('content', 'is not', null)
+        .limit(100);
+
+      // If channelIds provided, filter by channels
+      if (channelIds && channelIds.length > 0) {
+        query = query.where('channel_id', 'in', channelIds);
+      } else {
+        // Otherwise, filter by tenant's channels
+        const channels = await this.db
+          .selectFrom('channels')
+          .select('id')
+          .where('tenant_id', '=', tenantId)
+          .execute();
+        
+        const channelIdList = channels.map(c => c.id);
+        if (channelIdList.length > 0) {
+          query = query.where('channel_id', 'in', channelIdList);
+        } else {
+          // No channels for this tenant
+          await this.jobRepo.update(analysisJob.id, {
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            processed_items: 0,
+            total_items: 0,
+          });
+          return result;
+        }
+      }
+
+      const messages = await query.execute();
+
+      const totalMessages = messages.length;
+      logger.info(`Found ${totalMessages} messages without embeddings for tenant ${tenantId}`);
+
+      if (totalMessages === 0) {
+        // Update job as completed
+        await this.jobRepo.update(analysisJob.id, {
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          processed_items: 0,
+          total_items: 0,
+        });
+        return result;
+      }
+
+      await job.updateProgress({
+        stage: 'generating_embeddings',
+        processed: 0,
+        total: totalMessages,
+      });
+
+      // Update database with total items
+      await this.jobRepo.update(analysisJob.id, {
+        total_items: totalMessages,
+      });
+
+      // Process in batches of 10 for efficiency
+      const batchSize = 10;
+      let processedCount = 0;
+      
+      for (let i = 0; i < messages.length; i += batchSize) {
+        const batch = messages.slice(i, i + batchSize);
+        
+        try {
+          // Filter out messages with empty content
+          const messagesWithContent = batch.filter(m => m.content && m.content.trim() !== '');
+          
+          // Skip batch if all messages have empty content
+          if (messagesWithContent.length === 0) {
+            logger.debug(`Skipping batch ${i} - all messages have empty content`);
+            continue;
+          }
+          
+          // Extract texts only from messages with content
+          const texts = messagesWithContent.map(m => m.content!);
+          
+          // Generate embeddings using the ML service
+          const embeddings = await this.mlClient.embedBatch(texts);
+          
+          // Validate embeddings response
+          if (!embeddings || !Array.isArray(embeddings)) {
+            throw new Error(`Invalid embeddings response: expected array, got ${typeof embeddings}`);
+          }
+          
+          if (embeddings.length !== messagesWithContent.length) {
+            throw new Error(`Embeddings count mismatch: expected ${messagesWithContent.length}, got ${embeddings.length}`);
+          }
+          
+          // Update messages with embeddings
+          for (let j = 0; j < messagesWithContent.length; j++) {
+            const message = messagesWithContent[j];
+            const embeddingResult = embeddings[j];
+            
+            if (!embeddingResult || !embeddingResult.embedding) {
+              logger.error(`Invalid embedding result at index ${j}`, { embeddingResult });
+              throw new Error(`Missing embedding for index ${j}`);
+            }
+            
+            const embedding = embeddingResult.embedding;
+            
+            // Convert embedding array to JSON string for TiDB vector storage
+            const embeddingJson = `[${embedding.join(',')}]`;
+            
+            await this.db
+              .updateTable('messages')
+              .set({ embedding: embeddingJson as any })
+              .where('id', '=', message.id)
+              .execute();
+              
+            processedCount++;
+          }
+
+          result.questionsExtracted = processedCount; // Reusing this field for embeddings generated
+
+          // Update progress
+          await job.updateProgress({
+            stage: 'generating_embeddings',
+            processed: Math.min(i + batchSize, totalMessages),
+            total: totalMessages,
+          });
+
+          // Update database progress periodically
+          if ((i + batchSize) % 20 === 0 || i + batchSize >= totalMessages) {
+            await this.jobRepo.update(analysisJob.id, {
+              processed_items: processedCount,
+            });
+          }
+        } catch (error: any) {
+          logger.error(`Failed to process message batch`, error);
+          result.errors.push({
+            threadId: `batch_${i}`,
+            error: error.message,
+          });
+        }
+      }
+
+      // Update analysis job as completed
+      await this.jobRepo.update(analysisJob.id, {
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        processed_items: processedCount,
+        total_items: totalMessages,
+      });
+
+      logger.info('Message embeddings job completed', result);
+      return result;
+    } catch (error: any) {
+      logger.error('Message embeddings job failed', error);
+      throw error;
+    }
   }
 }

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { TenantMetadata } from '@/lib/data';
 import { applyBranding, applySavedContrastPreference } from '@/lib/theme';
 import ChannelList from './ChannelList';
+import Search from './Search';
 import { FiMenu, FiX } from 'react-icons/fi'; // Using react-icons for menu icons
 
 interface LayoutProps {
@@ -43,7 +44,7 @@ export default function Layout({ children, metadata, currentChannelId, syncStatu
       <div className="fixed inset-0 z-0 pointer-events-none radial-glow-purple" />
       
       <header className={`fixed top-0 left-0 right-0 h-16 z-30 glass glass-hover border-b border-primary/20 ${hasScrolled ? 'shadow-lg shadow-primary/10' : ''} transition-all duration-300`}>
-        <div className="navbar h-full px-4 lg:px-6">
+        <div className="navbar flex justify-between items-center h-full px-4 lg:px-6">
           <div className="navbar-start">
             <button 
               className="btn btn-ghost btn-circle lg:hidden focus-ring hover:bg-primary/10" 
@@ -59,7 +60,7 @@ export default function Layout({ children, metadata, currentChannelId, syncStatu
           </div>
           
           {/* Stats Display and FAQ Link - Hidden on mobile */}
-          <div className="navbar-center hidden lg:flex gap-2 items-center">
+          <div className="navbar-center hidden lg:flex gap-3 items-center">
             <div className="badge badge-primary badge-outline">
               <span className="text-primary-content/80 mr-1">Channels:</span>
               <span className="font-semibold">{metadata.channels.length}</span>
@@ -70,13 +71,16 @@ export default function Layout({ children, metadata, currentChannelId, syncStatu
             </div>
             <Link 
               href="/faq" 
-              className="btn btn-sm btn-ghost text-primary hover:bg-primary/10 ml-2"
+              className="btn btn-sm btn-ghost text-primary hover:bg-primary/10"
             >
               FAQ
             </Link>
           </div>
           
-          <div className="navbar-end gap-2">
+          <div className="navbar-end gap-3 hidden lg:flex">
+            <div className="w-96">
+              <Search />
+            </div>
             {syncStatus && (
               <div className={`badge badge-primary badge-outline ${syncStatus.isActive ? 'animate-pulse' : ''}`}>
                 {syncStatus.isActive ? 'Syncing' : 'Synced'}
