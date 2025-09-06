@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Dict, Any
@@ -29,6 +30,21 @@ class HealthResponse(BaseModel):
     version: str
     timestamp: str
     models_loaded: bool = False
+
+
+async def refresh_ocr_models_periodically():
+    """Background task to refresh OCR models every 30 minutes."""
+    while True:
+        try:
+            await asyncio.sleep(30 * 60)  # Wait 30 minutes
+            logger.info("Running periodic OCR model refresh...")
+            ocr_model = get_ocr_model()
+            await ocr_model.refresh_models()
+        except asyncio.CancelledError:
+            logger.info("OCR model refresh task cancelled")
+            break
+        except Exception as e:
+            logger.error(f"Error during OCR model refresh: {e}")
 
 
 @asynccontextmanager
@@ -64,9 +80,13 @@ async def lifespan(app: FastAPI):
         logger.info("Getting OpenRouter OCR model instance...")
         ocr_model = get_ocr_model()
         logger.info("Discovering free vision models from OpenRouter...")
-        import asyncio
         await ocr_model.load()
         logger.info("OpenRouter OCR model loaded successfully")
+        
+        # Start background task to refresh OCR models periodically
+        refresh_task = asyncio.create_task(refresh_ocr_models_periodically())
+        app.state.refresh_task = refresh_task
+        logger.info("Started OCR model refresh background task")
         
         # Load reranker model (optional - don't fail if it can't load)
         try:
@@ -91,6 +111,14 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info(f"Shutting down {settings.service_name}")
+    
+    # Cancel background task
+    if hasattr(app.state, 'refresh_task'):
+        app.state.refresh_task.cancel()
+        try:
+            await app.state.refresh_task
+        except asyncio.CancelledError:
+            pass
 
 
 # Create FastAPI app
