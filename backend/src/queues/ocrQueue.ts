@@ -46,11 +46,11 @@ export function createOcrQueue(
         delay: 2000, // Start with 2 seconds
       },
       removeOnComplete: {
-        age: 7 * 24 * 3600, // Keep completed jobs for 7 days
-        count: 1000, // Keep last 1000 completed jobs
+        age: 24 * 3600, // Keep completed jobs for 1 day
+        count: 100, // Keep last 100 completed jobs
       },
       removeOnFail: {
-        age: 30 * 24 * 3600, // Keep failed jobs for 30 days for debugging
+        age: 24 * 3600, // Keep failed jobs for 1 day
       },
     },
   });
