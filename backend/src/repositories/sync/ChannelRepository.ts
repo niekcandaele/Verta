@@ -73,6 +73,20 @@ export class ChannelRepositoryImpl
   }
 
   /**
+   * Find a channel by slug and tenant ID
+   */
+  async findBySlug(tenantId: string, slug: string): Promise<Channel | null> {
+    const row = await this.db
+      .selectFrom('channels')
+      .selectAll()
+      .where('tenant_id', '=', tenantId)
+      .where('slug', '=', slug)
+      .executeTakeFirst();
+
+    return row ? this.mapRowToEntity(row) : null;
+  }
+
+  /**
    * Upsert a channel (create if not exists, update if exists)
    */
   async upsert(data: CreateChannelData): Promise<Channel> {
@@ -90,6 +104,7 @@ export class ChannelRepositoryImpl
             name: insertData.name,
             type: insertData.type,
             parent_channel_id: insertData.parent_channel_id,
+            slug: insertData.slug,
             metadata: insertData.metadata,
             updated_at: new Date().toISOString(),
           })
@@ -123,6 +138,7 @@ export class ChannelRepositoryImpl
       name: row.name,
       type: row.type as ChannelType,
       parentChannelId: row.parent_channel_id,
+      slug: row.slug,
       metadata: row.metadata || {},
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
@@ -140,6 +156,7 @@ export class ChannelRepositoryImpl
       name: data.name,
       type: data.type,
       parent_channel_id: data.parentChannelId || null,
+      slug: data.slug || null,
       metadata: JSON.stringify(data.metadata || {}),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -156,6 +173,9 @@ export class ChannelRepositoryImpl
     if (data.type !== undefined) row.type = data.type;
     if (data.parentChannelId !== undefined) {
       row.parent_channel_id = data.parentChannelId;
+    }
+    if (data.slug !== undefined) {
+      row.slug = data.slug;
     }
     if (data.metadata !== undefined) {
       row.metadata = JSON.stringify(data.metadata);

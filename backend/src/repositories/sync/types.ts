@@ -43,6 +43,11 @@ export interface ChannelRepository
   findByParentId(parentChannelId: string): Promise<Channel[]>;
 
   /**
+   * Find a channel by slug and tenant ID
+   */
+  findBySlug(tenantId: string, slug: string): Promise<Channel | null>;
+
+  /**
    * Upsert a channel (create if not exists, update if exists)
    */
   upsert(data: CreateChannelData): Promise<Channel>;
@@ -60,6 +65,20 @@ export interface MessageRepository
     channelId: string,
     platformMessageId: string
   ): Promise<Message | null>;
+
+  /**
+   * Find a message by platform message ID only (across all channels)
+   */
+  findByPlatformMessageId(
+    platformMessageId: string
+  ): Promise<Message | null>;
+
+  /**
+   * Find a message by platform message ID with attachments and reactions
+   */
+  findByPlatformMessageIdWithExtras(
+    platformMessageId: string
+  ): Promise<(Message & { attachments: any[]; reactions: any[] }) | null>;
 
   /**
    * Find all messages in a channel with pagination

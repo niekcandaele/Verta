@@ -12,9 +12,18 @@ import MessageActions from './MessageActions';
 interface MessageProps {
   message: MessageWithExtras;
   channels: Channel[];
+  showChannel?: boolean;
+  isHighlighted?: boolean;
+  channelSlug?: string;
 }
 
-export default function Message({ message, channels }: MessageProps) {
+export default function Message({ 
+  message, 
+  channels,
+  showChannel = true,
+  isHighlighted = false,
+  channelSlug
+}: MessageProps) {
 
   const formatTimestamp = (timestamp: Date | string) => {
     const date = new Date(timestamp);
@@ -172,7 +181,8 @@ export default function Message({ message, channels }: MessageProps) {
       
       {/* Message Actions - Appears on hover */}
       <MessageActions 
-        message={message} 
+        message={message}
+        channelSlug={channelSlug}
         className="absolute top-3 right-3"
       />
     </div>

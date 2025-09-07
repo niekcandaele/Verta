@@ -3,6 +3,7 @@ import type { Channel } from 'shared-types';
 import ChannelTypeIcon from './ChannelTypeIcon';
 import { useState, KeyboardEvent } from 'react';
 import clsx from 'clsx';
+import { getChannelUrl, getThreadUrl } from '@/lib/navigation';
 
 interface ChannelListProps {
   channels: Channel[];
@@ -91,28 +92,46 @@ interface ChannelItemProps {
 
 function ChannelItem({ channel, currentChannelId, level = 1 }: ChannelItemProps) {
   const isActive = channel.id === currentChannelId;
+  // Determine the href - threads use ID, regular channels use slug
+  const href = channel.type === 'thread' && channel.parentChannelId 
+    ? getThreadUrl(channel.id)
+    : channel.slug 
+      ? getChannelUrl(channel.slug)
+      : null;
+
+  const linkClasses = clsx(
+    'group flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-all duration-200 focus-ring',
+    isActive 
+      ? 'bg-primary/25 text-white font-semibold ring-2 ring-primary/50 shadow-lg shadow-primary/40 glow-purple' 
+      : 'text-base-content/80 hover:bg-primary/15 hover:text-primary hover:shadow-md hover:shadow-primary/20 hover:ring-1 hover:ring-primary/30'
+  );
+
+  const content = (
+    <>
+      <ChannelTypeIcon 
+        type={channel.type} 
+        discordType={channel.metadata?.discordType as number | undefined} 
+        size="sm" 
+        className={clsx(
+          'transition-opacity',
+          isActive ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'
+        )} 
+      />
+      <span className="truncate flex-1">{channel.name}</span>
+    </>
+  );
+
   return (
     <li role="treeitem" aria-level={level}>
-      <Link 
-        href={`/channel/${channel.id}/1`}
-        className={clsx(
-          'group flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-all duration-200 focus-ring',
-          isActive 
-            ? 'bg-primary/25 text-white font-semibold ring-2 ring-primary/50 shadow-lg shadow-primary/40 glow-purple' 
-            : 'text-base-content/80 hover:bg-primary/15 hover:text-primary hover:shadow-md hover:shadow-primary/20 hover:ring-1 hover:ring-primary/30'
-        )}
-      >
-        <ChannelTypeIcon 
-          type={channel.type} 
-          discordType={channel.metadata?.discordType as number | undefined} 
-          size="sm" 
-          className={clsx(
-            'transition-opacity',
-            isActive ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'
-          )} 
-        />
-        <span className="truncate flex-1">{channel.name}</span>
-      </Link>
+      {href ? (
+        <Link href={href} className={linkClasses}>
+          {content}
+        </Link>
+      ) : (
+        <div className={clsx(linkClasses, 'cursor-not-allowed opacity-50')}>
+          {content}
+        </div>
+      )}
     </li>
   );
 }

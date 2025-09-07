@@ -4,6 +4,25 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Handle redirects from old URL format to new format
+  // Old format: /channel/{uuid}/1 → New format: /channel/{slug}
+  const oldChannelPattern = /^\/channel\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/(\d+)/i;
+  const match = pathname.match(oldChannelPattern);
+  
+  if (match) {
+    // For now, redirect to the channel ID-based URL without page number
+    // In the future, this could look up the slug from a mapping
+    const channelId = match[1];
+    const newUrl = new URL(`/channel/${channelId}`, request.url);
+    
+    // Preserve query parameters
+    request.nextUrl.searchParams.forEach((value, key) => {
+      newUrl.searchParams.set(key, value);
+    });
+    
+    return NextResponse.redirect(newUrl, 301); // Permanent redirect
+  }
+
   // Only protect /admin routes
   if (pathname.startsWith('/admin')) {
     const authHeader = request.headers.get('authorization');
@@ -49,5 +68,5 @@ export function middleware(request: NextRequest) {
 
 // Configure which paths the middleware should run on
 export const config = {
-  matcher: '/admin/:path*',
+  matcher: ['/admin/:path*', '/channel/:path*'],
 };

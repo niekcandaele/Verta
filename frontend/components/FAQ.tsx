@@ -1,16 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 import { FiChevronDown, FiChevronUp, FiUsers } from 'react-icons/fi';
 import type { FAQItem } from '@/lib/faq';
 import { markdownSanitizeSchema } from '@/lib/markdown';
+import { useRouter } from 'next/router';
 
 interface FAQProps {
   items: FAQItem[];
 }
 
 export default function FAQ({ items }: FAQProps) {
+  const router = useRouter();
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  
+  // Auto-expand item if accessed via hash
+  useEffect(() => {
+    if (router.asPath.includes('#')) {
+      const hash = router.asPath.split('#')[1];
+      if (hash && items.some(item => item.id === hash)) {
+        setExpandedItems(new Set([hash]));
+        // Scroll to the element after a short delay
+        setTimeout(() => {
+          const element = document.getElementById(hash);
+          element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    }
+  }, [router.asPath, items]);
   
   const toggleItem = (id: string) => {
     setExpandedItems(prev => {
@@ -32,6 +49,7 @@ export default function FAQ({ items }: FAQProps) {
         return (
           <div
             key={item.id}
+            id={item.id}
             className="glass rounded-xl overflow-hidden border border-base-content/10 hover:border-primary/30 transition-all duration-300"
           >
             <button

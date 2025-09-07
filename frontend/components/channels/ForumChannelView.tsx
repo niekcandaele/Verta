@@ -1,6 +1,7 @@
 import type { ForumThreadsPage } from '@/lib/data';
 import { FiMessageSquare, FiClock, FiUser, FiLock, FiArchive } from 'react-icons/fi';
 import Link from 'next/link';
+import { getChannelUrl } from '@/lib/navigation';
 
 interface ForumChannelViewProps {
   threadData: ForumThreadsPage;
@@ -105,12 +106,18 @@ export default function ForumChannelView({ threadData, currentPage }: ForumChann
                     <span className="font-medium">{thread.messageCount}</span>
                   </div>
                 </div>
-                <Link 
-                  href={`/channel/${thread.id}/1`}
-                  className="btn btn-primary btn-sm btn-ghost hover:btn-primary group-hover:btn-primary focus-ring"
-                >
-                  View Thread
-                </Link>
+                {thread.slug ? (
+                  <Link 
+                    href={getChannelUrl(thread.slug)}
+                    className="btn btn-primary btn-sm btn-ghost hover:btn-primary group-hover:btn-primary focus-ring"
+                  >
+                    View Thread
+                  </Link>
+                ) : (
+                  <button className="btn btn-primary btn-sm btn-disabled" disabled>
+                    View Thread
+                  </button>
+                )}
               </div>
             </div>
           </div>

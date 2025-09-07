@@ -70,6 +70,7 @@ export interface ChannelsTable {
   type: ChannelType;
   parent_channel_id: string | null;
   metadata: ColumnType<unknown, string | undefined, string>;
+  slug: string | null;
   created_at: ColumnType<Date, string | undefined, never>;
   updated_at: ColumnType<Date, string | undefined, string>;
 }

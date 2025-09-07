@@ -2,7 +2,11 @@
  * Content service implementation
  */
 
-import type { ContentService } from './ContentService.js';
+import type { 
+  ContentService,
+  MessageContextOptions,
+  MessageContextResult 
+} from './ContentService.js';
 import type { ServiceResult } from '../types.js';
 import type {
   Tenant,
@@ -16,7 +20,7 @@ import type {
 import type { TenantRepository } from '../../repositories/tenant/TenantRepository.js';
 import type { TenantBrandingRepository } from '../../repositories/tenant/TenantBrandingRepository.js';
 import type { ChannelRepositoryImpl } from '../../repositories/sync/ChannelRepository.js';
-import type { MessageRepositoryImpl } from '../../repositories/sync/MessageRepository.js';
+import type { MessageRepository } from '../../repositories/sync/MessageRepository.js';
 import {
   ServiceErrorType,
   createSuccessResult,
@@ -34,7 +38,7 @@ export class ContentServiceImpl implements ContentService {
     private readonly tenantRepository: TenantRepository,
     private readonly brandingRepository: TenantBrandingRepository,
     private readonly channelRepository: ChannelRepositoryImpl,
-    private readonly messageRepository: MessageRepositoryImpl
+    private readonly messageRepository: MessageRepository
   ) {}
 
   /**
@@ -265,7 +269,7 @@ export class ContentServiceImpl implements ContentService {
       const allThreads = await this.channelRepository.findByParentId(channelId);
 
       // Filter to only thread type channels
-      const threadChannels = allThreads.filter((c) => c.type === 'thread');
+      const threadChannels = allThreads.filter((c: any) => c.type === 'thread');
 
       // Apply pagination
       const offset = ((pagination.page || 1) - 1) * (pagination.limit || 20);
@@ -276,7 +280,7 @@ export class ContentServiceImpl implements ContentService {
 
       // Enrich threads with message data
       const enrichedThreads = await Promise.all(
-        paginatedThreads.map(async (thread) => {
+        paginatedThreads.map(async (thread: any) => {
           // Get message stats for this thread
           const messages = await this.messageRepository.findByChannel(
             thread.id,
@@ -408,6 +412,259 @@ export class ContentServiceImpl implements ContentService {
         createServiceError(
           ServiceErrorType.DATABASE_ERROR,
           'Failed to retrieve thread messages'
+        )
+      );
+    }
+  }
+
+  /**
+   * Get a channel by slug
+   */
+  async getChannelBySlug(
+    tenantSlug: string,
+    channelSlug: string
+  ): Promise<ServiceResult<Channel>> {
+    try {
+      // First get the tenant to verify access
+      const tenant = await this.tenantRepository.findBySlug(tenantSlug);
+      if (!tenant) {
+        return createErrorResult(
+          createServiceError(
+            ServiceErrorType.NOT_FOUND,
+            `Tenant with slug '${tenantSlug}' not found`
+          )
+        );
+      }
+
+      const channel = await this.channelRepository.findBySlug(tenant.id, channelSlug);
+      if (!channel) {
+        return createErrorResult(
+          createServiceError(
+            ServiceErrorType.NOT_FOUND,
+            `Channel with slug '${channelSlug}' not found`
+          )
+        );
+      }
+
+      return createSuccessResult(channel);
+    } catch (error) {
+      logger.error('Failed to get channel by slug', {
+        tenantSlug,
+        channelSlug,
+        error,
+      });
+      return createErrorResult(
+        createServiceError(
+          ServiceErrorType.DATABASE_ERROR,
+          'Failed to retrieve channel'
+        )
+      );
+    }
+  }
+
+  /**
+   * Get a message with surrounding context
+   */
+  async getMessageContext(
+    tenantSlug: string,
+    messageId: string,
+    options: MessageContextOptions = {}
+  ): Promise<ServiceResult<MessageContextResult>> {
+    const beforeCount = options.beforeCount || 50;
+    const afterCount = options.afterCount || 50;
+
+    try {
+      // First get the tenant to verify access
+      const tenant = await this.tenantRepository.findBySlug(tenantSlug);
+      if (!tenant) {
+        return createErrorResult(
+          createServiceError(
+            ServiceErrorType.NOT_FOUND,
+            `Tenant with slug '${tenantSlug}' not found`
+          )
+        );
+      }
+
+      // Get the target message by platform message ID with extras
+      const targetMessage = await this.messageRepository.findByPlatformMessageIdWithExtras(messageId);
+      if (!targetMessage) {
+        return createErrorResult(
+          createServiceError(
+            ServiceErrorType.NOT_FOUND,
+            `Message not found`
+          )
+        );
+      }
+
+      // Verify the channel belongs to the tenant
+      const channel = await this.channelRepository.findById(targetMessage.channelId);
+      if (!channel || channel.tenantId !== tenant.id) {
+        return createErrorResult(
+          createServiceError(
+            ServiceErrorType.NOT_FOUND,
+            `Message not found for this tenant`
+          )
+        );
+      }
+
+      // Get messages before the target (older messages)
+      const beforeMessages = await this.messageRepository.findByChannelWithExtras(
+        targetMessage.channelId,
+        {
+          limit: beforeCount,
+          endDate: targetMessage.platformCreatedAt,
+        }
+      );
+
+      // Get messages after the target (newer messages)
+      const afterMessages = await this.messageRepository.findByChannelWithExtras(
+        targetMessage.channelId,
+        {
+          limit: afterCount,
+          startDate: targetMessage.platformCreatedAt,
+        }
+      );
+
+      // Combine messages: before + target + after
+      const allMessages = [
+        ...beforeMessages.data.reverse(), // Reverse to get chronological order
+        targetMessage,
+        ...afterMessages.data
+      ];
+
+      // Find the position of the target message
+      const targetPosition = beforeMessages.data.length;
+
+      const result: MessageContextResult = {
+        messages: allMessages,
+        target: {
+          id: targetMessage.id,
+          position: targetPosition,
+        },
+        navigation: {
+          before: {
+            hasMore: beforeMessages.pagination.total > beforeCount,
+            cursor: beforeMessages.data.length > 0 ? beforeMessages.data[0].id : null,
+          },
+          after: {
+            hasMore: afterMessages.pagination.total > afterCount,
+            cursor: afterMessages.data.length > 0 
+              ? afterMessages.data[afterMessages.data.length - 1].id 
+              : null,
+          },
+        },
+      };
+
+      return createSuccessResult(result);
+    } catch (error) {
+      logger.error('Failed to get message context', {
+        tenantSlug,
+        messageId,
+        error,
+      });
+      return createErrorResult(
+        createServiceError(
+          ServiceErrorType.DATABASE_ERROR,
+          'Failed to retrieve message context'
+        )
+      );
+    }
+  }
+
+  /**
+   * Get messages around a specific timestamp
+   */
+  async getMessagesAtTimestamp(
+    tenantSlug: string,
+    channelId: string,
+    timestamp: Date,
+    options: MessageContextOptions = {}
+  ): Promise<ServiceResult<MessageContextResult>> {
+    const beforeCount = options.beforeCount || 50;
+    const afterCount = options.afterCount || 50;
+
+    try {
+      // First get the tenant to verify access
+      const tenant = await this.tenantRepository.findBySlug(tenantSlug);
+      if (!tenant) {
+        return createErrorResult(
+          createServiceError(
+            ServiceErrorType.NOT_FOUND,
+            `Tenant with slug '${tenantSlug}' not found`
+          )
+        );
+      }
+
+      // Verify the channel exists and belongs to the tenant
+      const channel = await this.channelRepository.findById(channelId);
+      if (!channel || channel.tenantId !== tenant.id) {
+        return createErrorResult(
+          createServiceError(
+            ServiceErrorType.NOT_FOUND,
+            `Channel not found for this tenant`
+          )
+        );
+      }
+
+      // Get messages before the timestamp
+      const beforeMessages = await this.messageRepository.findByChannelWithExtras(
+        channelId,
+        {
+          limit: beforeCount,
+          endDate: timestamp,
+        }
+      );
+
+      // Get messages after the timestamp
+      const afterMessages = await this.messageRepository.findByChannelWithExtras(
+        channelId,
+        {
+          limit: afterCount,
+          startDate: timestamp,
+        }
+      );
+
+      // Combine messages
+      const allMessages = [
+        ...beforeMessages.data.reverse(), // Reverse to get chronological order
+        ...afterMessages.data
+      ];
+
+      // The "target" in timestamp-based navigation is the dividing point
+      const targetPosition = beforeMessages.data.length;
+
+      const result: MessageContextResult = {
+        messages: allMessages,
+        target: {
+          id: '', // No specific message ID for timestamp navigation
+          position: targetPosition,
+        },
+        navigation: {
+          before: {
+            hasMore: beforeMessages.pagination.total > beforeCount,
+            cursor: beforeMessages.data.length > 0 ? beforeMessages.data[0].id : null,
+          },
+          after: {
+            hasMore: afterMessages.pagination.total > afterCount,
+            cursor: afterMessages.data.length > 0 
+              ? afterMessages.data[afterMessages.data.length - 1].id 
+              : null,
+          },
+        },
+      };
+
+      return createSuccessResult(result);
+    } catch (error) {
+      logger.error('Failed to get messages at timestamp', {
+        tenantSlug,
+        channelId,
+        timestamp,
+        error,
+      });
+      return createErrorResult(
+        createServiceError(
+          ServiceErrorType.DATABASE_ERROR,
+          'Failed to retrieve messages'
         )
       );
     }

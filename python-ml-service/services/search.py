@@ -55,6 +55,7 @@ class SearchService:
             query = f"""
             SELECT 
                 ga.id,
+                ga.cluster_id,
                 qc.representative_text as question,
                 ga.answer as content,
                 ga.tenant_id,
@@ -98,6 +99,8 @@ class SearchService:
                 m.id,
                 m.content,
                 m.channel_id,
+                m.platform_message_id,
+                c.slug as channel_slug,
                 m.anonymized_author_id,
                 m.platform_created_at,
                 VEC_COSINE_DISTANCE(m.{vector_field}, %s) as distance,
@@ -124,7 +127,7 @@ class SearchService:
             logger.error(f"Search query failed for {table}: {e}")
             raise
     
-    def search_all(
+    async def search_all(
         self,
         search_configs: List[Dict[str, Any]],
         embedding: List[float],
@@ -141,22 +144,47 @@ class SearchService:
         Returns:
             Combined list of search results
         """
-        all_results = []
+        import asyncio
+        import concurrent.futures
         
-        for config in search_configs:
-            results = self.search_table(
-                table=config['table'],
-                text_field=config['text_field'],
-                vector_field=config['vector_field'],
-                embedding=embedding,
-                filters=config['filters'],
-                limit=limit_per_source
-            )
-            
-            # Add source information
-            for result in results:
-                result['source_table'] = config['table']
+        # Create a shared thread pool executor for all searches
+        loop = asyncio.get_event_loop()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            # Create tasks for parallel execution
+            async def search_table_async(config):
+                table_name = config['table']
+                logger.info(f"Starting search for table: {table_name}")
+                start_time = asyncio.get_event_loop().time()
                 
+                results = await loop.run_in_executor(
+                    executor,
+                    self.search_table,
+                    config['table'],
+                    config['text_field'],
+                    config['vector_field'],
+                    embedding,
+                    config['filters'],
+                    limit_per_source
+                )
+                
+                end_time = asyncio.get_event_loop().time()
+                logger.info(f"Completed search for table: {table_name} in {end_time - start_time:.3f}s")
+                
+                # Add source information
+                for result in results:
+                    result['source_table'] = config['table']
+                    
+                return results
+            
+            # Execute all searches in parallel
+            logger.info(f"Starting parallel searches for {len(search_configs)} tables")
+            search_tasks = [search_table_async(config) for config in search_configs]
+            all_results_nested = await asyncio.gather(*search_tasks)
+            logger.info("All parallel searches completed")
+        
+        # Flatten results
+        all_results = []
+        for results in all_results_nested:
             all_results.extend(results)
         
         # Sort combined results by similarity score
@@ -192,6 +220,7 @@ class SearchService:
                     'content': result['content'],
                     'metadata': {
                         'id': str(result['id']),
+                        'cluster_id': str(result['cluster_id']),
                         'question': result['question'],
                         'tenant_id': result['tenant_id']
                     }
@@ -209,6 +238,8 @@ class SearchService:
                     'message_id': str(result['id']),
                     'metadata': {
                         'channel_id': result['channel_id'],
+                        'channel_slug': result.get('channel_slug'),
+                        'platform_message_id': result.get('platform_message_id'),
                         'author_id': result['anonymized_author_id'],
                         'created_at': result['platform_created_at'].isoformat() if result['platform_created_at'] else None
                     }

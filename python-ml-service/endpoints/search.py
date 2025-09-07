@@ -73,7 +73,7 @@ async def search(
     start_time = datetime.now()
     
     # Execute searches across all configured tables
-    raw_results = search_service.search_all(
+    raw_results = await search_service.search_all(
         search_configs=[config.dict() for config in request.search_configs],
         embedding=request.embedding,
         limit_per_source=request.limit

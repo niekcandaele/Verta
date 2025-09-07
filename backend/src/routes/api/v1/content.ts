@@ -12,6 +12,7 @@ import { TenantBrandingRepositoryImpl } from '../../../repositories/tenant/index
 import { ChannelRepository } from '../../../repositories/sync/index.js';
 import { MessageRepository } from '../../../repositories/sync/index.js';
 import { getDatabase } from '../../../database/index.js';
+import { decodeMessageId } from '../../../utils/base62.js';
 
 // Initialize repositories and service (will be done after database is available)
 let contentService: ContentServiceImpl;
@@ -168,6 +169,49 @@ router.get(
 );
 
 /**
+ * GET /api/v1/channels/by-slug/:slug/messages
+ * Get messages for a channel using slug (convenience endpoint)
+ */
+router.get(
+  '/channels/by-slug/:slug/messages',
+  validateTenantHeader,
+  asyncHandler(async (req: Request, res: Response) => {
+    const tenantSlug = (req as any).tenantSlug;
+    const { slug } = req.params;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+
+    // First resolve the slug to a channel
+    const channelResult = await contentService.getChannelBySlug(tenantSlug, slug);
+    
+    if (!channelResult.success) {
+      if (channelResult.error.type === 'NOT_FOUND') {
+        throw new ApiError(404, 'Channel Not Found', channelResult.error.message);
+      }
+      throw new ApiError(500, 'Internal Server Error', channelResult.error.message);
+    }
+
+    // Then get the messages
+    const result = await contentService.getChannelMessages(
+      tenantSlug,
+      channelResult.data.id,
+      { page, limit }
+    );
+
+    if (!result.success) {
+      throw new ApiError(500, 'Internal Server Error', result.error.message);
+    }
+
+    const { data: items, pagination: paginationMeta } = result.data;
+
+    res.json({
+      data: items,
+      meta: paginationMeta,
+    });
+  })
+);
+
+/**
  * GET /api/v1/channels/:channelId/messages
  * Get paginated messages for a channel
  */
@@ -269,6 +313,122 @@ router.get(
     res.json({
       data: items,
       meta: paginationMeta,
+    });
+  })
+);
+
+/**
+ * GET /api/v1/channels/by-slug/:slug
+ * Get channel information by slug
+ */
+router.get(
+  '/channels/by-slug/:slug',
+  validateTenantHeader,
+  asyncHandler(async (req: Request, res: Response) => {
+    const tenantSlug = (req as any).tenantSlug;
+    const { slug } = req.params;
+
+    const result = await contentService.getChannelBySlug(tenantSlug, slug);
+
+    if (!result.success) {
+      if (result.error.type === 'NOT_FOUND') {
+        throw new ApiError(404, 'Channel Not Found', result.error.message);
+      }
+      throw new ApiError(500, 'Internal Server Error', result.error.message);
+    }
+
+    res.json({
+      data: result.data,
+      meta: {},
+    });
+  })
+);
+
+/**
+ * GET /api/v1/messages/:messageId
+ * Get a message with surrounding context
+ */
+router.get(
+  '/messages/:messageId',
+  validateTenantHeader,
+  asyncHandler(async (req: Request, res: Response) => {
+    const tenantSlug = (req as any).tenantSlug;
+    const { messageId } = req.params;
+    const beforeCount = parseInt(req.query.before as string) || undefined;
+    const afterCount = parseInt(req.query.after as string) || undefined;
+
+    // Decode the base62-encoded message ID to get the Discord message ID
+    let platformMessageId: string;
+    try {
+      platformMessageId = decodeMessageId(messageId);
+    } catch (error) {
+      throw new ApiError(400, 'Invalid Message ID', 'Invalid base62-encoded message ID');
+    }
+
+    const result = await contentService.getMessageContext(
+      tenantSlug,
+      platformMessageId,
+      { beforeCount, afterCount }
+    );
+
+    if (!result.success) {
+      if (result.error.type === 'NOT_FOUND') {
+        throw new ApiError(404, 'Message Not Found', result.error.message);
+      }
+      throw new ApiError(500, 'Internal Server Error', result.error.message);
+    }
+
+    res.json({
+      data: result.data,
+      meta: {},
+    });
+  })
+);
+
+/**
+ * GET /api/v1/channels/:channelId/messages/at/:timestamp
+ * Get messages around a specific timestamp
+ */
+router.get(
+  '/channels/:channelId/messages/at/:timestamp',
+  validateTenantHeader,
+  asyncHandler(async (req: Request, res: Response) => {
+    const tenantSlug = (req as any).tenantSlug;
+    const { channelId, timestamp } = req.params;
+    const beforeCount = parseInt(req.query.before as string) || undefined;
+    const afterCount = parseInt(req.query.after as string) || undefined;
+
+    // Parse timestamp - could be ISO string or Unix timestamp
+    let targetDate: Date;
+    if (/^\d+$/.test(timestamp)) {
+      // Unix timestamp
+      targetDate = new Date(parseInt(timestamp) * 1000);
+    } else {
+      // ISO string
+      targetDate = new Date(timestamp);
+    }
+
+    if (isNaN(targetDate.getTime())) {
+      throw new ApiError(400, 'Invalid Timestamp', 'Timestamp must be a valid Unix timestamp or ISO date string');
+    }
+
+    const result = await contentService.getMessagesAtTimestamp(
+      tenantSlug,
+      channelId,
+      targetDate,
+      { beforeCount, afterCount }
+    );
+
+    if (!result.success) {
+      if (result.error.type === 'NOT_FOUND') {
+        throw new ApiError(404, 'Channel Not Found', result.error.message);
+      }
+      throw new ApiError(500, 'Internal Server Error', result.error.message);
+    }
+
+    res.json({
+      data: result.data,
+      meta: {},
     });
   })
 );
