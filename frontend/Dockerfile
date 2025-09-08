@@ -46,7 +46,7 @@ COPY shared-types/package*.json ./shared-types/
 # Copy dependencies
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/frontend/node_modules ./frontend/node_modules
-COPY --from=deps /app/shared-types/node_modules ./shared-types/node_modules
+# shared-types might not have node_modules if it has no runtime dependencies
 
 # Copy source code
 COPY frontend ./frontend
