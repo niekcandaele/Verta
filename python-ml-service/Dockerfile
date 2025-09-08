@@ -1,5 +1,10 @@
 FROM python:3.11-slim
 
+# Add image metadata
+LABEL org.opencontainers.image.source="https://github.com/niekcandaele/Verta"
+LABEL org.opencontainers.image.description="Verta ML Service - Python-based machine learning service"
+LABEL org.opencontainers.image.licenses="MIT"
+
 # Set working directory
 WORKDIR /app
 

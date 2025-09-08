@@ -88,20 +88,15 @@ router.post(
       limit: searchRequest.limit,
     });
 
-    try {
-      const results = await searchService.search(tenantSlug, searchRequest);
+    const results = await searchService.search(tenantSlug, searchRequest);
 
-      res.json({
-        data: results,
-        meta: {
-          query: searchRequest.query,
-          limit: searchRequest.limit,
-        },
-      });
-    } catch (error) {
-      // Let error handler middleware deal with it
-      throw error;
-    }
+    res.json({
+      data: results,
+      meta: {
+        query: searchRequest.query,
+        limit: searchRequest.limit,
+      },
+    });
   })
 );
 

@@ -16,7 +16,10 @@ export interface MessageWithExtras extends Message {
 export function getTenantSlug(): string {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG;
   if (!slug) {
-    throw new Error('NEXT_PUBLIC_TENANT_SLUG environment variable is required');
+    // During build time, return a placeholder
+    // The actual value will be checked when API calls are made
+    console.warn('NEXT_PUBLIC_TENANT_SLUG not set, using placeholder');
+    return 'build-placeholder';
   }
   return slug;
 }

@@ -1,5 +1,10 @@
 # Verta - Discord Archive & FAQ System
 
+[![CI Pipeline](https://github.com/niekcandaele/Verta/actions/workflows/ci.yml/badge.svg)](https://github.com/niekcandaele/Verta/actions/workflows/ci.yml)
+[![Backend Image](https://ghcr-badge.egpl.dev/niekcandaele/verta-backend/latest_tag?label=backend)](https://github.com/niekcandaele/Verta/pkgs/container/verta-backend)
+[![Frontend Image](https://ghcr-badge.egpl.dev/niekcandaele/verta-frontend/latest_tag?label=frontend)](https://github.com/niekcandaele/Verta/pkgs/container/verta-frontend)
+[![ML Service Image](https://ghcr-badge.egpl.dev/niekcandaele/verta-ml-service/latest_tag?label=ml-service)](https://github.com/niekcandaele/Verta/pkgs/container/verta-ml-service)
+
 A comprehensive Discord archive system with AI-powered question clustering and FAQ management.
 
 ## Features
