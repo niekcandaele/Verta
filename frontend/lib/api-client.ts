@@ -40,17 +40,17 @@ const createApiClient = (): AxiosInstance => {
              `http://${window.location.hostname}:25000`;
   }
 
-  if (!tenantSlug) {
-    throw new Error('NEXT_PUBLIC_TENANT_SLUG environment variable is required');
-  }
+  // During build time, we might not have the tenant slug yet
+  // Use a placeholder that will be replaced at runtime
+  const effectiveTenantSlug = tenantSlug || 'build-placeholder';
 
   const baseURL = `${apiUrl}/api/v1`;
-  console.log('API Client Config:', { baseURL, tenantSlug, isServer });
+  console.log('API Client Config:', { baseURL, tenantSlug: effectiveTenantSlug, isServer });
   
   const instance = axios.create({
     baseURL,
     headers: {
-      'X-Tenant-Slug': tenantSlug,
+      'X-Tenant-Slug': effectiveTenantSlug,
       'Content-Type': 'application/json',
     },
     timeout: 120000, // 2 minutes
@@ -94,8 +94,14 @@ export const getApiClient = (): AxiosInstance => {
   return apiClientInstance;
 };
 
-// Export singleton instance
-export const apiClient = getApiClient();
+// Export lazy getter instead of immediate instance
+// This prevents initialization during module import
+export const apiClient = new Proxy({} as AxiosInstance, {
+  get(target, prop, receiver) {
+    const client = getApiClient();
+    return Reflect.get(client, prop, receiver);
+  }
+});
 
 // Convenience methods for common API calls
 export const api = {
