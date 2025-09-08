@@ -23,10 +23,10 @@ jobs:
           cache: 'npm'
       
       - name: Install root dependencies
-        run: npm install
+        run: npm ci
       
       - name: Install workspace dependencies
-        run: npm run install:all
+        run: npm ci --workspaces
       
       - name: Build shared-types
         run: |
