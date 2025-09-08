@@ -1,4 +1,4 @@
-import { GetStaticProps } from 'next';
+import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import Layout from '@/components/Layout';
 import FAQ from '@/components/FAQ';
@@ -51,7 +51,7 @@ export default function FAQPage({ metadata, faqData }: FAQPageProps) {
   );
 }
 
-export const getStaticProps: GetStaticProps<FAQPageProps> = async () => {
+export const getServerSideProps: GetServerSideProps<FAQPageProps> = async () => {
   try {
     // Fetch tenant metadata
     const metadata = await getTenantMetadata();
@@ -64,8 +64,6 @@ export const getStaticProps: GetStaticProps<FAQPageProps> = async () => {
         metadata,
         faqData,
       },
-      // Revalidate every hour
-      revalidate: 3600,
     };
   } catch (error) {
     console.error('Failed to generate FAQ page:', error);
@@ -79,7 +77,6 @@ export const getStaticProps: GetStaticProps<FAQPageProps> = async () => {
           total: 0,
         },
       },
-      revalidate: 60, // Retry more frequently on error
     };
   }
 };

@@ -1,4 +1,4 @@
-import { GetStaticProps } from 'next';
+import { GetServerSideProps } from 'next';
 import { getTenantMetadata, type TenantMetadata } from '@/lib/data';
 import Layout from '@/components/Layout';
 import { useEffect, useState } from 'react';
@@ -69,7 +69,7 @@ export default function Home({ metadata }: HomeProps) {
   );
 }
 
-export const getStaticProps: GetStaticProps<HomeProps> = async () => {
+export const getServerSideProps: GetServerSideProps<HomeProps> = async () => {
   try {
     const metadata = await getTenantMetadata();
     
