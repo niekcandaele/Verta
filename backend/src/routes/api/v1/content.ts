@@ -361,7 +361,7 @@ router.get(
     let platformMessageId: string;
     try {
       platformMessageId = decodeMessageId(messageId);
-    } catch (error) {
+    } catch {
       throw new ApiError(400, 'Invalid Message ID', 'Invalid base62-encoded message ID');
     }
 
