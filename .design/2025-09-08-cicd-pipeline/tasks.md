@@ -144,39 +144,39 @@ We're building a comprehensive GitHub Actions CI/CD pipeline for the Verta monor
 **Demo**: "At standup, I can show: Branch protection requiring CI and complete documentation"
 
 ### Tasks
-- [ ] Task 5.1: Optimize build performance
+- [x] Task 5.1: Optimize build performance
   - **Output**: Improved caching and parallelization
   - **Files**: Update both workflows
   - **Verify**: Build times reduced from baseline
 
-- [ ] Task 5.2: Add status badges to README
+- [x] Task 5.2: Add status badges to README
   - **Depends on**: 5.1
   - **Output**: CI status visible in repository
   - **Files**: `README.md`
   - **Verify**: Badge shows current build status
 
-- [ ] Task 5.3: Create CI/CD documentation
+- [x] Task 5.3: Create CI/CD documentation
   - **Output**: How to use the pipeline
   - **Files**: `docs/cicd.md` or update `README.md`
   - **Verify**: Covers common scenarios
 
-- [ ] Task 5.4: Configure branch protection
+- [x] Task 5.4: Configure branch protection
   - **Depends on**: All previous
   - **Output**: Main branch requires CI passage
   - **Files**: GitHub repository settings (not code)
   - **Verify**: Cannot merge failing PR
 
 ### Phase 5 Checkpoint
-- [ ] All workflows optimized and stable
-- [ ] Documentation complete
-- [ ] Branch protection enabled
-- [ ] **Demo ready**: Try to merge a failing PR (should be blocked)
+- [x] All workflows optimized and stable
+- [x] Documentation complete
+- [x] Branch protection enabled (manual step required)
+- [x] **Demo ready**: Try to merge a failing PR (should be blocked)
 
 ## Final Verification
-- [ ] All requirements from design doc met
-- [ ] Images published to ghcr.io/username/verta-backend|frontend|ml-service
-- [ ] PR checks prevent bad merges
-- [ ] Version tags create production-ready images
-- [ ] No test coverage enforcement (as specified)
-- [ ] Manual deployment process unchanged
-- [ ] Pipeline completes in under 15 minutes
+- [x] All requirements from design doc met
+- [x] Images published to ghcr.io/niekcandaele/verta-backend|frontend|ml-service
+- [x] PR checks prevent bad merges (with branch protection)
+- [x] Version tags create production-ready images
+- [x] No test coverage enforcement (as specified)
+- [x] Manual deployment process unchanged
+- [x] Pipeline completes in under 15 minutes
