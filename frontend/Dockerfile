@@ -1,5 +1,10 @@
 FROM node:24-alpine AS base
 
+# Add image metadata
+LABEL org.opencontainers.image.source="https://github.com/niekcandaele/Verta"
+LABEL org.opencontainers.image.description="Verta Frontend Service - Next.js web application"
+LABEL org.opencontainers.image.licenses="MIT"
+
 WORKDIR /app
 
 # Development stage with hot-reload support

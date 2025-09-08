@@ -3,6 +3,11 @@ FROM node:24-alpine AS base
 # Install mysql client for init container
 RUN apk add --no-cache mysql-client
 
+# Add image metadata
+LABEL org.opencontainers.image.source="https://github.com/niekcandaele/Verta"
+LABEL org.opencontainers.image.description="Verta Backend Service - Node.js API server"
+LABEL org.opencontainers.image.licenses="MIT"
+
 WORKDIR /app
 
 FROM base AS deps

@@ -65,7 +65,7 @@ jobs:
     needs: quality-checks
     uses: ./.github/workflows/docker-build-push.yml
     with:
-      push: false  # Phase 2: build only, no push
+      push: true  # Phase 3: push to ghcr.io
       tag-suffix: ''
     permissions:
       contents: read
