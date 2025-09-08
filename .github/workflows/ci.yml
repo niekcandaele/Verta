@@ -59,3 +59,14 @@ jobs:
         run: |
           cd backend
           npm run test || echo "No tests found, continuing..."
+
+  docker-build:
+    name: Build Docker Images
+    needs: quality-checks
+    uses: ./.github/workflows/docker-build-push.yml
+    with:
+      push: false  # Phase 2: build only, no push
+      tag-suffix: ''
+    permissions:
+      contents: read
+      packages: write
