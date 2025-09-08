@@ -6,14 +6,19 @@ WORKDIR /app
 FROM base AS dev
 ENV NODE_ENV=development
 
-# Copy package files
+# Copy workspace root package files
 COPY package*.json ./
+COPY frontend/package*.json ./frontend/
+COPY shared-types/package*.json ./shared-types/
 
-# Install dependencies
-RUN npm install
+# Install all dependencies including workspaces
+RUN npm ci --workspaces
 
 # Copy application code
-COPY . .
+COPY frontend ./frontend
+COPY shared-types ./shared-types
+
+WORKDIR /app/frontend
 
 # Expose Next.js development server port
 EXPOSE 3000
@@ -21,31 +26,61 @@ EXPOSE 3000
 # Start development server with hot-reload
 CMD ["npm", "run", "dev"]
 
-# Production dependencies stage
+# Dependencies stage - install ALL dependencies for build
 FROM base AS deps
+# Copy workspace package files
 COPY package*.json ./
-RUN npm ci --production
+COPY frontend/package*.json ./frontend/
+COPY shared-types/package*.json ./shared-types/
+
+# Install dependencies including workspaces
+RUN npm ci --workspaces
 
 # Build stage
 FROM base AS build
+# Copy workspace package files
 COPY package*.json ./
+COPY frontend/package*.json ./frontend/
+COPY shared-types/package*.json ./shared-types/
+
+# Copy dependencies
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY --from=deps /app/frontend/node_modules ./frontend/node_modules
+COPY --from=deps /app/shared-types/node_modules ./shared-types/node_modules
+
+# Copy source code
+COPY frontend ./frontend
+COPY shared-types ./shared-types
+
+# Build shared-types first
+WORKDIR /app/shared-types
+RUN npm run build
+
+# Build frontend
+WORKDIR /app/frontend
 RUN npm run build
 
 # Production runtime stage
 FROM base AS runtime
 ENV NODE_ENV=production
 
-# Copy package files
+# Copy workspace package files
 COPY package*.json ./
+COPY frontend/package*.json ./frontend/
+COPY shared-types/package*.json ./shared-types/
 
 # Install production dependencies only
-RUN npm ci --production && npm cache clean --force
+RUN npm ci --production --workspaces && npm cache clean --force
 
-# Copy built application
-COPY --from=build /app/.next ./.next
-COPY --from=build /app/public ./public
+# Copy built shared-types
+COPY --from=build /app/shared-types/dist ./shared-types/dist
+COPY --from=build /app/shared-types/package.json ./shared-types/
+
+# Copy built frontend application
+COPY --from=build /app/frontend/.next ./frontend/.next
+COPY --from=build /app/frontend/public ./frontend/public
+
+WORKDIR /app/frontend
 
 # Expose production server port
 EXPOSE 3000
