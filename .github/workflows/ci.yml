@@ -3,9 +3,22 @@ name: CI Pipeline
 on:
   push:
     branches: ['*']
+    tags:
+      - 'v*.*.*'  # Semantic version tags
   pull_request:
     branches: ['*']
   workflow_dispatch:
+    inputs:
+      push-images:
+        description: 'Push images to registry'
+        required: false
+        type: boolean
+        default: true
+      custom-tag:
+        description: 'Custom tag for images (optional)'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   quality-checks:
@@ -65,8 +78,8 @@ jobs:
     needs: quality-checks
     uses: ./.github/workflows/docker-build-push.yml
     with:
-      push: true  # Phase 3: push to ghcr.io
-      tag-suffix: ''
+      push: ${{ github.event_name != 'workflow_dispatch' && true || inputs.push-images }}
+      tag-suffix: ${{ inputs.custom-tag || '' }}
     permissions:
       contents: read
       packages: write
