@@ -111,33 +111,33 @@ We're building a comprehensive GitHub Actions CI/CD pipeline for the Verta monor
 **Demo**: "At standup, I can show: PR images with pr-123 tags and version tagged releases"
 
 ### Tasks
-- [ ] Task 4.1: Implement PR number tagging
+- [x] Task 4.1: Implement PR number tagging
   - **Output**: PRs create pr-<number> tagged images
   - **Files**: Update `.github/workflows/ci.yml`
   - **Verify**: Create test PR and check tag
 
-- [ ] Task 4.2: Add version tag detection
+- [x] Task 4.2: Add version tag detection
   - **Depends on**: 4.1
   - **Output**: Git tags create version-tagged images
   - **Files**: Update workflow triggers and logic
   - **Verify**: Tag v1.0.0 creates 1.0.0 and latest tags
 
-- [ ] Task 4.3: Implement multi-tag push
+- [x] Task 4.3: Implement multi-tag push
   - **Depends on**: 4.2
   - **Output**: Single build can push multiple tags
   - **Files**: Update docker-build-push workflow
   - **Verify**: Version tags create both version and latest
 
-- [ ] Task 4.4: Add workflow_dispatch for manual runs
+- [x] Task 4.4: Add workflow_dispatch for manual runs
   - **Output**: Manual trigger option in GitHub UI
   - **Files**: Update workflow triggers
   - **Verify**: Can manually run with custom parameters
 
 ### Phase 4 Checkpoint
-- [ ] PR creates pr-N tagged images
-- [ ] Git tags create version and latest tags
-- [ ] Manual dispatch works correctly
-- [ ] **Demo ready**: Show PR with its own images and a tagged release
+- [x] PR creates pr-N tagged images
+- [x] Git tags create version and latest tags
+- [x] Manual dispatch works correctly
+- [x] **Demo ready**: Show PR with its own images and a tagged release
 
 ## Phase 5: Production Readiness
 **Goal**: Enable as required checks and add documentation
