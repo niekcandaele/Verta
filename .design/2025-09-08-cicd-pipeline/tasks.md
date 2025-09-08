@@ -43,34 +43,34 @@ We're building a comprehensive GitHub Actions CI/CD pipeline for the Verta monor
 **Demo**: "At standup, I can show: CI successfully building all Docker images"
 
 ### Tasks
-- [ ] Task 2.1: Create reusable Docker workflow
+- [x] Task 2.1: Create reusable Docker workflow
   - **Output**: Separate workflow for Docker operations
   - **Files**: `.github/workflows/docker-build-push.yml`
   - **Verify**: File exists with proper structure
 
-- [ ] Task 2.2: Implement backend Docker build
+- [x] Task 2.2: Implement backend Docker build
   - **Depends on**: 2.1
   - **Output**: Backend image builds in CI
   - **Files**: Update both workflow files
   - **Verify**: Backend build completes with caching
 
-- [ ] Task 2.3: Implement frontend Docker build
+- [x] Task 2.3: Implement frontend Docker build
   - **Depends on**: 2.1
   - **Output**: Frontend Next.js image builds
   - **Files**: Update workflow configuration
   - **Verify**: Frontend build uses production target
 
-- [ ] Task 2.4: Implement ML service Docker build
+- [x] Task 2.4: Implement ML service Docker build
   - **Depends on**: 2.1
   - **Output**: Python ML service builds with models
   - **Files**: Update workflow configuration
   - **Verify**: Confirm model download occurs during build
 
 ### Phase 2 Checkpoint
-- [ ] All Docker builds complete within 15 minutes
-- [ ] Build logs show layer caching working
-- [ ] No push attempts occur (dry run)
-- [ ] **Demo ready**: Show successful Docker builds for all services
+- [x] All Docker builds complete within 15 minutes
+- [x] Build logs show layer caching working
+- [x] No push attempts occur (dry run)
+- [x] **Demo ready**: Show successful Docker builds for all services
 
 ## Phase 3: Enable Container Registry Push
 **Goal**: Push images to GitHub Container Registry with branch-based tags
