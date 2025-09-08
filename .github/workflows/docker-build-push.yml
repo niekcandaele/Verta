@@ -52,6 +52,10 @@ jobs:
         with:
           driver-opts: |
             image=moby/buildkit:latest
+          buildkitd-flags: --debug
+          config-inline: |
+            [worker.oci]
+              max-parallelism = 4
       
       - name: Log in to Container Registry
         if: inputs.push
@@ -83,8 +87,12 @@ jobs:
           push: ${{ inputs.push }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.service.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
+          cache-from: |
+            type=gha,scope=${{ matrix.service.name }}
+            type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.service.image }}:buildcache
+          cache-to: |
+            type=gha,mode=max,scope=${{ matrix.service.name }}
+            ${{ inputs.push && format('type=registry,ref={0}/{1}/{2}:buildcache,mode=max', env.REGISTRY, github.repository_owner, matrix.service.image) || '' }}
           build-args: ${{ matrix.service.build-args }}
       
       - name: Image Summary

@@ -1,5 +1,10 @@
 name: CI Pipeline
 
+# Cancel redundant runs
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: ['*']
