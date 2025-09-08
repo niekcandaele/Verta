@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { MessageRepositoryImpl } from '../MessageRepository.js';
+import { MessageRepository } from '../MessageRepository.js';
 import {
   createTestDatabase,
   destroyTestDatabase,
@@ -10,7 +10,7 @@ import { anonymizeUserId } from '../../../utils/crypto.js';
 
 describe('MessageRepository', () => {
   let testContext: TestDatabaseContext;
-  let repository: MessageRepositoryImpl;
+  let repository: MessageRepository;
   let testTenantId: string;
   let testChannelId: string;
 
@@ -46,7 +46,7 @@ describe('MessageRepository', () => {
       .executeTakeFirstOrThrow();
 
     testChannelId = channel.id;
-    repository = new MessageRepositoryImpl(testContext.db);
+    repository = new MessageRepository(testContext.db);
   });
 
   afterAll(async () => {
@@ -236,7 +236,7 @@ describe('MessageRepository', () => {
       const found = await repository.findReplies(original.id);
 
       expect(found).toHaveLength(3);
-      expect(found.map((r) => r.content)).toEqual([
+      expect(found.map((r: any) => r.content)).toEqual([
         'Reply 0',
         'Reply 1',
         'Reply 2',
@@ -273,7 +273,7 @@ describe('MessageRepository', () => {
       const created = await repository.bulkCreate(messages);
 
       expect(created).toHaveLength(3);
-      expect(created.map((m) => m.content)).toEqual([
+      expect(created.map((m: any) => m.content)).toEqual([
         'First bulk message',
         'Second bulk message',
         'Third bulk message',
@@ -325,7 +325,7 @@ describe('MessageRepository', () => {
 
       expect(result.created).toHaveLength(2);
       expect(result.skipped).toBe(1);
-      expect(result.created.map((m) => m.content)).toEqual([
+      expect(result.created.map((m: any) => m.content)).toEqual([
         'New message 1',
         'New message 2',
       ]);

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
+import { getMessageUrl, encodeMessageId } from '@/lib/navigation';
 
 interface SearchResultsProps {
   results: SearchResultItem[];
@@ -25,33 +26,44 @@ export default function SearchResults({ results, onClose }: SearchResultsProps) 
             <span className="w-1 h-3 bg-primary rounded-full"></span>
             FAQ Answers
           </h3>
-          {goldenAnswers.map((result, index) => (
-            <div
-              key={`golden-${index}`}
-              className="mb-3 p-3 bg-primary/5 rounded-lg hover:bg-primary/10 transition-colors cursor-pointer"
-              onClick={onClose}
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div className="badge badge-primary badge-sm">Golden Answer</div>
-                <span className="text-xs text-base-content/60">
-                  {Math.round(result.score * 100)}% match
-                </span>
-              </div>
-              {result.metadata?.question && (
-                <p className="text-sm font-medium text-primary mb-2">
-                  {result.metadata.question}
-                </p>
-              )}
-              <div className="prose prose-sm max-w-none">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeSanitize]}
-                >
-                  {result.content || ''}
-                </ReactMarkdown>
-              </div>
-            </div>
-          ))}
+          {goldenAnswers.map((result, index) => {
+            // Use the cluster_id from metadata as the FAQ item ID for linking
+            const faqItemId = result.metadata?.cluster_id;
+            const href = faqItemId ? `/faq#${faqItemId}` : '/faq';
+            
+            return (
+              <Link
+                key={`golden-${index}`}
+                href={href}
+                onClick={onClose}
+              >
+                <div className="mb-3 p-3 bg-primary/5 rounded-lg hover:bg-primary/10 transition-colors cursor-pointer">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="badge badge-primary badge-sm">Golden Answer</div>
+                    <span className="text-xs text-base-content/60">
+                      {Math.round(result.score * 100)}% match
+                    </span>
+                  </div>
+                  {result.metadata?.question && (
+                    <p className="text-sm font-medium text-primary mb-2">
+                      {result.metadata.question}
+                    </p>
+                  )}
+                  <div className="prose prose-sm max-w-none">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeSanitize]}
+                    >
+                      {result.content || ''}
+                    </ReactMarkdown>
+                  </div>
+                  <p className="text-xs text-primary mt-2">
+                    View in FAQ →
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
 
@@ -63,37 +75,53 @@ export default function SearchResults({ results, onClose }: SearchResultsProps) 
             Message Archive
           </h3>
           {messages.map((result, index) => {
+            const channelSlug = result.metadata?.channel_slug;
+            const platformMessageId = result.metadata?.platform_message_id;
             const channelId = result.metadata?.channel_id;
-            const messageId = result.message_id;
             
-            return (
-              <Link
-                key={`message-${index}`}
-                href={channelId ? `/channel/${channelId}/1#${messageId}` : '#'}
-                onClick={onClose}
-              >
-                <div className="mb-2 p-3 rounded-lg hover:bg-secondary/10 transition-colors cursor-pointer">
-                  <div className="flex items-start justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <div className="badge badge-secondary badge-sm">Message</div>
-                      {result.metadata?.created_at && (
-                        <span className="text-xs text-base-content/60">
-                          {new Date(result.metadata.created_at).toLocaleDateString()}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-xs text-base-content/60">
-                      {Math.round(result.score * 100)}%
-                    </span>
+            // Use permalink format if we have slug and platform message ID
+            const href = channelSlug && platformMessageId 
+              ? getMessageUrl(channelSlug, platformMessageId)
+              : null;
+            
+            const content = (
+              <div className="mb-2 p-3 rounded-lg hover:bg-secondary/10 transition-colors cursor-pointer">
+                <div className="flex items-start justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <div className="badge badge-secondary badge-sm">Message</div>
+                    {result.metadata?.created_at && (
+                      <span className="text-xs text-base-content/60">
+                        {new Date(result.metadata.created_at).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
-                  <p className="text-sm text-base-content/80">
-                    {result.excerpt}
-                  </p>
+                  <span className="text-xs text-base-content/60">
+                    {Math.round(result.score * 100)}%
+                  </span>
+                </div>
+                <p className="text-sm text-base-content/80">
+                  {result.excerpt}
+                </p>
+                {href && (
                   <p className="text-xs text-secondary mt-1">
                     View in context →
                   </p>
-                </div>
+                )}
+              </div>
+            );
+            
+            return href ? (
+              <Link
+                key={`message-${index}`}
+                href={href}
+                onClick={onClose}
+              >
+                {content}
               </Link>
+            ) : (
+              <div key={`message-${index}`} className="opacity-75">
+                {content}
+              </div>
             );
           })}
         </div>

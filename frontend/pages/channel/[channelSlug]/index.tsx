@@ -3,20 +3,20 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { 
   getTenantMetadata,
-  getChannels, 
-  getChannel,
-  getChannelMessages, 
-  getChannelPageNumbers,
+  getChannelBySlug,
+  getChannelMessagesBySlug, 
   getForumThreadsPage,
   type MessagePageData,
   type TenantMetadata,
   type ForumThreadsPage
 } from '@/lib/data';
+import { getChannelUrl } from '@/lib/navigation';
 import type { Channel } from 'shared-types';
 import Layout from '@/components/Layout';
 import TextChannelView from '@/components/channels/TextChannelView';
 import ForumChannelView from '@/components/channels/ForumChannelView';
 import ThreadChannelView from '@/components/channels/ThreadChannelView';
+import MessageView from '@/components/MessageView';
 
 interface ChannelPageProps {
   metadata: TenantMetadata;
@@ -59,12 +59,12 @@ export default function ChannelPage({ metadata, channel, pageData, currentPage, 
             </div>
 
             {/* Pagination */}
-            {pageData && (
+            {pageData && pageData.totalPages > 1 && (
               <div className="flex justify-between items-center mb-6">
                 <div className="btn-group">
                   {currentPage > 1 ? (
                     <Link 
-                      href={`/channel/${channel.id}/${currentPage - 1}`}
+                      href={`${getChannelUrl(channel.slug!)}?page=${currentPage - 1}`}
                       className="btn btn-sm"
                     >
                       « Previous
@@ -77,7 +77,7 @@ export default function ChannelPage({ metadata, channel, pageData, currentPage, 
                   
                   {currentPage < pageData.totalPages ? (
                     <Link 
-                      href={`/channel/${channel.id}/${currentPage + 1}`}
+                      href={`${getChannelUrl(channel.slug!)}?page=${currentPage + 1}`}
                       className="btn btn-sm"
                     >
                       Next »
@@ -97,26 +97,36 @@ export default function ChannelPage({ metadata, channel, pageData, currentPage, 
 
         {/* Messages - Render based on channel type */}
         {channel.type === 'text' && pageData && (
-          <TextChannelView messages={pageData.messages} channelName={channel.name} channels={metadata.channels} />
+          <MessageView 
+            messages={pageData.messages}
+            channelSlug={channel.slug!}
+            channels={metadata.channels}
+            enableUrlSync={true}
+          />
         )}
         {channel.type === 'forum' && forumThreadsData && (
           <ForumChannelView threadData={forumThreadsData} currentPage={currentPage} />
         )}
         {channel.type === 'thread' && pageData && (
-          <ThreadChannelView messages={pageData.messages} channelName={channel.name} channels={metadata.channels} />
+          <MessageView
+            messages={pageData.messages}
+            channelSlug={channel.slug!}
+            channels={metadata.channels}
+            enableUrlSync={true}
+          />
         )}
       </div>
     </Layout>
   );
 }
 
-export const getServerSideProps: GetServerSideProps<ChannelPageProps> = async ({ params }) => {
-  if (!params || typeof params.channelId !== 'string' || typeof params.page !== 'string') {
+export const getServerSideProps: GetServerSideProps<ChannelPageProps> = async ({ params, query }) => {
+  if (!params || typeof params.channelSlug !== 'string') {
     return { notFound: true };
   }
   
-  const channelId = params.channelId;
-  const currentPage = parseInt(params.page, 10);
+  const channelSlug = params.channelSlug;
+  const currentPage = query.page ? parseInt(query.page as string, 10) : 1;
   
   if (isNaN(currentPage) || currentPage < 1) {
     return { notFound: true };
@@ -124,7 +134,7 @@ export const getServerSideProps: GetServerSideProps<ChannelPageProps> = async ({
   
   const [metadata, channel] = await Promise.all([
     getTenantMetadata(),
-    getChannel(channelId),
+    getChannelBySlug(channelSlug),
   ]);
   
   if (!channel) {
@@ -133,7 +143,7 @@ export const getServerSideProps: GetServerSideProps<ChannelPageProps> = async ({
   
   // For forum channels, fetch thread summaries page
   if (channel.type === 'forum') {
-    const forumThreadsData = await getForumThreadsPage(channelId, currentPage);
+    const forumThreadsData = await getForumThreadsPage(channel.id, currentPage);
     
     if (!forumThreadsData) {
       return { notFound: true };
@@ -150,7 +160,7 @@ export const getServerSideProps: GetServerSideProps<ChannelPageProps> = async ({
   }
   
   // For non-forum channels, fetch messages as usual
-  const pageData = await getChannelMessages(channelId, currentPage);
+  const pageData = await getChannelMessagesBySlug(channelSlug, currentPage);
   if (!pageData) {
     return { notFound: true };
   }

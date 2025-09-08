@@ -93,8 +93,12 @@ class RerankService:
                 indices.append(i)
             
             # Get reranking scores from the model
-            logger.debug(f"Reranking {len(pairs)} results")
+            import time
+            start = time.time()
+            logger.info(f"Starting reranking of {len(pairs)} results")
             scores = self._compute_scores(pairs)
+            end = time.time()
+            logger.info(f"Reranking completed in {end - start:.2f}s")
             
             # Create list of (index, score) tuples and sort by score (descending)
             scored_results = list(zip(indices, scores))
@@ -122,13 +126,31 @@ class RerankService:
         try:
             # Use the model's compute_score method if available (Jina models have this)
             if hasattr(self.model, 'compute_score'):
-                scores = self.model.compute_score(pairs, max_length=512)
-                # Convert to list if necessary
-                if isinstance(scores, torch.Tensor):
-                    scores = scores.cpu().numpy().tolist()
-                elif not isinstance(scores, list):
-                    scores = list(scores)
-                return scores
+                import time
+                start = time.time()
+                
+                # Process in batches for better performance
+                batch_size = 8  # Adjust based on memory constraints
+                all_scores = []
+                
+                for i in range(0, len(pairs), batch_size):
+                    batch = pairs[i:i + batch_size]
+                    batch_start = time.time()
+                    batch_scores = self.model.compute_score(batch, max_length=512)
+                    
+                    # Convert to list if necessary
+                    if isinstance(batch_scores, torch.Tensor):
+                        batch_scores = batch_scores.cpu().numpy().tolist()
+                    elif not isinstance(batch_scores, list):
+                        batch_scores = list(batch_scores)
+                    
+                    all_scores.extend(batch_scores)
+                    batch_end = time.time()
+                    logger.debug(f"Batch {i//batch_size + 1} processed in {batch_end - batch_start:.2f}s")
+                
+                end = time.time()
+                logger.info(f"All batches processed in {end - start:.2f}s")
+                return all_scores
             else:
                 # Fallback: this shouldn't happen with Jina models
                 logger.error("Model doesn't have compute_score method")

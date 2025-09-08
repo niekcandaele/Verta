@@ -5,7 +5,7 @@ import { OcrJobData, OcrJobResult, addOcrJob } from '../queues/ocrQueue.js';
 import { MlClientService } from '../services/MlClientService.js';
 import { OcrResultRepositoryImpl } from '../repositories/sync/OcrResultRepository.js';
 import { MessageAttachmentRepositoryImpl } from '../repositories/sync/MessageAttachmentRepository.js';
-import { MessageRepositoryImpl } from '../repositories/sync/MessageRepository.js';
+import { MessageRepository } from '../repositories/sync/MessageRepository.js';
 import type { Kysely } from 'kysely';
 import type { Database } from '../database/types.js';
 import logger from '../utils/logger.js';
@@ -18,7 +18,7 @@ export class OcrWorker {
   private mlService: MlClientService;
   private ocrRepository: OcrResultRepositoryImpl;
   private attachmentRepo: MessageAttachmentRepositoryImpl;
-  private messageRepo: MessageRepositoryImpl;
+  private messageRepo: MessageRepository;
   private db: Kysely<Database>;
 
   constructor(mlService: MlClientService, db: Kysely<Database>) {
@@ -26,7 +26,7 @@ export class OcrWorker {
     this.db = db;
     this.ocrRepository = new OcrResultRepositoryImpl(db);
     this.attachmentRepo = new MessageAttachmentRepositoryImpl(db);
-    this.messageRepo = new MessageRepositoryImpl(db);
+    this.messageRepo = new MessageRepository(db);
   }
 
   /**

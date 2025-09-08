@@ -56,7 +56,7 @@ export class SearchService {
         embedding: embedResult.embedding,
         search_configs: searchConfigs,
         limit: apiRequest.limit || 10,
-        rerank: true,
+        rerank: apiRequest.rerank !== undefined ? apiRequest.rerank : true,
       };
 
       // Execute search via ML service

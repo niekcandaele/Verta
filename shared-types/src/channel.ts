@@ -7,6 +7,7 @@ export type Channel = {
   name: string;
   type: ChannelType;
   parentChannelId: string | null;
+  slug: string | null;
   discordChannelType?: number;
   metadata: Record<string, unknown>;
   createdAt: Date;
@@ -19,6 +20,7 @@ export type CreateChannelData = {
   name: string;
   type: ChannelType;
   parentChannelId?: string | null;
+  slug?: string | null;
   metadata?: Record<string, unknown>;
 };
 
@@ -26,5 +28,6 @@ export type UpdateChannelData = {
   name?: string;
   type?: ChannelType;
   parentChannelId?: string | null;
+  slug?: string | null;
   metadata?: Record<string, unknown>;
 };

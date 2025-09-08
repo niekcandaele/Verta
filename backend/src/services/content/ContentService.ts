@@ -14,6 +14,29 @@ import type {
 } from '../../repositories/types.js';
 
 /**
+ * Options for fetching message context
+ */
+export interface MessageContextOptions {
+  beforeCount?: number; // Default: 50
+  afterCount?: number;  // Default: 50
+}
+
+/**
+ * Message context response with target message and surrounding messages
+ */
+export interface MessageContextResult {
+  messages: Message[];
+  target: {
+    id: string;
+    position: number;
+  };
+  navigation: {
+    before: { hasMore: boolean; cursor: string | null };
+    after: { hasMore: boolean; cursor: string | null };
+  };
+}
+
+/**
  * Service interface for content delivery via REST API
  */
 export interface ContentService {
@@ -89,4 +112,43 @@ export interface ContentService {
     threadId: string,
     pagination?: PaginationOptions
   ): Promise<ServiceResult<PaginatedResult<Message>>>;
+
+  /**
+   * Get a channel by slug
+   * @param tenantSlug - The tenant slug from header
+   * @param channelSlug - The channel slug
+   * @returns Service result with channel data
+   */
+  getChannelBySlug(
+    tenantSlug: string,
+    channelSlug: string
+  ): Promise<ServiceResult<Channel>>;
+
+  /**
+   * Get a message with surrounding context
+   * @param tenantSlug - The tenant slug from header
+   * @param messageId - The message ID (base62 decoded)
+   * @param options - Context options (before/after count)
+   * @returns Service result with message context
+   */
+  getMessageContext(
+    tenantSlug: string,
+    messageId: string,
+    options?: MessageContextOptions
+  ): Promise<ServiceResult<MessageContextResult>>;
+
+  /**
+   * Get messages around a specific timestamp
+   * @param tenantSlug - The tenant slug from header
+   * @param channelId - The channel ID
+   * @param timestamp - The target timestamp
+   * @param options - Context options (before/after count)
+   * @returns Service result with message context
+   */
+  getMessagesAtTimestamp(
+    tenantSlug: string,
+    channelId: string,
+    timestamp: Date,
+    options?: MessageContextOptions
+  ): Promise<ServiceResult<MessageContextResult>>;
 }

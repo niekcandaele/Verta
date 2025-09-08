@@ -6,7 +6,7 @@ import { Worker, type Job } from 'bullmq';
 import { addOcrJob } from '../queues/ocrQueue.js';
 import { OcrResultRepositoryImpl } from '../repositories/sync/OcrResultRepository.js';
 import { MessageAttachmentRepositoryImpl } from '../repositories/sync/MessageAttachmentRepository.js';
-import { MessageRepositoryImpl } from '../repositories/sync/MessageRepository.js';
+import { MessageRepository } from '../repositories/sync/MessageRepository.js';
 import { db } from '../database/index.js';
 import logger from '../utils/logger.js';
 import { redisConfig } from '../config/redis.js';
@@ -18,12 +18,12 @@ export class OcrRetryWorker {
   private worker: Worker;
   private ocrRepo: OcrResultRepositoryImpl;
   private attachmentRepo: MessageAttachmentRepositoryImpl;
-  private messageRepo: MessageRepositoryImpl;
+  private messageRepo: MessageRepository;
 
   constructor() {
     this.ocrRepo = new OcrResultRepositoryImpl(db);
     this.attachmentRepo = new MessageAttachmentRepositoryImpl(db);
-    this.messageRepo = new MessageRepositoryImpl(db);
+    this.messageRepo = new MessageRepository(db);
 
     // Create the worker to process OCR retry triggers
     this.worker = new Worker(

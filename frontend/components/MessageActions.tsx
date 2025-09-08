@@ -2,14 +2,16 @@ import { useState } from 'react';
 import { FiCopy, FiLink, FiShare2 } from 'react-icons/fi';
 import type { Message } from 'shared-types';
 import clsx from 'clsx';
+import { getMessageUrl, getShareUrl } from '@/lib/navigation';
 
 interface MessageActionsProps {
   message: Message;
+  channelSlug?: string;
   onCopy?: () => void;
   className?: string;
 }
 
-export default function MessageActions({ message, onCopy, className }: MessageActionsProps) {
+export default function MessageActions({ message, channelSlug, onCopy, className }: MessageActionsProps) {
   const [copiedType, setCopiedType] = useState<'content' | 'link' | null>(null);
 
   const handleCopyContent = async () => {
@@ -29,7 +31,14 @@ export default function MessageActions({ message, onCopy, className }: MessageAc
 
   const handleCopyLink = async () => {
     try {
-      const url = window.location.href;
+      let url: string;
+      if (channelSlug && 'platformMessageId' in message) {
+        // Generate proper permalink
+        url = getShareUrl(getMessageUrl(channelSlug, message.platformMessageId));
+      } else {
+        // Fallback to current URL
+        url = window.location.href;
+      }
       await navigator.clipboard.writeText(url);
       setCopiedType('link');
       

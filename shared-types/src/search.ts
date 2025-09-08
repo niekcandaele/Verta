@@ -32,6 +32,7 @@ export interface SearchResponse {
 export interface SearchApiRequest {
   query: string;
   limit?: number;
+  rerank?: boolean;
 }
 
 export interface SearchApiResponse {

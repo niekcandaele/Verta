@@ -53,7 +53,7 @@ const createApiClient = (): AxiosInstance => {
       'X-Tenant-Slug': tenantSlug,
       'Content-Type': 'application/json',
     },
-    timeout: 30000, // 30 seconds
+    timeout: 120000, // 2 minutes
   });
 
   // Response interceptor for error handling
@@ -112,10 +112,26 @@ export const api = {
   getChannel: (channelId: string) => 
     apiClient.get<ApiResponse<any>>(`/channels/${channelId}`),
 
+  // Get channel by slug
+  getChannelBySlug: (slug: string) =>
+    apiClient.get<ApiResponse<any>>(`/channels/by-slug/${slug}`),
+
   // Get channel messages with pagination
   getChannelMessages: (channelId: string, page: number = 1, limit: number = 50) =>
     apiClient.get<ApiResponse<any>>(`/channels/${channelId}/messages`, {
       params: { page, limit }
+    }),
+
+  // Get channel messages by slug with pagination
+  getChannelMessagesBySlug: (slug: string, page: number = 1, limit: number = 50) =>
+    apiClient.get<ApiResponse<any>>(`/channels/by-slug/${slug}/messages`, {
+      params: { page, limit }
+    }),
+
+  // Get message with context
+  getMessageContext: (messageId: string, before: number = 50, after: number = 50) =>
+    apiClient.get<ApiResponse<any>>(`/messages/${messageId}`, {
+      params: { before, after }
     }),
 
   // Get forum threads

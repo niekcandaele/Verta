@@ -108,6 +108,17 @@ export async function getChannel(channelId: string): Promise<Channel | undefined
   }
 }
 
+// Get a specific channel by slug
+export async function getChannelBySlug(slug: string): Promise<Channel | undefined> {
+  try {
+    const response = await api.getChannelBySlug(slug);
+    return response.data.data;
+  } catch (error) {
+    console.error(`Failed to load channel by slug ${slug}:`, error);
+    return undefined;
+  }
+}
+
 // Get messages for a specific channel and page
 export async function getChannelMessages(channelId: string, page: number): Promise<MessagePageData | null> {
   try {
@@ -137,6 +148,99 @@ export async function getChannelMessages(channelId: string, page: number): Promi
     };
   } catch (error) {
     console.error(`Failed to load messages for channel ${channelId}, page ${page}:`, error);
+    return null;
+  }
+}
+
+// Get messages for a channel by slug
+export async function getChannelMessagesBySlug(slug: string, page: number): Promise<MessagePageData | null> {
+  try {
+    const [channelResponse, messagesResponse] = await Promise.all([
+      api.getChannelBySlug(slug),
+      api.getChannelMessagesBySlug(slug, page, 50)
+    ]);
+
+    const channel = channelResponse.data.data;
+    const messages = messagesResponse.data.data;
+    const meta = messagesResponse.data.meta;
+
+    const messagesWithExtras: MessageWithExtras[] = messages.map((msg: any) => ({
+      ...msg,
+      attachments: msg.attachments || [],
+      reactions: msg.reactions || []
+    }));
+
+    return {
+      channelId: channel.id,
+      channelName: channel.name,
+      channelType: channel.type,
+      page: meta.page || page,
+      totalPages: meta.totalPages || 1,
+      messages: messagesWithExtras
+    };
+  } catch (error) {
+    console.error(`Failed to load messages for channel slug ${slug}, page ${page}:`, error);
+    return null;
+  }
+}
+
+// Message context interface
+export interface MessageContext {
+  message: MessageWithExtras;
+  before: MessageWithExtras[];
+  after: MessageWithExtras[];
+  channel: Channel;
+}
+
+// Get message with context
+export async function getMessageWithContext(messageId: string, before: number = 50, after: number = 50): Promise<MessageContext | null> {
+  try {
+    const response = await api.getMessageContext(messageId, before, after);
+    const data = response.data.data;
+    
+    // Transform backend response format
+    // Backend returns: { messages, target: { id, position }, navigation }
+    // We need: { message, before, after, channel }
+    
+    if (!data.messages || !data.target) {
+      throw new Error('Invalid message context response format');
+    }
+    
+    const targetPosition = data.target.position;
+    const targetMessage = data.messages[targetPosition];
+    
+    if (!targetMessage) {
+      throw new Error('Target message not found in response');
+    }
+    
+    // Transform all messages to ensure they have required properties
+    const transformMessage = (msg: any): MessageWithExtras => ({
+      ...msg,
+      attachments: msg.attachments || [],
+      reactions: msg.reactions || []
+    });
+    
+    const transformedMessages = data.messages.map(transformMessage);
+    
+    // Split messages into before and after arrays
+    const beforeMessages = transformedMessages.slice(0, targetPosition);
+    const afterMessages = transformedMessages.slice(targetPosition + 1);
+    const targetMsg = transformedMessages[targetPosition];
+    
+    // Get the channel information
+    const channel = await getChannel(targetMsg.channelId);
+    if (!channel) {
+      throw new Error('Channel not found for message');
+    }
+    
+    return {
+      message: targetMsg,
+      before: beforeMessages,
+      after: afterMessages,
+      channel: channel
+    };
+  } catch (error) {
+    console.error(`Failed to load message context for ${messageId}:`, error);
     return null;
   }
 }

@@ -19,10 +19,12 @@ import {
   ChannelRepository,
   ChannelSyncJobRepository,
 } from '../repositories/sync/index.js';
+import type { UpdateChannelData } from 'shared-types';
 import type { SyncJobData, SyncJobResult } from '../types/sync.js';
 import type { Platform, ChannelType } from '../database/types.js';
 import { isRateLimitError, classifyError } from '../types/errors.js';
 import { config } from '../config/env.js';
+import { generateSlug } from '../utils/slugify.js';
 
 /**
  * Sync worker implementation
@@ -258,6 +260,29 @@ export class SyncWorker {
   }
 
   /**
+   * Generate a unique slug for a channel
+   */
+  private async generateUniqueSlug(
+    tenantId: string,
+    channelName: string
+  ): Promise<string> {
+    let baseSlug = generateSlug(channelName);
+    let slug = baseSlug;
+    let counter = 2;
+
+    // Keep trying until we find a unique slug
+    while (true) {
+      const existing = await this.channelRepo.findBySlug(tenantId, slug);
+      if (!existing) {
+        return slug;
+      }
+      // Append counter and try again
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+  }
+
+  /**
    * Sync channels from the platform
    */
   private async syncChannels(
@@ -338,12 +363,31 @@ export class SyncWorker {
                 )?.id || null
               : null;
 
-            await this.channelRepo.update(existingChannel.id, {
+            // Only generate slug if the channel doesn't have one
+            // This handles channels created before the slug feature was added
+            const updateData: UpdateChannelData = {
               name: platformChannel.name,
               type: platformChannel.type as ChannelType,
               parentChannelId,
               metadata: platformChannel.metadata || {},
-            });
+            };
+
+            if (!existingChannel.slug) {
+              // Generate slug for channels that don't have one
+              const slug = await this.generateUniqueSlug(
+                tenantId,
+                platformChannel.name
+              );
+              updateData.slug = slug;
+              logger.info('Generated slug for existing channel', {
+                channelId: platformChannel.id,
+                channelName: platformChannel.name,
+                slug,
+                tenantId,
+              });
+            }
+
+            await this.channelRepo.update(existingChannel.id, updateData);
           } else {
             // Create new channel
             // Look up parent channel's internal ID if it has a parent
@@ -356,12 +400,19 @@ export class SyncWorker {
                 )?.id || null
               : null;
 
+            // Generate unique slug for new channel
+            const slug = await this.generateUniqueSlug(
+              tenantId,
+              platformChannel.name
+            );
+
             await this.channelRepo.create({
               tenantId,
               platformChannelId: platformChannel.id,
               name: platformChannel.name,
               type: platformChannel.type as ChannelType,
               parentChannelId,
+              slug,
               metadata: platformChannel.metadata || {},
             });
             logger.info('Added new channel visible to @everyone', {

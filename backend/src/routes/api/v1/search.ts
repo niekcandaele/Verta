@@ -55,7 +55,7 @@ router.post(
     const tenantSlug = (req as any).tenantSlug;
 
     // Validate request body
-    const { query, limit } = req.body as SearchApiRequest;
+    const { query, limit, rerank } = req.body as SearchApiRequest;
 
     if (!query || typeof query !== 'string' || query.trim().length === 0) {
       throw new ApiError(
@@ -79,6 +79,7 @@ router.post(
     const searchRequest: SearchApiRequest = {
       query: query.trim(),
       limit: limit || 10,
+      rerank: rerank !== undefined ? rerank : true, // Default to true for backward compatibility
     };
 
     logger.info('Processing search request', {

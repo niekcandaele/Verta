@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
 import { randomUUID } from 'crypto';
 import { BaseCrudRepositoryImpl } from '../BaseCrudRepository.js';
-import type { MessageRepository } from './types.js';
+import type { MessageRepository as IMessageRepository } from './types.js';
 import type { PaginatedResult } from '../types.js';
 import type { Message, CreateMessageData } from 'shared-types';
 import type { Database } from '../../database/types.js';
@@ -9,9 +9,9 @@ import type { Database } from '../../database/types.js';
 /**
  * Implementation of MessageRepository using Kysely
  */
-export class MessageRepositoryImpl
+export class MessageRepository
   extends BaseCrudRepositoryImpl<Message, CreateMessageData, never>
-  implements MessageRepository
+  implements IMessageRepository
 {
   constructor(db: Kysely<Database>) {
     super(db, 'messages');
@@ -32,6 +32,79 @@ export class MessageRepositoryImpl
       .executeTakeFirst();
 
     return row ? this.mapRowToEntity(row) : null;
+  }
+
+  /**
+   * Find a message by platform message ID only (across all channels)
+   */
+  async findByPlatformMessageId(
+    platformMessageId: string
+  ): Promise<Message | null> {
+    const row = await this.db
+      .selectFrom('messages')
+      .selectAll()
+      .where('platform_message_id', '=', platformMessageId)
+      .executeTakeFirst();
+
+    return row ? this.mapRowToEntity(row) : null;
+  }
+
+  /**
+   * Find a message by platform message ID with attachments and reactions
+   */
+  async findByPlatformMessageIdWithExtras(
+    platformMessageId: string
+  ): Promise<(Message & { attachments: any[]; reactions: any[] }) | null> {
+    const message = await this.db
+      .selectFrom('messages')
+      .selectAll()
+      .where('platform_message_id', '=', platformMessageId)
+      .executeTakeFirst();
+
+    if (!message) {
+      return null;
+    }
+
+    // Fetch attachments for the message
+    const attachments = await this.db
+      .selectFrom('message_attachments')
+      .selectAll()
+      .where('message_id', '=', message.id)
+      .execute();
+
+    // Fetch reactions for the message
+    const reactions = await this.db
+      .selectFrom('message_emoji_reactions')
+      .selectAll()
+      .where('message_id', '=', message.id)
+      .execute();
+
+    // Map attachments
+    const mappedAttachments = attachments.map((att) => ({
+      id: att.id,
+      messageId: att.message_id,
+      filename: att.filename,
+      url: att.url,
+      contentType: att.content_type,
+      fileSize: att.file_size,
+      metadata: att.metadata,
+      createdAt: new Date(att.created_at),
+    }));
+
+    // Map reactions
+    const mappedReactions = reactions.map((react) => ({
+      id: react.id,
+      messageId: react.message_id,
+      emoji: react.emoji,
+      anonymizedUserId: react.anonymized_user_id,
+      createdAt: new Date(react.created_at),
+    }));
+
+    return {
+      ...this.mapRowToEntity(message),
+      attachments: mappedAttachments,
+      reactions: mappedReactions,
+    };
   }
 
   /**
