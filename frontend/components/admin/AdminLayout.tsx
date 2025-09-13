@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { FiLogOut, FiList, FiHome } from 'react-icons/fi';
+import { FiLogOut, FiList, FiHome, FiDatabase, FiSettings } from 'react-icons/fi';
 import ErrorBoundary from '../ErrorBoundary';
 
 interface AdminLayoutProps {
@@ -18,7 +18,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   };
 
   const isActive = (path: string) => {
-    return router.pathname === path ? 'bg-primary/20' : '';
+    if (path === '/admin') {
+      return router.pathname === '/admin' ? 'bg-primary/20' : '';
+    }
+    return router.pathname.startsWith(path) ? 'bg-primary/20' : '';
   };
 
   return (
@@ -35,7 +38,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   className={`flex items-center px-4 py-2 rounded-lg hover:bg-base-300 transition-colors ${isActive('/admin')}`}
                 >
                   <FiList className="mr-2" />
-                  Clusters
+                  FAQ
+                </Link>
+                <Link
+                  href="/admin/knowledge-bases"
+                  className={`flex items-center px-4 py-2 rounded-lg hover:bg-base-300 transition-colors ${isActive('/admin/knowledge-bases')}`}
+                >
+                  <FiDatabase className="mr-2" />
+                  Knowledge Bases
+                </Link>
+                <Link
+                  href="/admin/bot-config"
+                  className={`flex items-center px-4 py-2 rounded-lg hover:bg-base-300 transition-colors ${isActive('/admin/bot-config')}`}
+                >
+                  <FiSettings className="mr-2" />
+                  Bot Config
                 </Link>
               </nav>
             </div>

@@ -213,4 +213,29 @@ export class QuestionClusterRepository extends BaseCrudRepositoryImpl<
 
     return row;
   }
+
+  /**
+   * Bulk delete clusters by IDs
+   * @param clusterIds Array of cluster IDs to delete
+   * @throws Error if any deletion fails
+   */
+  async bulkDelete(clusterIds: string[]): Promise<void> {
+    if (clusterIds.length === 0) {
+      return;
+    }
+
+    // Delete all clusters in one query
+    // Foreign key constraints will handle cascade deletion of related data
+    const result = await this.db
+      .deleteFrom('question_clusters')
+      .where('id', 'in', clusterIds)
+      .execute();
+
+    // Verify all clusters were deleted
+    if (Number(result[0].numDeletedRows) !== clusterIds.length) {
+      throw new Error(
+        `Expected to delete ${clusterIds.length} clusters, but only deleted ${result[0].numDeletedRows}`
+      );
+    }
+  }
 }

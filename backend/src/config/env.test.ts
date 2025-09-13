@@ -19,6 +19,7 @@ describe('Environment Configuration', () => {
       process.env.ADMIN_API_KEY = 'test-api-key';
       process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
       process.env.DISCORD_BOT_TOKEN = 'test-discord-token';
+      process.env.DISCORD_CLIENT_ID = 'test-discord-client-id';
 
       const { ConfigSchema } = await import('./env.js');
 
@@ -26,6 +27,7 @@ describe('Environment Configuration', () => {
         ADMIN_API_KEY: 'test-api-key',
         DATABASE_URL: 'postgresql://user:pass@localhost:5432/test',
         DISCORD_BOT_TOKEN: 'test-discord-token',
+        DISCORD_CLIENT_ID: 'test-discord-client-id',
       };
 
       const result = ConfigSchema.parse(testEnv);
@@ -43,6 +45,7 @@ describe('Environment Configuration', () => {
       process.env.ADMIN_API_KEY = 'test-api-key';
       process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
       process.env.DISCORD_BOT_TOKEN = 'test-discord-token';
+      process.env.DISCORD_CLIENT_ID = 'test-discord-client-id';
 
       const { ConfigSchema } = await import('./env.js');
       const testEnv = {};
@@ -55,6 +58,7 @@ describe('Environment Configuration', () => {
       process.env.ADMIN_API_KEY = 'test-api-key';
       process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
       process.env.DISCORD_BOT_TOKEN = 'test-discord-token';
+      process.env.DISCORD_CLIENT_ID = 'test-discord-client-id';
 
       const { ConfigSchema } = await import('./env.js');
 
@@ -62,6 +66,7 @@ describe('Environment Configuration', () => {
         ADMIN_API_KEY: 'test-api-key',
         DATABASE_URL: 'invalid-url',
         DISCORD_BOT_TOKEN: 'test-discord-token',
+        DISCORD_CLIENT_ID: 'test-discord-client-id',
       };
 
       expect(() => ConfigSchema.parse(testEnv)).toThrow();
@@ -72,6 +77,7 @@ describe('Environment Configuration', () => {
       process.env.ADMIN_API_KEY = 'test-api-key';
       process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
       process.env.DISCORD_BOT_TOKEN = 'test-discord-token';
+      process.env.DISCORD_CLIENT_ID = 'test-discord-client-id';
 
       const { ConfigSchema } = await import('./env.js');
 
@@ -81,6 +87,7 @@ describe('Environment Configuration', () => {
         PORT: '8080',
         DATABASE_POOL_SIZE: '20',
         DISCORD_BOT_TOKEN: 'test-discord-token',
+        DISCORD_CLIENT_ID: 'test-discord-client-id',
       };
 
       const result = ConfigSchema.parse(testEnv);
@@ -95,6 +102,7 @@ describe('Environment Configuration', () => {
       process.env.ADMIN_API_KEY = 'test-api-key';
       process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
       process.env.DISCORD_BOT_TOKEN = 'test-discord-token';
+      process.env.DISCORD_CLIENT_ID = 'test-discord-client-id';
 
       const { loadConfig } = await import('./env.js');
       const config = loadConfig();
@@ -120,6 +128,7 @@ describe('Environment Configuration', () => {
       process.env.ADMIN_API_KEY = 'test-api-key';
       process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
       process.env.DISCORD_BOT_TOKEN = 'test-discord-token';
+      process.env.DISCORD_CLIENT_ID = 'test-discord-client-id';
 
       // This test verifies the design - non-Zod errors would be thrown directly
       // The current implementation already handles this correctly in the catch block
@@ -135,6 +144,7 @@ describe('Environment Configuration', () => {
       process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
       process.env.NODE_ENV = 'test';
       process.env.DISCORD_BOT_TOKEN = 'test-discord-token';
+      process.env.DISCORD_CLIENT_ID = 'test-discord-client-id';
 
       const env = await import('./env.js');
 

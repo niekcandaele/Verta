@@ -27,8 +27,8 @@ class LLMService:
             return
         
         self.enabled = True
-        # Use Gemini Flash via OpenRouter for fast, cost-effective processing
-        self.model = "openrouter/google/gemini-flash-1.5"
+        # Use Gemini 2.5 Pro via OpenRouter for larger context window
+        self.model = "openrouter/google/gemini-2.5-pro"
         
         # Configure generation settings
         self.temperature = 0.3  # Low temperature for consistent rephrasing

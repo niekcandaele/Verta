@@ -30,7 +30,7 @@ export class SearchService {
       // Generate embedding for the query
       const embedResult = await this.mlClient.embed(apiRequest.query);
 
-      // Build search configs for both golden answers and messages
+      // Build search configs for golden answers, knowledge base chunks, and optionally messages
       const searchConfigs = [
         {
           table: 'golden_answers',
@@ -41,14 +41,32 @@ export class SearchService {
           },
         },
         {
+          table: 'knowledge_base_chunks',
+          text_field: 'content',
+          vector_field: 'embedding',
+          filters: {
+            'knowledge_bases.tenant_id': tenant.id,
+          },
+          joins: [
+            {
+              table: 'knowledge_bases',
+              on: 'knowledge_base_chunks.knowledge_base_id = knowledge_bases.id',
+            },
+          ],
+        },
+      ];
+
+      // Only include messages if not explicitly excluded
+      if (!apiRequest.excludeMessages) {
+        searchConfigs.push({
           table: 'messages',
           text_field: 'content',
           vector_field: 'embedding',
           filters: {
             tenant_id: tenant.id,
           },
-        },
-      ];
+        });
+      }
 
       // Build the search request for ML service
       const searchRequest: SearchRequest = {
@@ -56,7 +74,7 @@ export class SearchService {
         embedding: embedResult.embedding,
         search_configs: searchConfigs,
         limit: apiRequest.limit || 10,
-        rerank: apiRequest.rerank !== undefined ? apiRequest.rerank : true,
+        rerank: false, // Disabled for performance
       };
 
       // Execute search via ML service

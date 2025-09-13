@@ -114,6 +114,59 @@ class SearchService:
             """
             # Add embedding twice (for distance and similarity calculations)
             params = [embedding_json, embedding_json] + params + [limit]
+            
+        elif table == "knowledge_base_chunks":
+            # Need to join with knowledge_bases to get tenant_id and kb name
+            # Handle tenant_id filter through knowledge_bases table
+            if "knowledge_bases.tenant_id" in filters:
+                tenant_filter = "kb.tenant_id = %s"
+                tenant_id = filters.pop("knowledge_bases.tenant_id")
+                other_filters = []
+                for key, value in filters.items():
+                    if key.startswith("knowledge_bases."):
+                        other_filters.append(f"kb.{key.replace('knowledge_bases.', '')} = %s")
+                    else:
+                        other_filters.append(f"kbc.{key} = %s")
+                where_clause = tenant_filter
+                if other_filters:
+                    where_clause += " AND " + " AND ".join(other_filters)
+                # Rebuild params with tenant_id first
+                params = [tenant_id] + list(filters.values())
+            else:
+                # No tenant filter, use original where clause with kbc. prefix
+                where_clauses = []
+                params = []
+                for key, value in filters.items():
+                    if key.startswith("knowledge_bases."):
+                        where_clauses.append(f"kb.{key.replace('knowledge_bases.', '')} = %s")
+                    else:
+                        where_clauses.append(f"kbc.{key} = %s")
+                    params.append(value)
+                where_clause = " AND ".join(where_clauses) if where_clauses else "1=1"
+            
+            query = f"""
+            SELECT 
+                kbc.id,
+                kbc.content,
+                kbc.title,
+                kbc.source_url,
+                kbc.chunk_index,
+                kbc.total_chunks,
+                kbc.heading_hierarchy,
+                kbc.knowledge_base_id,
+                kb.name as kb_name,
+                kb.tenant_id,
+                VEC_COSINE_DISTANCE(kbc.{vector_field}, %s) as distance,
+                1.0 - VEC_COSINE_DISTANCE(kbc.{vector_field}, %s) as similarity_score
+            FROM {table} kbc
+            JOIN knowledge_bases kb ON kbc.knowledge_base_id = kb.id
+            WHERE kbc.{vector_field} IS NOT NULL
+                AND {where_clause}
+            ORDER BY distance ASC
+            LIMIT %s
+            """
+            # Add embedding twice (for distance and similarity calculations)
+            params = [embedding_json, embedding_json] + params + [limit]
         
         else:
             raise ValueError(f"Unsupported table: {table}")
@@ -242,6 +295,38 @@ class SearchService:
                         'platform_message_id': result.get('platform_message_id'),
                         'author_id': result['anonymized_author_id'],
                         'created_at': result['platform_created_at'].isoformat() if result['platform_created_at'] else None
+                    }
+                })
+                
+            elif result['source_table'] == 'knowledge_base_chunks':
+                # Create excerpt (first 200 characters)
+                content = result['content'] or ''
+                excerpt = content[:200] + '...' if len(content) > 200 else content
+                
+                # Parse heading hierarchy if it's a JSON string
+                heading_hierarchy = result.get('heading_hierarchy')
+                if heading_hierarchy and isinstance(heading_hierarchy, str):
+                    try:
+                        import json
+                        heading_hierarchy = json.loads(heading_hierarchy)
+                    except:
+                        heading_hierarchy = None
+                
+                formatted.append({
+                    'type': 'knowledge_base',
+                    'score': float(result['similarity_score']),
+                    'excerpt': excerpt,
+                    'content': result['content'],
+                    'metadata': {
+                        'id': str(result['id']),
+                        'knowledge_base_id': str(result['knowledge_base_id']),
+                        'kb_name': result['kb_name'],
+                        'title': result.get('title'),
+                        'source_url': result['source_url'],
+                        'chunk_index': result['chunk_index'],
+                        'total_chunks': result['total_chunks'],
+                        'heading_hierarchy': heading_hierarchy,
+                        'tenant_id': result['tenant_id']
                     }
                 })
         

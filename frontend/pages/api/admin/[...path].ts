@@ -67,15 +67,20 @@ export default async function handler(
         'X-API-KEY': adminKey,
         'Content-Type': 'application/json',
       },
-      // Only include body for non-GET requests
-      ...(req.method !== 'GET' && { data: req.body }),
+      // Only include body for non-GET requests with actual content
+      ...(req.method !== 'GET' && req.body && { data: req.body }),
       params: queryParams,
       // Don't throw on 4xx/5xx responses
       validateStatus: () => true,
     });
     
     // Forward the response status and data
-    res.status(response.status).json(response.data);
+    if (response.status === 204) {
+      // No Content - don't send any body
+      res.status(204).end();
+    } else {
+      res.status(response.status).json(response.data);
+    }
   } catch (error) {
     console.error('Admin API proxy error:', error);
     

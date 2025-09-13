@@ -4,7 +4,7 @@ const mlConfigSchema = z.object({
   // ML Service Configuration
   mlServiceUrl: z.string().url().default('http://ml-service:8000'),
   mlServiceApiKey: z.string().min(1),
-  mlServiceTimeout: z.number().positive().default(120000), // Increased from 30s to 2 minutes
+  mlServiceTimeout: z.number().positive().default(600000), // Increased to 10 minutes for CPU-only embedding service
   mlServiceOcrTimeout: z.number().positive().default(300000), // 5 minutes for OCR
   mlServiceMaxRetries: z.number().positive().default(3),
   mlServiceRetryDelay: z.number().positive().default(5000), // Increased from 1s to 5s
@@ -44,7 +44,7 @@ export function loadMlConfig(): MlConfig {
     // ML Service
     mlServiceUrl: process.env.ML_SERVICE_URL || 'http://ml-service:8000',
     mlServiceApiKey: process.env.ADMIN_API_KEY,
-    mlServiceTimeout: parseInt(process.env.ML_SERVICE_TIMEOUT || '120000', 10),
+    mlServiceTimeout: parseInt(process.env.ML_SERVICE_TIMEOUT || '600000', 10),
     mlServiceOcrTimeout: parseInt(
       process.env.ML_SERVICE_OCR_TIMEOUT || '300000',
       10

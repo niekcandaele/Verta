@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "verta.fullname" . }}
+  labels:
+    {{- include "verta.labels" . | nindent 4 }}
+data:
+  # Question processing configuration
+  QUESTION_CONFIDENCE_THRESHOLD: "0.6"
+  CLUSTER_SIMILARITY_THRESHOLD: "0.85"
+  CONTEXT_WINDOW_SIZE: "5"
+  CONTEXT_TIME_WINDOW_MINUTES: "5"
+  PROCESSING_BATCH_SIZE: "100"
+  ENABLE_REPHRASING: "true"
+  
+  # Feature flags
+  ENABLE_QUESTION_CLUSTERING: "true"
+  ENABLE_LLM_REPHRASING: "true"
+  ENABLE_BATCH_PROCESSING: "true"
+  
+  # Vector search configuration
+  VECTOR_DIMENSION: "1024"
+  MAX_SIMILAR_RESULTS: "10"
+  
+  # ML Service configuration
+  ML_SERVICE_TIMEOUT: "30000"
+  ML_SERVICE_MAX_RETRIES: "3"
+  ML_SERVICE_RETRY_DELAY: "1000"

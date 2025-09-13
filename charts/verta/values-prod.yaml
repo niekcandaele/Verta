@@ -1,0 +1,125 @@
+# Production environment values for Verta Helm chart
+# This file contains overrides for production environments
+
+# Global settings
+global:
+  domain: verta.example.com  # Replace with your actual domain
+
+# Backend configuration
+backend:
+  replicaCount: 3
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    LOG_LEVEL: info
+    NODE_ENV: production
+    DATABASE_POOL_SIZE: "20"
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# Frontend configuration  
+frontend:
+  replicaCount: 3
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+# ML Service configuration
+ml:
+  replicaCount: 2
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 6Gi
+    requests:
+      cpu: 1000m
+      memory: 4Gi
+  env:
+    ML_SERVICE_DEBUG: "false"
+    ML_SERVICE_WORKERS: "2"
+
+# Redis configuration
+redis:
+  persistence:
+    enabled: true
+    size: 16Gi
+    storageClass: fast-ssd  # Update based on your cluster
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+  tls:
+    - secretName: verta-tls
+      hosts:
+        - verta.example.com  # Replace with your domain
+
+# Enable pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Network policies (optional, enable if needed)
+networkPolicy:
+  enabled: false
+
+# Node affinity for production workloads
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - verta
+          topologyKey: kubernetes.io/hostname
+
+# Production secrets should be provided via:
+# - Sealed Secrets
+# - External Secrets Operator
+# - HashiCorp Vault
+# - Manual secret creation
+# DO NOT commit actual secrets to git
+secrets:
+  adminApiKey: ""  # Set via --set-file or external secret management
+  databaseUrl: ""  # Set via --set-file or external secret management
+  discordBotToken: ""  # Set via --set-file or external secret management
+  openrouterApiKey: ""  # Set via --set-file or external secret management
+  testDiscordGuildId: ""
+  testDiscordTenantName: ""
+  testDiscordTenantSlug: ""

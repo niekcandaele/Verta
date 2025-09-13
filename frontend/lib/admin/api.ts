@@ -38,6 +38,49 @@ export interface ClusterDetails {
   instances: QuestionInstance[];
 }
 
+export interface KnowledgeBase {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description: string | null;
+  sitemap_url: string;
+  last_crawled_at: string | null;
+  last_crawl_event: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeBaseWithStats extends KnowledgeBase {
+  chunk_count: number;
+  last_chunk_created: string | null;
+}
+
+export interface CrawlJob {
+  id: string;
+  state: 'completed' | 'active' | 'waiting' | 'delayed' | 'failed';
+  progress: number;
+  data: {
+    knowledgeBaseId: string;
+    tenantId: string;
+    sitemapUrl: string;
+    name: string;
+    isInitialCrawl: boolean;
+  };
+  result?: {
+    success: boolean;
+    knowledgeBaseId: string;
+    urlsProcessed: number;
+    chunksCreated: number;
+    chunksUpdated: number;
+    errors: string[];
+    processingTimeMs: number;
+    lastCrawledAt: string;
+    status: 'completed' | 'failed' | 'partial';
+  };
+  failedReason?: string;
+  attemptsMade: number;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   pagination: {
@@ -46,6 +89,33 @@ export interface PaginatedResponse<T> {
     total: number;
     totalPages: number;
   };
+}
+
+export interface CreateClusterRequest {
+  tenant_id: string;
+  representative_text: string;
+  thread_title?: string;
+  example_questions?: string[];
+  metadata?: Record<string, any>;
+}
+
+export interface BotConfig {
+  id: string;
+  tenant_id: string;
+  monitored_channels: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AvailableChannel {
+  id: string;
+  name: string;
+  type: string;
+}
+
+export interface BotConfigResponse {
+  config: BotConfig | null;
+  available_channels: AvailableChannel[];
 }
 
 // Retry configuration
@@ -169,6 +239,114 @@ export const adminApi = {
   }) => {
     const client = getAdminApiClient();
     const response = await client.patch(`/clusters/${clusterId}`, data);
+    return response.data;
+  },
+
+  // Create cluster
+  createCluster: async (data: CreateClusterRequest) => {
+    const client = getAdminApiClient();
+    const response = await client.post('/clusters', data);
+    return response.data;
+  },
+
+  // Delete cluster
+  deleteCluster: async (clusterId: string) => {
+    const client = getAdminApiClient();
+    await client.delete(`/clusters/${clusterId}`);
+  },
+
+  // Bulk delete clusters
+  bulkDeleteClusters: async (clusterIds: string[]) => {
+    const client = getAdminApiClient();
+    await client.delete('/clusters/bulk', {
+      data: { cluster_ids: clusterIds }
+    });
+  },
+
+  // Knowledge Base Methods
+  
+  // Get all knowledge bases with pagination
+  getKnowledgeBases: async (params?: {
+    tenant_id?: string;
+    page?: number;
+    limit?: number;
+    sort_by?: 'name' | 'created_at' | 'last_crawled_at';
+    sort_order?: 'asc' | 'desc';
+  }) => {
+    const client = getAdminApiClient();
+    const response = await client.get<PaginatedResponse<KnowledgeBaseWithStats>>('/knowledge-bases', { params });
+    return response.data;
+  },
+
+  // Get knowledge base by ID
+  getKnowledgeBase: async (id: string) => {
+    const client = getAdminApiClient();
+    const response = await client.get<KnowledgeBaseWithStats>(`/knowledge-bases/${id}`);
+    return response.data;
+  },
+
+  // Create new knowledge base
+  createKnowledgeBase: async (data: {
+    name: string;
+    description?: string | null;
+    sitemap_url: string;
+    tenant_id?: string;
+  }) => {
+    const client = getAdminApiClient();
+    const response = await client.post<KnowledgeBase>('/knowledge-bases', data);
+    return response.data;
+  },
+
+  // Update knowledge base
+  updateKnowledgeBase: async (id: string, data: {
+    name?: string;
+    description?: string | null;
+    sitemap_url?: string;
+  }) => {
+    const client = getAdminApiClient();
+    const response = await client.put<KnowledgeBase>(`/knowledge-bases/${id}`, data);
+    return response.data;
+  },
+
+  // Delete knowledge base
+  deleteKnowledgeBase: async (id: string) => {
+    const client = getAdminApiClient();
+    const response = await client.delete(`/knowledge-bases/${id}`);
+    return response.data;
+  },
+
+  // Trigger manual crawl
+  crawlKnowledgeBase: async (id: string) => {
+    const client = getAdminApiClient();
+    const response = await client.post<{ jobId: string }>(`/knowledge-bases/${id}/crawl`, {});
+    return response.data;
+  },
+
+  // Get crawl status/job
+  getKnowledgeBaseCrawlStatus: async (id: string) => {
+    const client = getAdminApiClient();
+    const response = await client.get<CrawlJob>(`/knowledge-bases/${id}/status`);
+    return response.data;
+  },
+
+  // Bot Config Methods
+
+  // Get bot configuration for a tenant
+  getBotConfig: async (tenantId: string) => {
+    const client = getAdminApiClient();
+    const response = await client.get<BotConfigResponse>('/bot-config', {
+      params: { tenant_id: tenantId }
+    });
+    return response.data;
+  },
+
+  // Update bot configuration
+  updateBotConfig: async (data: {
+    tenant_id: string;
+    monitored_channels: string[];
+  }) => {
+    const client = getAdminApiClient();
+    const response = await client.put<{ message: string; config: BotConfig }>('/bot-config', data);
     return response.data;
   },
 };

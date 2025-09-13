@@ -83,7 +83,7 @@ export interface SearchRequest {
 }
 
 export interface SearchResultItem {
-  type: 'golden_answer' | 'message';
+  type: 'golden_answer' | 'message' | 'knowledge_base';
   score: number;
   content?: string;
   excerpt?: string;
@@ -98,6 +98,31 @@ export interface SearchResponse {
   processing_time_ms: number;
 }
 
+export interface GenerateRequest {
+  question: string;
+  search_results: SearchResultItem[];
+  context?: string;
+  max_response_length?: number;
+}
+
+export interface GenerateResponse {
+  response: string;
+  confidence: 'high' | 'medium' | 'low';
+  sources_used: number;
+  model: string;
+}
+
+export interface SuggestQueriesRequest {
+  question: string;
+  search_results: SearchResultItem[];
+  max_queries?: number;
+}
+
+export interface SuggestQueriesResponse {
+  queries: string[];
+  reasoning?: string;
+}
+
 export interface MlServiceConfig {
   baseUrl: string;
   apiKey: string;
@@ -107,7 +132,7 @@ export interface MlServiceConfig {
   retryDelay?: number;
 }
 
-type OperationType = 'ocr' | 'embed' | 'classify' | 'rephrase' | 'search';
+type OperationType = 'ocr' | 'embed' | 'classify' | 'rephrase' | 'search' | 'generate';
 
 interface CircuitBreakerInstance {
   state: CircuitState;
@@ -148,6 +173,7 @@ export class MlClientService {
       'classify',
       'rephrase',
       'search',
+      'generate',
     ];
 
     operationTypes.forEach((opType) => {
@@ -545,6 +571,42 @@ export class MlClientService {
       },
       'Search',
       'search'
+    );
+  }
+
+  /**
+   * Generate natural language response from search results
+   */
+  async generate(request: GenerateRequest): Promise<GenerateResponse> {
+    return this.executeWithRetry(
+      async () => {
+        const response = await this.client.post<GenerateResponse>(
+          '/api/ml/generate',
+          request
+        );
+        return response.data;
+      },
+      'Response generation',
+      'generate'
+    );
+  }
+
+  /**
+   * Suggest follow-up search queries based on initial results
+   */
+  async suggestQueries(
+    request: SuggestQueriesRequest
+  ): Promise<SuggestQueriesResponse> {
+    return this.executeWithRetry(
+      async () => {
+        const response = await this.client.post<SuggestQueriesResponse>(
+          '/api/ml/suggest-queries',
+          request
+        );
+        return response.data;
+      },
+      'Query suggestion',
+      'generate' // Use same circuit breaker as generate
     );
   }
 

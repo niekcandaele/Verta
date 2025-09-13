@@ -5,6 +5,8 @@ import { syncQueue } from '../queues/syncQueue.js';
 import { channelSyncQueue } from '../queues/channelSyncQueue.js';
 import { getAnalysisQueue } from '../queues/analysisQueue.js';
 import { getOcrQueue } from '../queues/ocrQueue.js';
+import { getKnowledgeBaseQueue } from '../queues/knowledgeBaseQueue.js';
+import { getBotEventQueue } from '../queues/botEventQueue.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -20,6 +22,10 @@ export function createBullBoardAdapter() {
     const analysisQueue = getAnalysisQueue();
     // Get the OCR queue instance
     const ocrQueue = getOcrQueue();
+    // Get the knowledge base queue instance
+    const knowledgeBaseQueue = getKnowledgeBaseQueue();
+    // Get the bot event queue instance
+    const botEventQueue = getBotEventQueue();
 
     // Create Bull Board with all queues
     createBullBoard({
@@ -42,6 +48,16 @@ export function createBullBoardAdapter() {
           readOnlyMode: false,
           description:
             'OCR processing queue for extracting text from image attachments',
+        }),
+        new BullMQAdapter(knowledgeBaseQueue, {
+          readOnlyMode: false,
+          description:
+            'Knowledge base crawl queue for processing sitemap URLs and generating embeddings',
+        }),
+        new BullMQAdapter(botEventQueue, {
+          readOnlyMode: false,
+          description:
+            'Discord bot event queue for processing slash commands and thread auto-responses',
         }),
       ],
       serverAdapter,

@@ -77,6 +77,7 @@ class DiscordClientManager {
           GatewayIntentBits.GuildMessages,
           GatewayIntentBits.MessageContent,
           GatewayIntentBits.GuildMessageReactions,
+          // Thread events are handled through the Guilds intent
         ],
       });
 

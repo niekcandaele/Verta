@@ -9,9 +9,17 @@ import {
   ChannelSyncWorker,
   AnalysisWorker,
   OcrWorker,
+  KnowledgeBaseWorker,
+  BotEventWorker,
 } from './workers/index.js';
-import { syncScheduler, ocrRetryScheduler } from './scheduler/index.js';
+import { 
+  syncScheduler, 
+  ocrRetryScheduler,
+  startKnowledgeBaseScheduler,
+  stopKnowledgeBaseScheduler
+} from './scheduler/index.js';
 import { discordClientManager } from './adapters/discord/DiscordClientManager.js';
+import { discordBotService } from './services/discord/DiscordBotService.js';
 import { MlClientService } from './services/MlClientService.js';
 import { mlConfig } from './config/ml.js';
 import { db } from './database/index.js';
@@ -24,6 +32,8 @@ let hourlyTriggerWorker: HourlyTriggerWorker | null = null;
 let channelSyncWorker: ChannelSyncWorker | null = null;
 let analysisWorker: AnalysisWorker | null = null;
 let ocrWorker: OcrWorker | null = null;
+let knowledgeBaseWorker: KnowledgeBaseWorker | null = null;
+let botEventWorker: BotEventWorker | null = null;
 let mlService: MlClientService | null = null;
 
 /**
@@ -47,6 +57,11 @@ async function startServer() {
       logger.info('Initializing global Discord client...');
       await discordClientManager.initialize();
       logger.info('Global Discord client initialized');
+
+      // Initialize Discord bot service
+      logger.info('Initializing Discord bot service...');
+      await discordBotService.initialize();
+      logger.info('Discord bot service initialized');
     }
 
     // Start workers and scheduler
@@ -93,6 +108,18 @@ async function startServer() {
       await ocrWorker.start();
       logger.info('OCR worker started');
 
+      // Start knowledge base worker
+      logger.info('Starting knowledge base worker...');
+      knowledgeBaseWorker = new KnowledgeBaseWorker(db);
+      await knowledgeBaseWorker.start();
+      logger.info('Knowledge base worker started');
+
+      // Start bot event worker
+      logger.info('Starting bot event worker...');
+      botEventWorker = new BotEventWorker();
+      await botEventWorker.start();
+      logger.info('Bot event worker started');
+
       // Start sync scheduler
       logger.info('Starting sync scheduler...');
       await syncScheduler.start();
@@ -102,6 +129,11 @@ async function startServer() {
       logger.info('Starting OCR retry scheduler...');
       await ocrRetryScheduler.start();
       logger.info('OCR retry scheduler started');
+
+      // Start knowledge base scheduler
+      logger.info('Starting knowledge base scheduler...');
+      await startKnowledgeBaseScheduler();
+      logger.info('Knowledge base scheduler started');
     }
 
     // Create and start Express app
@@ -132,6 +164,11 @@ async function startServer() {
           logger.info('Stopping OCR retry scheduler...');
           await ocrRetryScheduler.stop();
           logger.info('OCR retry scheduler stopped');
+
+          // Stop knowledge base scheduler
+          logger.info('Stopping knowledge base scheduler...');
+          await stopKnowledgeBaseScheduler();
+          logger.info('Knowledge base scheduler stopped');
 
           // Stop hourly trigger worker
           if (hourlyTriggerWorker) {
@@ -167,6 +204,25 @@ async function startServer() {
             await ocrWorker.stop();
             logger.info('OCR worker stopped');
           }
+
+          // Stop knowledge base worker
+          if (knowledgeBaseWorker) {
+            logger.info('Stopping knowledge base worker...');
+            await knowledgeBaseWorker.stop();
+            logger.info('Knowledge base worker stopped');
+          }
+
+          // Stop bot event worker
+          if (botEventWorker) {
+            logger.info('Stopping bot event worker...');
+            await botEventWorker.stop();
+            logger.info('Bot event worker stopped');
+          }
+
+          // Cleanup Discord bot service
+          logger.info('Cleaning up Discord bot service...');
+          await discordBotService.cleanup();
+          logger.info('Discord bot service cleaned up');
 
           // Cleanup Discord client
           logger.info('Cleaning up Discord client...');

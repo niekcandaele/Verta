@@ -1,0 +1,187 @@
+name: Helm Chart Release
+
+# Cancel redundant runs
+concurrency:
+  group: helm-release-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'charts/**'
+      - '.github/workflows/helm-release.yml'
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Dry run (skip publishing)'
+        required: false
+        type: boolean
+        default: false
+      chart-version:
+        description: 'Override chart version (optional)'
+        required: false
+        type: string
+        default: ''
+
+env:
+  CHART_PATH: ./charts/verta
+  REGISTRY: ghcr.io
+
+jobs:
+  lint-and-test:
+    name: Lint and Test Chart
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.15.4'
+      
+      - name: Lint chart
+        run: helm lint ${{ env.CHART_PATH }}
+      
+      - name: Template chart
+        run: |
+          echo "### Helm Template Output" >> $GITHUB_STEP_SUMMARY
+          echo "Testing chart templating with default values..." >> $GITHUB_STEP_SUMMARY
+          helm template test-release ${{ env.CHART_PATH }} > /dev/null
+          echo "✅ Default values template: SUCCESS" >> $GITHUB_STEP_SUMMARY
+          
+          echo "Testing chart templating with dev values..." >> $GITHUB_STEP_SUMMARY
+          helm template test-release ${{ env.CHART_PATH }} -f ${{ env.CHART_PATH }}/values-dev.yaml > /dev/null
+          echo "✅ Dev values template: SUCCESS" >> $GITHUB_STEP_SUMMARY
+          
+          echo "Testing chart templating with prod values..." >> $GITHUB_STEP_SUMMARY
+          helm template test-release ${{ env.CHART_PATH }} -f ${{ env.CHART_PATH }}/values-prod.yaml > /dev/null
+          echo "✅ Prod values template: SUCCESS" >> $GITHUB_STEP_SUMMARY
+      
+      - name: Dry run install
+        run: |
+          helm install test-release ${{ env.CHART_PATH }} --dry-run --debug \
+            --set secrets.adminApiKey=test \
+            --set secrets.databaseUrl=mysql://test:test@localhost/test \
+            --set secrets.discordBotToken=test \
+            --set secrets.openrouterApiKey=test > /dev/null
+          echo "✅ Dry run install: SUCCESS" >> $GITHUB_STEP_SUMMARY
+      
+      - name: Run test script
+        run: |
+          chmod +x ./scripts/helm-test.sh
+          ./scripts/helm-test.sh
+
+  package-and-publish:
+    name: Package and Publish Chart
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'release' ||
+      github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.15.4'
+      
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+      
+      - name: Update chart version
+        if: inputs.chart-version != ''
+        run: |
+          # Update Chart.yaml with custom version
+          sed -i "s/^version:.*/version: ${{ inputs.chart-version }}/" ${{ env.CHART_PATH }}/Chart.yaml
+          echo "Updated chart version to: ${{ inputs.chart-version }}"
+      
+      - name: Package chart
+        run: |
+          helm package ${{ env.CHART_PATH }}
+          echo "CHART_PACKAGE=$(ls verta-*.tgz)" >> $GITHUB_ENV
+          
+          # Get chart version
+          CHART_VERSION=$(helm show chart ${{ env.CHART_PATH }} | grep '^version:' | awk '{print $2}')
+          echo "CHART_VERSION=$CHART_VERSION" >> $GITHUB_ENV
+          
+          echo "### Chart Package Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Chart**: verta" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: $CHART_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Package**: $CHART_PACKAGE" >> $GITHUB_STEP_SUMMARY
+      
+      - name: Upload to GitHub Release
+        if: github.event_name == 'release' && (inputs.dry-run != true)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./${{ env.CHART_PACKAGE }}
+          asset_name: ${{ env.CHART_PACKAGE }}
+          asset_content_type: application/gzip
+      
+      - name: Login to OCI Registry
+        if: inputs.dry-run != true
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Push to OCI Registry
+        if: inputs.dry-run != true
+        run: |
+          # Push chart to OCI registry (ghcr.io)
+          CHART_REF="${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/verta"
+          
+          echo "Pushing chart to: $CHART_REF:${{ env.CHART_VERSION }}"
+          helm push ${{ env.CHART_PACKAGE }} oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts
+          
+          # Tag as latest if on main branch
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "Also tagging as: $CHART_REF:latest"
+          fi
+          
+          echo "### OCI Registry Push" >> $GITHUB_STEP_SUMMARY
+          echo "- **Registry**: ${{ env.REGISTRY }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Chart**: $CHART_REF:${{ env.CHART_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Pushed successfully" >> $GITHUB_STEP_SUMMARY
+      
+      - name: Create Chart Index (for GitHub Pages)
+        if: github.ref == 'refs/heads/main' && inputs.dry-run != true
+        run: |
+          # This is preparation for hosting charts via GitHub Pages
+          # Create index for helm repo add
+          mkdir -p ./charts-repo
+          cp ${{ env.CHART_PACKAGE }} ./charts-repo/
+          helm repo index ./charts-repo --url https://${{ github.repository_owner }}.github.io/verta/charts
+          
+          echo "### Chart Repository Index" >> $GITHUB_STEP_SUMMARY
+          echo "Chart index created for potential GitHub Pages hosting" >> $GITHUB_STEP_SUMMARY
+      
+      - name: Summary
+        if: inputs.dry-run == true
+        run: |
+          echo "### Dry Run Mode" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ This was a dry run. No artifacts were published." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To publish the chart, run the workflow again without dry-run mode." >> $GITHUB_STEP_SUMMARY

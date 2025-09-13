@@ -3,6 +3,10 @@ export interface SearchConfig {
   text_field: string;
   vector_field: string;
   filters: Record<string, any>;
+  joins?: Array<{
+    table: string;
+    on: string;
+  }>;
 }
 
 export interface SearchRequest {
@@ -14,7 +18,7 @@ export interface SearchRequest {
 }
 
 export interface SearchResultItem {
-  type: 'golden_answer' | 'message';
+  type: 'golden_answer' | 'message' | 'knowledge_base';
   score: number;
   content?: string;
   excerpt?: string;
@@ -33,6 +37,7 @@ export interface SearchApiRequest {
   query: string;
   limit?: number;
   rerank?: boolean;
+  excludeMessages?: boolean;
 }
 
 export interface SearchApiResponse {

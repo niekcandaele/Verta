@@ -1,0 +1,79 @@
+# Development environment values for Verta Helm chart
+# This file contains overrides for development/testing environments
+
+# Global settings
+global:
+  domain: verta-dev.local
+
+# Backend configuration
+backend:
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  env:
+    LOG_LEVEL: debug
+    NODE_ENV: development
+  autoscaling:
+    enabled: false
+
+# Frontend configuration  
+frontend:
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 250m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+  autoscaling:
+    enabled: false
+
+# ML Service configuration
+ml:
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  env:
+    ML_SERVICE_DEBUG: "true"
+
+# Redis configuration
+redis:
+  persistence:
+    enabled: false  # Disable persistence for dev
+    size: 1Gi
+  resources:
+    limits:
+      cpu: 250m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+# Ingress configuration
+ingress:
+  enabled: false  # Usually use port-forward in dev
+
+# Disable pod disruption budget in dev
+podDisruptionBudget:
+  enabled: false
+
+# Example secrets for development (DO NOT USE IN PRODUCTION)
+secrets:
+  adminApiKey: "dev-admin-key-change-me"
+  databaseUrl: "mysql://user:password@host:3306/verta_dev"
+  discordBotToken: "dev-discord-token"
+  openrouterApiKey: "dev-openrouter-key"
+  testDiscordGuildId: "123456789012345678"
+  testDiscordTenantName: "Dev Test Server"
+  testDiscordTenantSlug: "dev-test-server"
