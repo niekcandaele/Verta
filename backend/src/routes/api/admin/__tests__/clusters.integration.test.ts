@@ -316,6 +316,246 @@ describe('Admin Clusters API Integration', () => {
     });
   });
 
+  describe('POST /api/admin/clusters', () => {
+    it('should require authentication', async () => {
+      const response = await request(app)
+        .post('/api/admin/clusters')
+        .send({
+          tenant_id: testTenantId,
+          representative_text: 'Test question?'
+        });
+
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty('error', 'Unauthorized');
+    });
+
+    it('should create cluster with minimal fields', async () => {
+      const clusterData = {
+        tenant_id: testTenantId,
+        representative_text: 'How do I configure the system?'
+      };
+
+      const response = await request(app)
+        .post('/api/admin/clusters')
+        .set('X-API-KEY', 'ikbeneenaap')
+        .send(clusterData);
+
+      expect(response.status).toBe(201);
+      expect(response.body).toHaveProperty('message', 'Cluster created successfully');
+      expect(response.body).toHaveProperty('cluster');
+      expect(response.body.cluster).toMatchObject({
+        tenant_id: testTenantId,
+        representative_text: 'How do I configure the system?',
+        instance_count: 0,
+      });
+      expect(response.body.cluster.metadata).toMatchObject({
+        source: 'manual',
+        example_questions: []
+      });
+    });
+
+    it('should create cluster with example questions', async () => {
+      const clusterData = {
+        tenant_id: testTenantId,
+        representative_text: 'Database connection issues',
+        thread_title: 'DB Problems',
+        example_questions: [
+          'How to fix connection timeout?',
+          'Database not responding',
+          'Connection pool exhausted'
+        ]
+      };
+
+      const response = await request(app)
+        .post('/api/admin/clusters')
+        .set('X-API-KEY', 'ikbeneenaap')
+        .send(clusterData);
+
+      expect(response.status).toBe(201);
+      expect(response.body.cluster).toMatchObject({
+        tenant_id: testTenantId,
+        representative_text: 'Database connection issues',
+        thread_title: 'DB Problems',
+        instance_count: 0,
+      });
+      expect(response.body.cluster.metadata).toMatchObject({
+        source: 'manual',
+        example_questions: clusterData.example_questions
+      });
+    });
+
+    it('should validate required fields', async () => {
+      const response = await request(app)
+        .post('/api/admin/clusters')
+        .set('X-API-KEY', 'ikbeneenaap')
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('error', 'Invalid request');
+      expect(response.body.message).toContain('tenant_id is required');
+    });
+
+    it('should validate tenant_id format', async () => {
+      const response = await request(app)
+        .post('/api/admin/clusters')
+        .set('X-API-KEY', 'ikbeneenaap')
+        .send({
+          tenant_id: 'invalid-uuid',
+          representative_text: 'Test question?'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('error', 'Invalid tenant_id format');
+    });
+
+    it('should validate representative_text', async () => {
+      const response = await request(app)
+        .post('/api/admin/clusters')
+        .set('X-API-KEY', 'ikbeneenaap')
+        .send({
+          tenant_id: testTenantId,
+          representative_text: ''
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('error', 'Invalid request');
+      expect(response.body.message).toContain('representative_text');
+    });
+
+    it('should validate example_questions format', async () => {
+      const response = await request(app)
+        .post('/api/admin/clusters')
+        .set('X-API-KEY', 'ikbeneenaap')
+        .send({
+          tenant_id: testTenantId,
+          representative_text: 'Test question?',
+          example_questions: 'not an array'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('error', 'Invalid request');
+      expect(response.body.message).toContain('example_questions must be an array');
+    });
+  });
+
+  describe('DELETE /api/admin/clusters/:id', () => {
+    it('should require authentication', async () => {
+      const response = await request(app)
+        .delete(`/api/admin/clusters/${testClusterId}`);
+
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty('error', 'Unauthorized');
+    });
+
+    it('should delete existing cluster', async () => {
+      const response = await request(app)
+        .delete(`/api/admin/clusters/${testClusterId}`)
+        .set('X-API-KEY', 'ikbeneenaap');
+
+      expect(response.status).toBe(204);
+
+      // Verify cluster is deleted
+      const checkResponse = await request(app)
+        .get(`/api/admin/clusters/${testClusterId}`)
+        .set('X-API-KEY', 'ikbeneenaap');
+
+      expect(checkResponse.status).toBe(404);
+    });
+
+    it('should return 404 for non-existent cluster', async () => {
+      const fakeId = uuidv4();
+      const response = await request(app)
+        .delete(`/api/admin/clusters/${fakeId}`)
+        .set('X-API-KEY', 'ikbeneenaap');
+
+      expect(response.status).toBe(404);
+      expect(response.body).toHaveProperty('error', 'Cluster not found');
+    });
+
+    it('should return 400 for invalid UUID', async () => {
+      const response = await request(app)
+        .delete('/api/admin/clusters/invalid-uuid')
+        .set('X-API-KEY', 'ikbeneenaap');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('error', 'Invalid cluster ID format');
+    });
+
+    it('should cascade delete associated data', async () => {
+      // Create a cluster with golden answer and instances
+      const clusterId = uuidv4();
+      const embedding = JSON.stringify(new Array(1024).fill(0));
+
+      await db
+        .insertInto('question_clusters')
+        .values({
+          id: clusterId,
+          tenant_id: testTenantId,
+          representative_text: 'Cluster to delete',
+          thread_title: 'Delete Test',
+          embedding: embedding as any,
+          instance_count: 1,
+          first_seen_at: new Date().toISOString(),
+          last_seen_at: new Date().toISOString(),
+          metadata: { source: 'manual' },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .execute();
+
+      // Add a golden answer
+      await db
+        .insertInto('golden_answers')
+        .values({
+          id: uuidv4(),
+          cluster_id: clusterId,
+          tenant_id: testTenantId,
+          answer: 'Answer for cluster to delete',
+          answer_format: 'plaintext',
+          created_by: 'test-admin',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .execute();
+
+      // Add a question instance
+      await db
+        .insertInto('question_instances')
+        .values({
+          id: uuidv4(),
+          cluster_id: clusterId,
+          tenant_id: testTenantId,
+          thread_id: 'test-thread-123',
+          thread_title: 'Test Thread',
+          original_text: 'Original question text',
+          rephrased_text: 'Rephrased question text',
+          confidence_score: 0.95,
+          created_at: new Date().toISOString(),
+        })
+        .execute();
+
+      // Delete the cluster
+      const response = await request(app)
+        .delete(`/api/admin/clusters/${clusterId}`)
+        .set('X-API-KEY', 'ikbeneenaap');
+
+      expect(response.status).toBe(204);
+
+      // Verify cascade deletion worked
+      const goldenAnswers = await db
+        .selectFrom('golden_answers')
+        .where('cluster_id', '=', clusterId)
+        .execute();
+      expect(goldenAnswers).toHaveLength(0);
+
+      const instances = await db
+        .selectFrom('question_instances')
+        .where('cluster_id', '=', clusterId)
+        .execute();
+      expect(instances).toHaveLength(0);
+    });
+  });
+
   describe('Full Workflow: Admin to FAQ', () => {
     it('should complete full workflow from admin to public FAQ', async () => {
       // Step 1: Create golden answer via admin API
@@ -365,6 +605,316 @@ describe('Admin Clusters API Integration', () => {
       expect(cachedResponse.status).toBe(200);
       expect(cachedResponse.body).toHaveProperty('cached_at');
       expect(cachedResponse.body.data).toHaveLength(1);
+    });
+  });
+
+  describe('Bulk Operations', () => {
+    describe('POST /api/admin/clusters/bulk - Bulk Create', () => {
+      it('should create multiple clusters in bulk', async () => {
+        const bulkCreateData = {
+          action: 'create',
+          clusters: [
+            {
+              tenant_id: testTenantId,
+              representative_text: 'Bulk cluster 1',
+              thread_title: 'Thread 1',
+              example_questions: ['Example question 1']
+            },
+            {
+              tenant_id: testTenantId,
+              representative_text: 'Bulk cluster 2',
+              thread_title: 'Thread 2',
+              example_questions: ['Example question 2', 'Another example']
+            },
+            {
+              tenant_id: testTenantId,
+              representative_text: 'Bulk cluster 3'
+              // No thread_title or example_questions - testing optional fields
+            }
+          ]
+        };
+
+        const response = await request(app)
+          .post('/api/admin/clusters/bulk')
+          .set('X-API-KEY', 'ikbeneenaap')
+          .send(bulkCreateData);
+
+        expect(response.status).toBe(201);
+        expect(response.body).toHaveProperty('message');
+        expect(response.body.message).toContain('Successfully created 3 clusters');
+        expect(response.body.clusters).toHaveLength(3);
+
+        // Verify each cluster was created correctly
+        response.body.clusters.forEach((cluster: any, index: number) => {
+          expect(cluster).toHaveProperty('id');
+          expect(cluster.tenant_id).toBe(testTenantId);
+          expect(cluster.representative_text).toBe(bulkCreateData.clusters[index].representative_text);
+          expect(cluster.instance_count).toBe(0);
+        });
+      });
+
+      it('should validate all clusters before creating any (fail-fast)', async () => {
+        const invalidBulkData = {
+          action: 'create',
+          clusters: [
+            {
+              tenant_id: testTenantId,
+              representative_text: 'Valid cluster'
+            },
+            {
+              tenant_id: 'invalid-uuid', // Invalid UUID
+              representative_text: 'Invalid cluster'
+            }
+          ]
+        };
+
+        const response = await request(app)
+          .post('/api/admin/clusters/bulk')
+          .set('X-API-KEY', 'ikbeneenaap')
+          .send(invalidBulkData);
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe('Invalid tenant ID');
+        expect(response.body.message).toContain('Cluster at index 1');
+
+        // Verify no clusters were created
+        const clusters = await db
+          .selectFrom('question_clusters')
+          .where('representative_text', '=', 'Valid cluster')
+          .execute();
+        expect(clusters).toHaveLength(0);
+      });
+
+      it('should enforce maximum 10 clusters limit', async () => {
+        const tooManyClusters = {
+          action: 'create',
+          clusters: Array(11).fill({
+            tenant_id: testTenantId,
+            representative_text: 'Test cluster'
+          })
+        };
+
+        const response = await request(app)
+          .post('/api/admin/clusters/bulk')
+          .set('X-API-KEY', 'ikbeneenaap')
+          .send(tooManyClusters);
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe('Too many clusters');
+        expect(response.body.message).toContain('Maximum 10 clusters');
+      });
+
+      it('should handle empty clusters array', async () => {
+        const response = await request(app)
+          .post('/api/admin/clusters/bulk')
+          .set('X-API-KEY', 'ikbeneenaap')
+          .send({
+            action: 'create',
+            clusters: []
+          });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe('Invalid input');
+        expect(response.body.message).toContain('non-empty array');
+      });
+
+      it('should validate required fields', async () => {
+        const missingFields = {
+          action: 'create',
+          clusters: [
+            {
+              tenant_id: testTenantId
+              // Missing representative_text
+            }
+          ]
+        };
+
+        const response = await request(app)
+          .post('/api/admin/clusters/bulk')
+          .set('X-API-KEY', 'ikbeneenaap')
+          .send(missingFields);
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe('Invalid cluster data');
+        expect(response.body.message).toContain('missing required fields');
+      });
+
+      it('should only support create action', async () => {
+        const response = await request(app)
+          .post('/api/admin/clusters/bulk')
+          .set('X-API-KEY', 'ikbeneenaap')
+          .send({
+            action: 'update',
+            clusters: []
+          });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe('Invalid action');
+        expect(response.body.message).toContain('Only "create" action is supported');
+      });
+    });
+
+    describe('DELETE /api/admin/clusters/bulk - Bulk Delete', () => {
+      let clusterIdsToDelete: string[] = [];
+
+      beforeEach(async () => {
+        // Create test clusters for deletion
+        clusterIdsToDelete = [];
+        for (let i = 0; i < 3; i++) {
+          const clusterId = uuidv4();
+          await db
+            .insertInto('question_clusters')
+            .values({
+              id: clusterId,
+              tenant_id: testTenantId,
+              representative_text: `Delete test cluster ${i}`,
+              instance_count: 0,
+              first_seen_at: new Date().toISOString(),
+              last_seen_at: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .execute();
+          clusterIdsToDelete.push(clusterId);
+        }
+      });
+
+      it('should delete multiple clusters in bulk', async () => {
+        const response = await request(app)
+          .delete('/api/admin/clusters/bulk')
+          .set('X-API-KEY', 'ikbeneenaap')
+          .send({
+            cluster_ids: clusterIdsToDelete
+          });
+
+        expect(response.status).toBe(204);
+        expect(response.body).toEqual({});
+
+        // Verify all clusters were deleted
+        const remainingClusters = await db
+          .selectFrom('question_clusters')
+          .where('id', 'in', clusterIdsToDelete)
+          .execute();
+        expect(remainingClusters).toHaveLength(0);
+      });
+
+      it('should validate all cluster IDs exist before deleting any', async () => {
+        const nonExistentId = uuidv4();
+        const mixedIds = [...clusterIdsToDelete.slice(0, 2), nonExistentId];
+
+        const response = await request(app)
+          .delete('/api/admin/clusters/bulk')
+          .set('X-API-KEY', 'ikbeneenaap')
+          .send({
+            cluster_ids: mixedIds
+          });
+
+        expect(response.status).toBe(404);
+        expect(response.body.error).toBe('Clusters not found');
+        expect(response.body.message).toContain(nonExistentId);
+
+        // Verify no clusters were deleted
+        const remainingClusters = await db
+          .selectFrom('question_clusters')
+          .where('id', 'in', clusterIdsToDelete)
+          .execute();
+        expect(remainingClusters).toHaveLength(3);
+      });
+
+      it('should cascade delete related data', async () => {
+        // Add a golden answer to one cluster
+        const clusterWithAnswer = clusterIdsToDelete[0];
+        await db
+          .insertInto('golden_answers')
+          .values({
+            id: uuidv4(),
+            tenant_id: testTenantId,
+            cluster_id: clusterWithAnswer,
+            answer: 'Test answer',
+            answer_format: 'plaintext',
+            created_by: 'test',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .execute();
+
+        // Add question instances
+        await db
+          .insertInto('question_instances')
+          .values({
+            id: uuidv4(),
+            tenant_id: testTenantId,
+            cluster_id: clusterWithAnswer,
+            thread_id: 'test-thread',
+            original_text: 'Test question',
+            confidence_score: 0.9,
+            created_at: new Date().toISOString(),
+          })
+          .execute();
+
+        const response = await request(app)
+          .delete('/api/admin/clusters/bulk')
+          .set('X-API-KEY', 'ikbeneenaap')
+          .send({
+            cluster_ids: [clusterWithAnswer]
+          });
+
+        expect(response.status).toBe(204);
+
+        // Verify cascade deletion
+        const goldenAnswers = await db
+          .selectFrom('golden_answers')
+          .where('cluster_id', '=', clusterWithAnswer)
+          .execute();
+        expect(goldenAnswers).toHaveLength(0);
+
+        const instances = await db
+          .selectFrom('question_instances')
+          .where('cluster_id', '=', clusterWithAnswer)
+          .execute();
+        expect(instances).toHaveLength(0);
+      });
+
+      it('should enforce maximum 10 clusters limit', async () => {
+        const tooManyIds = Array(11).fill(null).map(() => uuidv4());
+
+        const response = await request(app)
+          .delete('/api/admin/clusters/bulk')
+          .set('X-API-KEY', 'ikbeneenaap')
+          .send({
+            cluster_ids: tooManyIds
+          });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe('Too many clusters');
+        expect(response.body.message).toContain('Maximum 10 clusters');
+      });
+
+      it('should handle empty cluster_ids array', async () => {
+        const response = await request(app)
+          .delete('/api/admin/clusters/bulk')
+          .set('X-API-KEY', 'ikbeneenaap')
+          .send({
+            cluster_ids: []
+          });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe('Invalid input');
+        expect(response.body.message).toContain('non-empty array');
+      });
+
+      it('should validate UUID format', async () => {
+        const response = await request(app)
+          .delete('/api/admin/clusters/bulk')
+          .set('X-API-KEY', 'ikbeneenaap')
+          .send({
+            cluster_ids: ['not-a-uuid', uuidv4()]
+          });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe('Invalid cluster ID');
+        expect(response.body.message).toContain('at index 0');
+      });
     });
   });
 });

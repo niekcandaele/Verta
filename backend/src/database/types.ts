@@ -272,6 +272,60 @@ export interface GoldenAnswersTable {
 }
 
 /**
+ * Chunk method enum
+ */
+export type ChunkMethod = 'semantic' | 'fixed_size' | 'structural';
+
+/**
+ * Database table schema for knowledge bases
+ */
+export interface KnowledgeBasesTable {
+  id: Generated<string>;
+  tenant_id: string;
+  name: string;
+  description: string | null;
+  sitemap_url: string;
+  last_crawled_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  last_crawl_event: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  created_at: ColumnType<Date, string | undefined, never>;
+  updated_at: ColumnType<Date, string | undefined, string>;
+}
+
+/**
+ * Database table schema for knowledge base chunks
+ */
+export interface KnowledgeBaseChunksTable {
+  id: Generated<string>;
+  knowledge_base_id: string;
+  source_url: string;
+  title: string | null;
+  heading_hierarchy: ColumnType<unknown, unknown | null, unknown | null>;
+  content: string;
+  embedding: VectorColumn | null;
+  chunk_index: number;
+  total_chunks: number;
+  start_char_index: number | null;
+  end_char_index: number | null;
+  overlap_with_previous: ColumnType<number, number | undefined, number>;
+  checksum: string | null;
+  chunk_method: ColumnType<ChunkMethod, ChunkMethod | undefined, ChunkMethod>;
+  token_count: number | null;
+  created_at: ColumnType<Date, string | undefined, never>;
+  updated_at: ColumnType<Date, string | undefined, string>;
+}
+
+/**
+ * Database table schema for bot configuration
+ */
+export interface BotConfigTable {
+  id: Generated<string>;
+  tenant_id: string;
+  monitored_channels: ColumnType<string[], string[], string[]>;
+  created_at: ColumnType<Date, string | undefined, never>;
+  updated_at: ColumnType<Date, string | undefined, string>;
+}
+
+/**
  * Database schema interface
  */
 export interface Database {
@@ -288,6 +342,9 @@ export interface Database {
   analysis_jobs: AnalysisJobsTable;
   ocr_results: OcrResultsTable;
   golden_answers: GoldenAnswersTable;
+  knowledge_bases: KnowledgeBasesTable;
+  knowledge_base_chunks: KnowledgeBaseChunksTable;
+  bot_config: BotConfigTable;
 }
 
 /**
@@ -371,3 +428,24 @@ export type OcrResultUpdate = Updateable<OcrResultsTable>;
 export type GoldenAnswer = Selectable<GoldenAnswersTable>;
 export type NewGoldenAnswer = Insertable<GoldenAnswersTable>;
 export type GoldenAnswerUpdate = Updateable<GoldenAnswersTable>;
+
+/**
+ * Type helpers for working with knowledge base records
+ */
+export type KnowledgeBase = Selectable<KnowledgeBasesTable>;
+export type NewKnowledgeBase = Insertable<KnowledgeBasesTable>;
+export type KnowledgeBaseUpdate = Updateable<KnowledgeBasesTable>;
+
+/**
+ * Type helpers for working with knowledge base chunk records
+ */
+export type KnowledgeBaseChunk = Selectable<KnowledgeBaseChunksTable>;
+export type NewKnowledgeBaseChunk = Insertable<KnowledgeBaseChunksTable>;
+export type KnowledgeBaseChunkUpdate = Updateable<KnowledgeBaseChunksTable>;
+
+/**
+ * Type helpers for working with bot config records
+ */
+export type BotConfig = Selectable<BotConfigTable>;
+export type NewBotConfig = Insertable<BotConfigTable>;
+export type BotConfigUpdate = Updateable<BotConfigTable>;

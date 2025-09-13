@@ -19,6 +19,10 @@ export const ConfigSchema = z.object({
   REDIS_PASSWORD: z.string().optional(),
   // Discord configuration
   DISCORD_BOT_TOKEN: z.string().min(1, 'DISCORD_BOT_TOKEN is required'),
+  DISCORD_CLIENT_ID: z.string().optional(), // Made optional for Phase 1
+  // ML Service configuration
+  ML_SERVICE_URL: z.string().url().default('http://localhost:8080'),
+  ML_SERVICE_API_KEY: z.string().min(1, 'ML_SERVICE_API_KEY is required'),
   // Sync configuration
   SYNC_MAX_CHANNEL_WORKERS: z.coerce.number().int().positive().default(10),
   SYNC_CHANNEL_BATCH_SIZE: z.coerce.number().int().positive().default(5),

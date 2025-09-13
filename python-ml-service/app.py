@@ -13,7 +13,7 @@ from models.classifier import get_classifier
 from models.embeddings import get_embedding_model
 from models.openrouter_ocr import get_ocr_model
 from services.rerank import rerank_service
-from endpoints import classify, embed, rephrase, ocr, search
+from endpoints import classify, embed, rephrase, ocr, search, generate, suggest_queries
 from middleware.auth import verify_api_key
 
 # Configure logging
@@ -156,6 +156,14 @@ app.include_router(
 )
 app.include_router(
     search.router,
+    dependencies=[Depends(verify_api_key)]
+)
+app.include_router(
+    generate.router,
+    dependencies=[Depends(verify_api_key)]
+)
+app.include_router(
+    suggest_queries.router,
     dependencies=[Depends(verify_api_key)]
 )
 

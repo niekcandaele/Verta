@@ -1,0 +1,310 @@
+# Default values for verta
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global settings applied to all services
+global:
+  # Image registry for all services
+  imageRegistry: ghcr.io
+  imagePullSecrets: []
+  
+  # Domain configuration
+  domain: verta.example.com
+  
+  # Common labels applied to all resources
+  labels: {}
+  
+  # Common annotations applied to all resources
+  annotations: {}
+
+# Backend API Service Configuration
+backend:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: niekcandaele/verta-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 25000
+    targetPort: 25000
+  
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  
+  # Environment variables
+  env:
+    NODE_ENV: production
+    PORT: "25000"
+    DATABASE_POOL_SIZE: "10"
+    LOG_LEVEL: info
+    # Redis connection will be auto-configured
+    REDIS_HOST: "{{ .Release.Name }}-redis"
+    REDIS_PORT: "6379"
+    ML_SERVICE_URL: "http://{{ .Release.Name }}-ml:8000"
+  
+  # Health check configuration
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 25000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 25000
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  
+  # Pod security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 1000
+  
+  # HPA configuration
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+
+# Frontend Service Configuration
+frontend:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: niekcandaele/verta-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 3000
+    targetPort: 3000
+  
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  
+  # Environment variables
+  env:
+    NODE_ENV: production
+    NEXT_PUBLIC_API_URL: "http://{{ .Values.global.domain }}/api"
+    # NEXT_PUBLIC_TENANT_SLUG will be set from secrets
+  
+  # Health check configuration
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 3000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 3000
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  
+  # Pod security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 1000
+  
+  # HPA configuration
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+
+# ML Service Configuration
+ml:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: niekcandaele/verta-ml-service
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+  
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 6Gi
+    requests:
+      cpu: 1000m
+      memory: 4Gi
+  
+  # Environment variables
+  env:
+    ML_SERVICE_DEBUG: "false"
+    ML_SERVICE_WORKERS: "1"
+    ML_SERVICE_MODEL_CACHE_DIR: "/models"
+    ML_SERVICE_HOST: "0.0.0.0"
+    ML_SERVICE_PORT: "8000"
+    PYTHONUNBUFFERED: "1"
+    # Database URL will be set from secrets
+  
+  # Health check configuration
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 120
+    periodSeconds: 60
+    timeoutSeconds: 60
+  
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 120
+    periodSeconds: 60
+    timeoutSeconds: 60
+  
+  # Pod security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false  # ML service needs write for model cache
+    runAsNonRoot: true
+    runAsUser: 1000
+
+# Redis configuration
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: 7-alpine
+    pullPolicy: IfNotPresent
+  persistence:
+    enabled: true
+    size: 8Gi
+    storageClass: ""  # Use default storage class
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+    # kubernetes.io/tls-acme: "true"
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: "{{ .Values.global.domain }}"
+      paths:
+        - path: /api
+          pathType: Prefix
+          service: backend
+        - path: /
+          pathType: Prefix
+          service: frontend
+  tls: []
+  #  - secretName: verta-tls
+  #    hosts:
+  #      - verta.example.com
+
+# Secret values - MUST be provided during installation
+secrets:
+  # Admin API key for internal services
+  adminApiKey: ""
+  
+  # Database connection string (TiDB)
+  databaseUrl: ""
+  
+  # Discord bot token
+  discordBotToken: ""
+  
+  # OpenRouter API key for LLM services
+  openrouterApiKey: ""
+  
+  # Test Discord configuration
+  testDiscordGuildId: ""
+  testDiscordTenantName: ""
+  testDiscordTenantSlug: ""
+
+# Service account configuration
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+# Network policies
+networkPolicy:
+  enabled: false
+  
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Additional labels and annotations
+commonLabels: {}
+commonAnnotations: {}
+
+# Node selector for pod assignment
+nodeSelector: {}
+
+# Tolerations for pod assignment
+tolerations: []
+
+# Affinity for pod assignment
+affinity: {}
+
+# Init containers - used for database migrations
+initContainers:
+  migrations:
+    enabled: true
+    image:
+      repository: niekcandaele/verta-backend
+      tag: latest
+      pullPolicy: IfNotPresent
+    command: ["npm", "run", "db:migrate"]

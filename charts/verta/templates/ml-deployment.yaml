@@ -1,0 +1,103 @@
+{{- if .Values.ml.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "verta.fullname" . }}-ml
+  labels:
+    {{- include "verta.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ml
+spec:
+  replicas: {{ .Values.ml.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "verta.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: ml
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.ml.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "verta.labels" . | nindent 8 }}
+        app.kubernetes.io/component: ml
+        {{- with .Values.ml.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "verta.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.ml.podSecurityContext | nindent 8 }}
+      containers:
+        - name: ml
+          securityContext:
+            {{- toYaml .Values.ml.securityContext | nindent 12 }}
+          image: "{{ .Values.global.imageRegistry }}/{{ .Values.ml.image.repository }}:{{ .Values.ml.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.ml.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.ml.service.targetPort }}
+              protocol: TCP
+          livenessProbe:
+            {{- toYaml .Values.ml.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.ml.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.ml.resources | nindent 12 }}
+          env:
+            {{- range $key, $value := .Values.ml.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            # Environment variables for model caching
+            - name: HF_HOME
+              value: "/models"
+            - name: TRANSFORMERS_CACHE
+              value: "/models"
+            - name: SENTENCE_TRANSFORMERS_HOME
+              value: "/models"
+            # Secrets
+            - name: ADMIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "verta.fullname" . }}
+                  key: admin-api-key
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "verta.fullname" . }}
+                  key: database-url
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "verta.fullname" . }}
+                  key: openrouter-api-key
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /.cache
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

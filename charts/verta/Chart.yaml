@@ -1,0 +1,24 @@
+apiVersion: v2
+name: verta
+description: Helm chart for Verta - Tenant Static Archive System
+
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+keywords:
+  - verta
+  - discord
+  - archive
+  - tenant
+  - nodejs
+  - nextjs
+  - python
+
+home: https://github.com/niekcandaele/Verta
+sources:
+  - https://github.com/niekcandaele/Verta
+
+maintainers:
+  - name: niekcandaele
+    url: https://github.com/niekcandaele

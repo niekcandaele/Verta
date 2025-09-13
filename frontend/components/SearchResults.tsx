@@ -14,8 +14,9 @@ export default function SearchResults({ results, onClose }: SearchResultsProps) 
   console.log('SearchResults component rendering with:', results);
   // Group results by type
   const goldenAnswers = results.filter(r => r.type === 'golden_answer');
+  const knowledgeBase = results.filter(r => r.type === 'knowledge_base');
   const messages = results.filter(r => r.type === 'message');
-  console.log('Grouped results:', { goldenAnswers, messages });
+  console.log('Grouped results:', { goldenAnswers, knowledgeBase, messages });
 
   return (
     <div className="divide-y divide-base-content/10">
@@ -62,6 +63,66 @@ export default function SearchResults({ results, onClose }: SearchResultsProps) 
                   </p>
                 </div>
               </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Knowledge Base Section */}
+      {knowledgeBase.length > 0 && (
+        <div className="p-3">
+          <h3 className="text-xs font-semibold text-accent uppercase tracking-wider mb-2 flex items-center gap-2">
+            <span className="w-1 h-3 bg-accent rounded-full"></span>
+            Documentation
+          </h3>
+          {knowledgeBase.map((result, index) => {
+            const sourceUrl = result.metadata?.source_url;
+            const title = result.metadata?.title;
+            const kbName = result.metadata?.kb_name;
+            
+            const content = (
+              <div className="mb-3 p-3 bg-accent/5 rounded-lg hover:bg-accent/10 transition-colors cursor-pointer">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="badge badge-accent badge-sm">Documentation</div>
+                    {kbName && (
+                      <span className="text-xs text-base-content/60">{kbName}</span>
+                    )}
+                  </div>
+                  <span className="text-xs text-base-content/60">
+                    {Math.round(result.score * 100)}% match
+                  </span>
+                </div>
+                {title && (
+                  <p className="text-sm font-medium text-accent mb-2">
+                    {title}
+                  </p>
+                )}
+                <p className="text-sm text-base-content/80">
+                  {result.excerpt || result.content?.substring(0, 200) + '...'}
+                </p>
+                {sourceUrl && (
+                  <p className="text-xs text-accent mt-2">
+                    View source →
+                  </p>
+                )}
+              </div>
+            );
+            
+            return sourceUrl ? (
+              <a
+                key={`kb-${index}`}
+                href={sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={onClose}
+              >
+                {content}
+              </a>
+            ) : (
+              <div key={`kb-${index}`}>
+                {content}
+              </div>
             );
           })}
         </div>

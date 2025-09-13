@@ -6,7 +6,7 @@ import AdminLayout from '@/components/admin/AdminLayout';
 import GoldenAnswerEditor from '@/components/admin/GoldenAnswerEditor';
 import { adminApi, ClusterDetails } from '@/lib/admin/api';
 import ReactMarkdown from 'react-markdown';
-import { FiArrowLeft, FiEdit, FiPlus, FiTrash, FiChevronDown, FiChevronUp, FiMessageSquare, FiSave, FiX } from 'react-icons/fi';
+import { FiArrowLeft, FiEdit, FiPlus, FiTrash, FiTrash2, FiChevronDown, FiChevronUp, FiMessageSquare, FiSave, FiX } from 'react-icons/fi';
 
 export default function ClusterDetail() {
   const router = useRouter();
@@ -20,6 +20,7 @@ export default function ClusterDetail() {
   const [editingRepText, setEditingRepText] = useState(false);
   const [tempRepText, setTempRepText] = useState('');
   const [savingRepText, setSavingRepText] = useState(false);
+  const [deletingCluster, setDeletingCluster] = useState(false);
 
   useEffect(() => {
     if (id && typeof id === 'string') {
@@ -113,7 +114,7 @@ export default function ClusterDetail() {
       await adminApi.updateCluster(id, {
         representative_text: tempRepText.trim()
       });
-      
+
       // Update the local state with the new text
       if (clusterDetails) {
         setClusterDetails({
@@ -124,13 +125,44 @@ export default function ClusterDetail() {
           }
         });
       }
-      
+
       setEditingRepText(false);
       setTempRepText('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update representative text');
     } finally {
       setSavingRepText(false);
+    }
+  };
+
+  const handleDeleteCluster = async () => {
+    if (!id || typeof id !== 'string' || !clusterDetails) return;
+
+    const instanceCount = clusterDetails.cluster.instance_count;
+    const hasGoldenAnswer = !!clusterDetails.golden_answer;
+
+    // Create a detailed confirmation message
+    let confirmMessage = `Are you sure you want to delete this cluster?\n\nThis action will permanently delete:\n- The cluster and its representative text`;
+    if (instanceCount > 0) {
+      confirmMessage += `\n- ${instanceCount} question instance${instanceCount > 1 ? 's' : ''}`;
+    }
+    if (hasGoldenAnswer) {
+      confirmMessage += `\n- The associated golden answer`;
+    }
+    confirmMessage += `\n\nThis action cannot be undone.`;
+
+    if (!confirm(confirmMessage)) return;
+
+    try {
+      setDeletingCluster(true);
+      await adminApi.deleteCluster(id);
+
+      // Redirect to cluster list on successful deletion
+      router.push('/admin');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete cluster');
+    } finally {
+      setDeletingCluster(false);
     }
   };
 
@@ -151,7 +183,7 @@ export default function ClusterDetail() {
         <div className="space-y-4">
           <div className="alert alert-error">
             <div>
-              <h3 className="font-bold">Unable to load cluster</h3>
+              <h3 className="font-bold">Unable to load FAQ entry</h3>
               <p className="text-sm">{error || 'The requested cluster could not be found.'}</p>
             </div>
           </div>
@@ -169,7 +201,7 @@ export default function ClusterDetail() {
   return (
     <AdminLayout>
       <Head>
-        <title>Admin - Cluster Details</title>
+        <title>Admin - FAQ Details</title>
       </Head>
 
       <div className="space-y-6">
@@ -181,16 +213,35 @@ export default function ClusterDetail() {
               className="btn btn-sm btn-ghost inline-flex items-center"
             >
               <FiArrowLeft className="mr-2" />
-              Back to Clusters
+              Back to FAQ
             </Link>
-            <h2 className="text-2xl font-bold">Cluster Details</h2>
+            <h2 className="text-2xl font-bold">FAQ Details</h2>
           </div>
         </div>
 
         {/* Cluster Information */}
         <div className="card bg-base-100 shadow-xl">
           <div className="card-body">
-            <h3 className="card-title">Cluster Information</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="card-title">Cluster Information</h3>
+              <button
+                className="btn btn-sm btn-error inline-flex items-center"
+                onClick={handleDeleteCluster}
+                disabled={deletingCluster}
+              >
+                {deletingCluster ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs mr-2"></span>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <FiTrash2 className="mr-2" />
+                    Delete Cluster
+                  </>
+                )}
+              </button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <div className="flex items-start justify-between">

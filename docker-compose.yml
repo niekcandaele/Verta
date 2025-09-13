@@ -15,7 +15,8 @@ services:
 
   app:
     build:
-      context: ./backend
+      context: .
+      dockerfile: ./backend/Dockerfile
       target: dev
     container_name: verta-app
     ports:
@@ -42,7 +43,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: .
+      dockerfile: ./frontend/Dockerfile
       target: dev
     container_name: verta-frontend
     ports:

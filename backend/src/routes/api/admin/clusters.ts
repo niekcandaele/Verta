@@ -3,13 +3,17 @@ import { db } from '../../../database/index.js';
 import { QuestionClusterRepository } from '../../../repositories/QuestionClusterRepository.js';
 import { QuestionInstanceRepository } from '../../../repositories/QuestionInstanceRepository.js';
 import { GoldenAnswerRepository } from '../../../repositories/GoldenAnswerRepository.js';
+import { MlClientService } from '../../../services/MlClientService.js';
+import { mlServiceConfig } from '../../../config/ml.js';
 import logger from '../../../utils/logger.js';
 import { sanitizeMarkdown } from '../../../utils/markdown.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
 const clusterRepo = new QuestionClusterRepository(db);
 const instanceRepo = new QuestionInstanceRepository(db);
 const goldenAnswerRepo = new GoldenAnswerRepository(db);
+const mlClient = new MlClientService(mlServiceConfig);
 
 /**
  * Admin authentication middleware
@@ -159,6 +163,236 @@ router.get(
 );
 
 /**
+ * POST /api/admin/clusters/bulk
+ * Bulk create clusters or perform other bulk operations
+ */
+router.post(
+  '/bulk',
+  requireAdminKey,
+  async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const { action, clusters } = req.body;
+
+      // Validate action
+      if (action !== 'create') {
+        return res.status(400).json({
+          error: 'Invalid action',
+          message: 'Only "create" action is supported',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Validate clusters array
+      if (!Array.isArray(clusters) || clusters.length === 0) {
+        return res.status(400).json({
+          error: 'Invalid input',
+          message: 'clusters must be a non-empty array',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Enforce max limit
+      if (clusters.length > 10) {
+        return res.status(400).json({
+          error: 'Too many clusters',
+          message: 'Maximum 10 clusters can be created at once',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Validate each cluster before creating any (fail-fast)
+      for (let i = 0; i < clusters.length; i++) {
+        const cluster = clusters[i];
+
+        if (!cluster.tenant_id || !cluster.representative_text) {
+          return res.status(400).json({
+            error: 'Invalid cluster data',
+            message: `Cluster at index ${i} is missing required fields`,
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        if (!isValidUUID(cluster.tenant_id)) {
+          return res.status(400).json({
+            error: 'Invalid tenant ID',
+            message: `Cluster at index ${i} has invalid tenant_id format`,
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        if (cluster.representative_text.trim().length === 0) {
+          return res.status(400).json({
+            error: 'Invalid representative text',
+            message: `Cluster at index ${i} has empty representative_text`,
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Validate example_questions if provided
+        if (cluster.example_questions && !Array.isArray(cluster.example_questions)) {
+          return res.status(400).json({
+            error: 'Invalid example questions',
+            message: `Cluster at index ${i} has invalid example_questions format`,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+
+      // Generate embeddings for all clusters in parallel
+      const embeddingPromises = clusters.map(async (cluster) => {
+        // Combine representative text with example questions for better embedding
+        const combinedText = [
+          cluster.representative_text,
+          ...(cluster.example_questions || [])
+        ].join(' ');
+
+        const result = await mlClient.embed(combinedText);
+        return result.embedding;
+      });
+
+      let embeddings: number[][];
+      try {
+        embeddings = await Promise.all(embeddingPromises);
+      } catch (error) {
+        logger.error('Failed to generate embeddings for bulk create:', error);
+        return res.status(503).json({
+          error: 'ML service unavailable',
+          message: 'Failed to generate embeddings for clusters',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Create all clusters in a transaction
+      const createdClusters = await db.transaction().execute(async (trx) => {
+        const results = [];
+
+        for (let i = 0; i < clusters.length; i++) {
+          const cluster = clusters[i];
+          const embedding = embeddings[i];
+
+          // Create cluster with transaction
+          const clusterData = {
+            id: uuidv4(),
+            tenant_id: cluster.tenant_id,
+            representative_text: cluster.representative_text.trim(),
+            thread_title: cluster.thread_title?.trim() || null,
+            embedding: embedding,
+            instance_count: 0,
+            first_seen_at: new Date(),
+            last_seen_at: new Date(),
+          };
+
+          // Use the transaction-aware repository
+          const transactionalRepo = new QuestionClusterRepository(trx);
+          const created = await transactionalRepo.create(clusterData);
+          results.push(created);
+        }
+
+        return results;
+      });
+
+      logger.info(`Bulk created ${createdClusters.length} clusters`);
+
+      return res.status(201).json({
+        message: `Successfully created ${createdClusters.length} clusters`,
+        clusters: createdClusters,
+      });
+    } catch (error) {
+      logger.error('Error in bulk cluster create:', error);
+      return res.status(500).json({
+        error: 'Internal server error',
+        message: 'Failed to create clusters in bulk',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+);
+
+/**
+ * DELETE /api/admin/clusters/bulk
+ * Bulk delete clusters
+ */
+router.delete(
+  '/bulk',
+  requireAdminKey,
+  async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const { cluster_ids } = req.body;
+
+      // Validate cluster_ids array
+      if (!Array.isArray(cluster_ids) || cluster_ids.length === 0) {
+        return res.status(400).json({
+          error: 'Invalid input',
+          message: 'cluster_ids must be a non-empty array',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Enforce max limit
+      if (cluster_ids.length > 10) {
+        return res.status(400).json({
+          error: 'Too many clusters',
+          message: 'Maximum 10 clusters can be deleted at once',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Validate all cluster IDs are valid UUIDs
+      for (let i = 0; i < cluster_ids.length; i++) {
+        if (!isValidUUID(cluster_ids[i])) {
+          return res.status(400).json({
+            error: 'Invalid cluster ID',
+            message: `Cluster ID at index ${i} is not a valid UUID`,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+
+      // Validate all clusters exist before deleting any
+      const clusters = await Promise.all(
+        cluster_ids.map(id => clusterRepo.findById(id))
+      );
+
+      const missingIndices: number[] = [];
+      clusters.forEach((cluster, index) => {
+        if (!cluster) {
+          missingIndices.push(index);
+        }
+      });
+
+      if (missingIndices.length > 0) {
+        const missingIds = missingIndices.map(i => cluster_ids[i]);
+        return res.status(404).json({
+          error: 'Clusters not found',
+          message: `The following cluster IDs do not exist: ${missingIds.join(', ')}`,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Delete all clusters in a transaction
+      await db.transaction().execute(async (trx) => {
+        const transactionalRepo = new QuestionClusterRepository(trx);
+
+        // Call bulkDelete method (we'll implement this next)
+        await transactionalRepo.bulkDelete(cluster_ids);
+      });
+
+      logger.info(`Bulk deleted ${cluster_ids.length} clusters`);
+
+      // Return 204 No Content on success (matching single delete)
+      return res.status(204).send();
+    } catch (error) {
+      logger.error('Error in bulk cluster delete:', error);
+      return res.status(500).json({
+        error: 'Internal server error',
+        message: 'Failed to delete clusters in bulk',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+);
+
+/**
  * GET /api/admin/clusters/:id
  * Get detailed information about a specific cluster
  */
@@ -240,6 +474,213 @@ router.get(
       return res.status(500).json({
         error: 'Internal server error',
         message: 'Failed to fetch cluster details',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/clusters
+ * Manually create a new question cluster with ML embedding generation
+ */
+router.post(
+  '/',
+  requireAdminKey,
+  async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const {
+        tenant_id,
+        representative_text,
+        thread_title,
+        example_questions,
+        metadata = {},
+      } = req.body;
+
+      // Validate required fields
+      if (!tenant_id || typeof tenant_id !== 'string') {
+        return res.status(400).json({
+          error: 'Invalid request',
+          message: 'tenant_id is required and must be a string',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      if (!representative_text || typeof representative_text !== 'string' || representative_text.trim().length === 0) {
+        return res.status(400).json({
+          error: 'Invalid request',
+          message: 'representative_text is required and must be a non-empty string',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Validate tenant_id format
+      if (!isValidUUID(tenant_id)) {
+        return res.status(400).json({
+          error: 'Invalid tenant_id format',
+          message: 'tenant_id must be a valid UUID',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Validate optional fields
+      if (thread_title && typeof thread_title !== 'string') {
+        return res.status(400).json({
+          error: 'Invalid request',
+          message: 'thread_title must be a string',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      if (example_questions && (!Array.isArray(example_questions) || !example_questions.every((q: any) => typeof q === 'string'))) {
+        return res.status(400).json({
+          error: 'Invalid request',
+          message: 'example_questions must be an array of strings',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Combine representative text with example questions for better embedding
+      const textForEmbedding = [
+        representative_text.trim(),
+        ...(example_questions || []).filter((q: string) => q.trim().length > 0)
+      ].join('\n');
+
+      // Generate embedding using ML service
+      let embedding: number[];
+      try {
+        const embeddingResult = await mlClient.embed(textForEmbedding);
+        embedding = embeddingResult.embedding;
+      } catch (error) {
+        logger.error('ML service error during cluster creation', {
+          error,
+          tenant_id,
+          representative_text,
+        });
+        return res.status(503).json({
+          error: 'Service unavailable',
+          message: 'Failed to generate embedding - ML service is unavailable',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Create cluster with manual source metadata
+      const clusterId = uuidv4();
+      const now = new Date().toISOString();
+
+      const clusterData = {
+        id: clusterId,
+        tenant_id,
+        representative_text: representative_text.trim(),
+        thread_title: thread_title?.trim() || null,
+        embedding: embedding,
+        instance_count: 0,
+        first_seen_at: now,
+        last_seen_at: now,
+        metadata: {
+          ...metadata,
+          source: 'manual',
+          example_questions: example_questions || [],
+        },
+        created_at: now,
+        updated_at: now,
+      };
+
+      const cluster = await clusterRepo.create(clusterData);
+
+      logger.info('Manual cluster created successfully', {
+        cluster_id: clusterId,
+        tenant_id,
+        representative_text: representative_text.substring(0, 100),
+        example_questions_count: example_questions?.length || 0,
+      });
+
+      return res.status(201).json({
+        message: 'Cluster created successfully',
+        cluster: {
+          id: cluster.id,
+          tenant_id: cluster.tenant_id,
+          representative_text: cluster.representative_text,
+          thread_title: cluster.thread_title,
+          instance_count: cluster.instance_count,
+          first_seen_at: cluster.first_seen_at,
+          last_seen_at: cluster.last_seen_at,
+          metadata: cluster.metadata,
+          created_at: cluster.created_at,
+          updated_at: cluster.updated_at,
+        },
+      });
+    } catch (error) {
+      logger.error('Error creating cluster', {
+        error,
+        body: req.body,
+      });
+      return res.status(500).json({
+        error: 'Internal server error',
+        message: 'Failed to create cluster',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+);
+
+/**
+ * DELETE /api/admin/clusters/:id
+ * Delete a question cluster and all associated data
+ */
+router.delete(
+  '/:id',
+  requireAdminKey,
+  async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const { id } = req.params;
+
+      // Validate cluster ID
+      if (!isValidUUID(id)) {
+        return res.status(400).json({
+          error: 'Invalid cluster ID format',
+          message: 'Cluster ID must be a valid UUID',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Check if cluster exists
+      const cluster = await clusterRepo.findById(id);
+      if (!cluster) {
+        return res.status(404).json({
+          error: 'Cluster not found',
+          message: `No cluster found with ID ${id}`,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Delete cluster (cascade deletion handled by DB constraints)
+      const deleted = await clusterRepo.delete(id);
+
+      if (!deleted) {
+        return res.status(500).json({
+          error: 'Failed to delete',
+          message: 'Could not delete cluster',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      logger.info('Cluster deleted successfully', {
+        cluster_id: id,
+        tenant_id: cluster.tenant_id,
+        representative_text: cluster.representative_text.substring(0, 100),
+        instance_count: cluster.instance_count,
+      });
+
+      return res.status(204).send();
+    } catch (error) {
+      logger.error('Error deleting cluster', {
+        error,
+        clusterId: req.params.id,
+      });
+      return res.status(500).json({
+        error: 'Internal server error',
+        message: 'Failed to delete cluster',
         timestamp: new Date().toISOString(),
       });
     }
