@@ -509,6 +509,6 @@ ${sources.map(source => {
     });
 
     // Convert map to array and remove count property
-    return Array.from(sourceMap.values()).map(({ count, ...source }) => source);
+    return Array.from(sourceMap.values()).map(({ count: _count, ...source }) => source);
   }
 }
