@@ -201,7 +201,13 @@ export class ContentExtractor {
   private extractTitle($: cheerio.CheerioAPI, url: string): string {
     // Try different title sources in order of preference
     const titleSources = [
-      'h1',
+      'main h1',                          // h1 within main content
+      '.main-content h1',                 // h1 within main-content class
+      '.main-content-with-sidebar h1',    // specific to modules.takaro.io structure
+      '[role="main"] h1',                 // h1 within main role
+      'article h1',                       // h1 within article
+      '.module-details h1',               // specific module details selector
+      'h1',                              // fallback to any h1
       'title',
       '[property="og:title"]',
       '[name="twitter:title"]',
