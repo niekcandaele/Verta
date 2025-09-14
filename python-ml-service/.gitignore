@@ -27,8 +27,10 @@ wheels/
 .env
 .env.local
 
-# Models
-/models/
+# Models (downloaded model binaries)
+# Note: We only want to ignore downloaded model files, not the source code
+model_cache/
+models_cache/
 *.bin
 *.safetensors
 *.pkl
