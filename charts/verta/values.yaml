@@ -25,7 +25,7 @@ backend:
   image:
     repository: niekcandaele/verta-backend
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
   
   service:
     type: ClusterIP
@@ -94,7 +94,7 @@ frontend:
   image:
     repository: niekcandaele/verta-frontend
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
   
   service:
     type: ClusterIP
@@ -157,7 +157,7 @@ ml:
   image:
     repository: niekcandaele/verta-ml-service
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
   
   service:
     type: ClusterIP
@@ -251,6 +251,16 @@ ingress:
   #    hosts:
   #      - verta.example.com
 
+# Admin ingress configuration with IP whitelisting
+adminIngress:
+  enabled: true
+  # Comma-separated list of allowed IPs/CIDR ranges (e.g., "192.168.1.100/32,10.0.0.0/8")
+  # Leave empty to disable the admin ingress
+  allowedIPs: ""
+  className: nginx
+  annotations: {}
+    # Additional nginx annotations if needed
+
 # Secret values - MUST be provided during installation
 secrets:
   # Admin API key for internal services
@@ -306,5 +316,5 @@ initContainers:
     image:
       repository: niekcandaele/verta-backend
       tag: latest
-      pullPolicy: IfNotPresent
+      pullPolicy: Always
     command: ["npm", "run", "db:migrate"]

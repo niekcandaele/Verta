@@ -1,0 +1,60 @@
+{{- if and .Values.ingress.enabled .Values.adminIngress.enabled -}}
+{{- if .Values.adminIngress.allowedIPs -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "verta.fullname" . }}-admin
+  labels:
+    {{- include "verta.labels" . | nindent 4 }}
+    app.kubernetes.io/component: admin-ingress
+  annotations:
+    {{- with .Values.adminIngress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    nginx.ingress.kubernetes.io/whitelist-source-range: {{ .Values.adminIngress.allowedIPs | quote }}
+spec:
+  {{- if .Values.adminIngress.className }}
+  ingressClassName: {{ .Values.adminIngress.className }}
+  {{- else if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    {{- range .Values.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    - host: {{ tpl .Values.global.domain $ | quote }}
+      http:
+        paths:
+          # Bull Board queue monitoring (direct to backend)
+          - path: /api/admin/queues
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "verta.fullname" . }}-backend
+                port:
+                  number: {{ .Values.backend.service.port }}
+          # Admin API routes (protected by IP whitelist)
+          - path: /api/admin
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "verta.fullname" . }}-frontend
+                port:
+                  number: {{ .Values.frontend.service.port }}
+          # Admin UI (frontend pages)
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "verta.fullname" . }}-frontend
+                port:
+                  number: {{ .Values.frontend.service.port }}
+{{- end }}
+{{- end }}

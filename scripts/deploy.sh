@@ -28,10 +28,16 @@ Usage: $0 [OPTIONS]
 Deploy Verta application using Helm
 
 Required Environment Variables:
-    ADMIN_API_KEY       Admin API key for internal services
-    DATABASE_URL        TiDB connection string (mysql://user:pass@host:4000/db)
-    DISCORD_BOT_TOKEN   Discord bot token
-    OPENROUTER_API_KEY  OpenRouter API key
+    ADMIN_API_KEY              Admin API key for internal services
+    DATABASE_URL               TiDB connection string (mysql://user:pass@host:4000/db)
+    DISCORD_BOT_TOKEN          Discord bot token
+    OPENROUTER_API_KEY         OpenRouter API key
+    TEST_DISCORD_GUILD_ID      Test Discord guild ID
+    TEST_DISCORD_TENANT_NAME   Test Discord tenant name
+    TEST_DISCORD_TENANT_SLUG   Test Discord tenant slug
+
+Optional Environment Variables:
+    ADMIN_ALLOWED_IPS          Comma-separated IPs for admin ingress whitelist
 
 Options:
     -n, --namespace     Kubernetes namespace (default: default)
@@ -100,6 +106,9 @@ validate_env() {
     [[ -z "${DATABASE_URL:-}" ]] && missing+=("DATABASE_URL")
     [[ -z "${DISCORD_BOT_TOKEN:-}" ]] && missing+=("DISCORD_BOT_TOKEN")
     [[ -z "${OPENROUTER_API_KEY:-}" ]] && missing+=("OPENROUTER_API_KEY")
+    [[ -z "${TEST_DISCORD_GUILD_ID:-}" ]] && missing+=("TEST_DISCORD_GUILD_ID")
+    [[ -z "${TEST_DISCORD_TENANT_NAME:-}" ]] && missing+=("TEST_DISCORD_TENANT_NAME")
+    [[ -z "${TEST_DISCORD_TENANT_SLUG:-}" ]] && missing+=("TEST_DISCORD_TENANT_SLUG")
 
     if [[ ${#missing[@]} -ne 0 ]]; then
         echo -e "${RED}Error: Missing required environment variables:${NC}"
@@ -111,6 +120,9 @@ validate_env() {
         echo "  export DATABASE_URL='mysql://user:pass@host:4000/database'"
         echo "  export DISCORD_BOT_TOKEN='your-discord-token'"
         echo "  export OPENROUTER_API_KEY='your-openrouter-key'"
+        echo "  export TEST_DISCORD_GUILD_ID='your-guild-id'"
+        echo "  export TEST_DISCORD_TENANT_NAME='your-tenant-name'"
+        echo "  export TEST_DISCORD_TENANT_SLUG='your-tenant-slug'"
         exit 1
     fi
 }
@@ -150,6 +162,9 @@ deploy() {
         "--set" "secrets.databaseUrl=$DATABASE_URL"
         "--set" "secrets.discordBotToken=$DISCORD_BOT_TOKEN"
         "--set" "secrets.openrouterApiKey=$OPENROUTER_API_KEY"
+        "--set-string" "secrets.testDiscordGuildId=$TEST_DISCORD_GUILD_ID"
+        "--set" "secrets.testDiscordTenantName=$TEST_DISCORD_TENANT_NAME"
+        "--set" "secrets.testDiscordTenantSlug=$TEST_DISCORD_TENANT_SLUG"
     )
 
     # Add optional parameters
@@ -161,6 +176,11 @@ deploy() {
     if [[ -n "$DOMAIN" ]]; then
         helm_cmd+=("--set" "global.domain=$DOMAIN")
         echo "Domain: $DOMAIN"
+    fi
+
+    if [[ -n "${ADMIN_ALLOWED_IPS:-}" ]]; then
+        helm_cmd+=("--set" "adminIngress.allowedIPs=$ADMIN_ALLOWED_IPS")
+        echo "Admin IP whitelist: Configured"
     fi
 
     if [[ "$DRY_RUN" == true ]]; then
