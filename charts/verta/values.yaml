@@ -50,6 +50,7 @@ backend:
     REDIS_HOST: "{{ .Release.Name }}-redis"
     REDIS_PORT: "6379"
     ML_SERVICE_URL: "http://{{ .Release.Name }}-ml:8000"
+    FRONTEND_URL: "https://{{ .Values.global.domain }}"
   
   # Health check configuration
   livenessProbe:

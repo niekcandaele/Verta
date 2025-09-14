@@ -4,6 +4,7 @@ import { SearchApiRequest } from 'shared-types';
 import logger from '../utils/logger.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import type { KnowledgeBaseChunkRepository } from '../repositories/knowledgeBase/types.js';
+import { config } from '../config/env.js';
 
 export interface BotResponse {
   content: string;
@@ -456,7 +457,7 @@ ${sources.map(source => {
           source = {
             type: 'golden_answer',
             title: `Golden Answer: ${result.metadata?.question || 'FAQ'}`,
-            url: result.metadata?.id ? `http://localhost:3000/faq#${result.metadata.id}` : undefined,
+            url: result.metadata?.id ? `${config.FRONTEND_URL}/faq#${result.metadata.id}` : undefined,
             excerpt: result.content?.slice(0, 100),
             count: 1,
           };
