@@ -40,7 +40,7 @@ jobs:
               NEXT_PUBLIC_TENANT_SLUG=docker-build
           - name: ml-service
             context: ./python-ml-service
-            dockerfile: ./python-ml-service/Dockerfile
+            dockerfile: ./Dockerfile
             image: verta-ml-service
     
     steps:
