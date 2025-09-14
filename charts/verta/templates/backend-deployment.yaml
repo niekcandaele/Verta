@@ -41,7 +41,7 @@ spec:
         - name: migrations
           image: "{{ .Values.global.imageRegistry }}/{{ .Values.initContainers.migrations.image.repository }}:{{ .Values.initContainers.migrations.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.initContainers.migrations.image.pullPolicy }}
-          command: {{ .Values.initContainers.migrations.command }}
+          command: ["/bin/sh", "-c", "npm run migrate:latest"]
           env:
             - name: DATABASE_URL
               valueFrom:
@@ -50,8 +50,26 @@ spec:
                   key: database-url
             - name: NODE_ENV
               value: production
+            - name: ADMIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "verta.fullname" . }}
+                  key: admin-api-key
+            - name: DISCORD_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "verta.fullname" . }}
+                  key: discord-bot-token
+            - name: ML_SERVICE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "verta.fullname" . }}
+                  key: admin-api-key
           securityContext:
             {{- toYaml .Values.backend.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
       {{- end }}
       containers:
         - name: backend
@@ -110,6 +128,11 @@ spec:
                 secretKeyRef:
                   name: {{ include "verta.fullname" . }}
                   key: test-discord-tenant-slug
+            - name: ML_SERVICE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "verta.fullname" . }}
+                  key: admin-api-key
           volumeMounts:
             - name: tmp
               mountPath: /tmp

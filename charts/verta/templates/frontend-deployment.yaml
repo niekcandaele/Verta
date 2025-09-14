@@ -68,6 +68,8 @@ spec:
                 secretKeyRef:
                   name: {{ include "verta.fullname" . }}
                   key: test-discord-tenant-slug
+            - name: BACKEND_URL
+              value: "http://{{ include "verta.fullname" . }}-backend:{{ .Values.backend.service.port }}"
           volumeMounts:
             - name: tmp
               mountPath: /tmp
