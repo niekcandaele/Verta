@@ -32,11 +32,11 @@ const createApiClient = (): AxiosInstance => {
   // Determine API URL based on environment
   let apiUrl: string;
   if (isServer) {
-    // Server-side: always use internal Docker network hostname
-    apiUrl = 'http://app:25000';
+    // Server-side: use BACKEND_URL env var or fall back to internal Docker network hostname
+    apiUrl = process.env.BACKEND_URL || 'http://app:25000';
   } else {
     // Client-side: use environment variable or dynamically determine from window.location
-    apiUrl = process.env.NEXT_PUBLIC_API_URL || 
+    apiUrl = process.env.NEXT_PUBLIC_API_URL ||
              `http://${window.location.hostname}:25000`;
   }
 
