@@ -11,6 +11,7 @@
   "dependencies": {
     "@dicebear/collection": "^9.2.3",
     "@dicebear/core": "^9.2.3",
+    "@tailwindcss/typography": "^0.5.16",
     "axios": "^1.11.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.12",
