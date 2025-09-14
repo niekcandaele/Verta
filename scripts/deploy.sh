@@ -36,6 +36,9 @@ Required Environment Variables:
     TEST_DISCORD_TENANT_NAME   Test Discord tenant name
     TEST_DISCORD_TENANT_SLUG   Test Discord tenant slug
 
+Optional Environment Variables:
+    ADMIN_ALLOWED_IPS          Comma-separated IPs for admin ingress whitelist
+
 Options:
     -n, --namespace     Kubernetes namespace (default: default)
     -f, --values        Path to additional values file
@@ -173,6 +176,11 @@ deploy() {
     if [[ -n "$DOMAIN" ]]; then
         helm_cmd+=("--set" "global.domain=$DOMAIN")
         echo "Domain: $DOMAIN"
+    fi
+
+    if [[ -n "${ADMIN_ALLOWED_IPS:-}" ]]; then
+        helm_cmd+=("--set" "adminIngress.allowedIPs=$ADMIN_ALLOWED_IPS")
+        echo "Admin IP whitelist: Configured"
     fi
 
     if [[ "$DRY_RUN" == true ]]; then
