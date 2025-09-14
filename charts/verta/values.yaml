@@ -304,7 +304,11 @@ commonAnnotations: {}
 nodeSelector: {}
 
 # Tolerations for pod assignment
-tolerations: []
+tolerations:
+  - key: cloud.google.com/gke-preemptible
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
 
 # Affinity for pod assignment
 affinity: {}
