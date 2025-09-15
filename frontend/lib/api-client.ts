@@ -37,7 +37,7 @@ const createApiClient = (): AxiosInstance => {
   } else {
     // Client-side: use environment variable or dynamically determine from window.location
     apiUrl = process.env.NEXT_PUBLIC_API_URL ||
-             `http://${window.location.hostname}:25000`;
+             `${window.location.protocol}//${window.location.hostname}`;
   }
 
   // During build time, we might not have the tenant slug yet
