@@ -113,7 +113,7 @@ frontend:
   # Environment variables
   env:
     NODE_ENV: production
-    NEXT_PUBLIC_API_URL: "http://{{ .Values.global.domain }}/api"
+    NEXT_PUBLIC_API_URL: "https://{{ .Values.global.domain }}/api"
     # NEXT_PUBLIC_TENANT_SLUG will be set from secrets
   
   # Health check configuration
