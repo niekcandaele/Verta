@@ -87,6 +87,13 @@ backend:
     targetCPUUtilizationPercentage: 80
     targetMemoryUtilizationPercentage: 80
 
+  # Pod annotations for Keel auto-updates
+  podAnnotations:
+    keel.sh/policy: force
+    keel.sh/trigger: poll
+    keel.sh/match-tag: "true"
+    keel.sh/approvals: "0"
+
 # Frontend Service Configuration
 frontend:
   enabled: true
@@ -150,6 +157,13 @@ frontend:
     maxReplicas: 10
     targetCPUUtilizationPercentage: 80
 
+  # Pod annotations for Keel auto-updates
+  podAnnotations:
+    keel.sh/policy: force
+    keel.sh/trigger: poll
+    keel.sh/match-tag: "true"
+    keel.sh/approvals: "0"
+
 # ML Service Configuration
 ml:
   enabled: true
@@ -211,6 +225,13 @@ ml:
     readOnlyRootFilesystem: false  # ML service needs write for model cache
     runAsNonRoot: true
     runAsUser: 1000
+
+  # Pod annotations for Keel auto-updates
+  podAnnotations:
+    keel.sh/policy: force
+    keel.sh/trigger: poll
+    keel.sh/match-tag: "true"
+    keel.sh/approvals: "0"
 
 # Redis configuration
 redis:
