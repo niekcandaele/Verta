@@ -19,7 +19,7 @@ export function getTenantSlug(): string {
     // During build time, return a placeholder
     // The actual value will be checked when API calls are made
     console.warn('NEXT_PUBLIC_TENANT_SLUG not set, using placeholder');
-    return 'build-placeholder';
+    return 'takaro';
   }
   return slug;
 }

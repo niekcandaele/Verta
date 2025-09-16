@@ -42,7 +42,7 @@ const createApiClient = (): AxiosInstance => {
 
   // During build time, we might not have the tenant slug yet
   // Use a placeholder that will be replaced at runtime
-  const effectiveTenantSlug = tenantSlug || 'build-placeholder';
+  const effectiveTenantSlug = tenantSlug || 'takaro';
 
   const baseURL = `${apiUrl}/api/v1`;
   console.log('API Client Config:', { baseURL, tenantSlug: effectiveTenantSlug, isServer });
